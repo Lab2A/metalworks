@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }}, ${{ matrix.extras }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+        extras: ["bare", "all"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install (bare)
+        if: matrix.extras == 'bare'
+        run: uv pip install --system -e ".[dev]"
+      - name: Install (all extras)
+        if: matrix.extras == 'all'
+        run: uv pip install --system -e ".[all,dev]"
+      # Offline by default: pytest-socket blocks all network in CI tests.
+      - name: Test
+        run: pytest -q
+      - name: Console script smoke
+        run: metalworks version
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv pip install --system -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pyright

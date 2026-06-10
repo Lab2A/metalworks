@@ -1,0 +1,89 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metalworks"
+version = "0.0.1"
+description = "Open-source marketing research and Reddit engagement library — demand reports from real conversations, usable as a Python library, CLI, MCP server, or Claude Code plugin."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Lab2A (built by the Clique team)" }]
+keywords = ["reddit", "marketing", "research", "demand", "mcp", "agents", "claude"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+# Core stays lean: contract models, config, CLI shell. Zero LLM-provider deps —
+# providers are extras so users install only what matches the API key they have.
+dependencies = [
+  "pydantic>=2.7",
+  "httpx>=0.27",
+  "typing-extensions>=4.10",
+  "typer>=0.12",
+  "rich>=13.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/Lab2A/metalworks"
+Repository = "https://github.com/Lab2A/metalworks"
+
+[project.scripts]
+metalworks = "metalworks.cli:app"
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.50"]
+google = ["google-genai>=1.0"]
+litellm = ["litellm>=1.55,<2"]
+reddit = ["redditwarp>=1.3", "cryptography>=42"]
+arctic = ["duckdb>=1.1"]
+research = ["metalworks[arctic]", "rank-bm25>=0.2.2"]
+supabase = ["supabase>=2.6"]
+exa = ["exa-py>=1.0"]
+tavily = ["tavily-python>=0.5"]
+mcp = ["mcp[cli]>=1.2"]
+all = [
+  "metalworks[anthropic,openai,google,reddit,arctic,research,supabase,exa,tavily,mcp]",
+]
+dev = [
+  "pytest>=8",
+  "pytest-socket>=0.7",
+  "respx>=0.21",
+  "ruff>=0.8",
+  "pyright>=1.1.390",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metalworks"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",      # pycodestyle / pyflakes
+  "I",                # isort
+  "UP",               # pyupgrade
+  "B",                # bugbear
+  "SIM",              # simplify
+  "TID",              # tidy imports
+  "SLF",              # private member access (the hydration.py lesson)
+  "RUF",
+]
+
+[tool.pyright]
+include = ["src"]
+strict = ["src"]
+pythonVersion = "3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--disable-socket"
