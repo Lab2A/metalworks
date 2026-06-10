@@ -18,7 +18,7 @@ IN-style filters chunk at 200 ids (PostgREST URL-length constraint).
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from metalworks.contract import (
     DemandReport,
@@ -111,20 +111,35 @@ class SupabaseStores:
 
     # ── helpers ──
 
-    def _select_all(self, table: str, build: Any) -> list[dict[str, Any]]:
-        """Paginate to exhaustion. `build` receives a fresh query and adds
-        filters; called once per page because PostgREST builders are
-        single-use."""
+    def _select_all(
+        self,
+        table: str,
+        *,
+        eq: tuple[str, object] | None = None,
+        in_filter: tuple[str, Sequence[str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Paginate to exhaustion. A fresh query is built each page because
+        PostgREST builders are single-use. Filters are passed as data (not a
+        callable) so the whole path stays statically typed despite the
+        duck-typed client."""
         out: list[dict[str, Any]] = []
         offset = 0
         while True:
-            query = build(self._c.table(self._t[table]).select("payload"))
-            resp = query.range(offset, offset + _PAGE - 1).execute()
-            rows: list[dict[str, Any]] = resp.data or []
+            query: Any = self._c.table(self._t[table]).select("payload")
+            if eq is not None:
+                query = query.eq(eq[0], eq[1])
+            if in_filter is not None:
+                query = query.in_(in_filter[0], list(in_filter[1]))
+            resp: Any = query.range(offset, offset + _PAGE - 1).execute()
+            rows = cast("list[dict[str, Any]]", resp.data or [])
             out.extend(rows)
             if len(rows) < _PAGE:
                 return out
             offset += _PAGE
+
+    @staticmethod
+    def _rows(resp: Any) -> list[dict[str, Any]]:
+        return cast("list[dict[str, Any]]", resp.data or [])
 
     @staticmethod
     def _payload(row: dict[str, Any]) -> str:
@@ -152,7 +167,7 @@ class SupabaseStores:
         )
 
     def get_brief(self, brief_id: str) -> ResearchBrief | None:
-        rows = self._select_all("briefs", lambda q: q.eq("brief_id", brief_id))
+        rows = self._select_all("briefs", eq=("brief_id", brief_id))
         return ResearchBrief.model_validate_json(self._payload(rows[0])) if rows else None
 
     def list_briefs(self, *, workspace_id: str = "local", limit: int = 50) -> list[ResearchBrief]:
@@ -165,7 +180,7 @@ class SupabaseStores:
             .limit(limit)
             .execute()
         )
-        return [ResearchBrief.model_validate_json(self._payload(r)) for r in (resp.data or [])]
+        return [ResearchBrief.model_validate_json(self._payload(r)) for r in self._rows(resp)]
 
     # ── RunRepo ──
 
@@ -184,7 +199,7 @@ class SupabaseStores:
         )
 
     def get_run(self, report_id: str) -> RunSummary | None:
-        rows = self._select_all("runs", lambda q: q.eq("report_id", report_id))
+        rows = self._select_all("runs", eq=("report_id", report_id))
         return RunSummary.model_validate_json(self._payload(rows[0])) if rows else None
 
     def list_runs(self, *, brief_id: str | None = None, limit: int = 50) -> list[RunSummary]:
@@ -192,7 +207,7 @@ class SupabaseStores:
         if brief_id is not None:
             query = query.eq("brief_id", brief_id)
         resp = query.order("created_at", desc=True).limit(limit).execute()
-        return [RunSummary.model_validate_json(self._payload(r)) for r in (resp.data or [])]
+        return [RunSummary.model_validate_json(self._payload(r)) for r in self._rows(resp)]
 
     def save_report(self, report: DemandReport) -> None:
         self._upsert(
@@ -202,7 +217,7 @@ class SupabaseStores:
         )
 
     def get_report(self, report_id: str) -> DemandReport | None:
-        rows = self._select_all("reports", lambda q: q.eq("report_id", report_id))
+        rows = self._select_all("reports", eq=("report_id", report_id))
         return DemandReport.model_validate_json(self._payload(rows[0])) if rows else None
 
     # ── CorpusRepo ──
@@ -232,7 +247,7 @@ class SupabaseStores:
         out: list[RedditPost] = []
         for chunk in _chunks(post_ids):
             ids = list(chunk)
-            rows = self._select_all("posts", lambda q, ids=ids: q.in_("post_id", ids))
+            rows = self._select_all("posts", in_filter=("post_id", ids))
             out.extend(RedditPost.model_validate_json(self._payload(r)) for r in rows)
         return out
 
@@ -240,7 +255,7 @@ class SupabaseStores:
         out: list[RedditComment] = []
         for chunk in _chunks(post_ids):
             ids = list(chunk)
-            rows = self._select_all("comments", lambda q, ids=ids: q.in_("post_id", ids))
+            rows = self._select_all("comments", in_filter=("post_id", ids))
             out.extend(RedditComment.model_validate_json(self._payload(r)) for r in rows)
         return out
 
@@ -254,11 +269,11 @@ class SupabaseStores:
         )
 
     def get_account(self, username: str) -> StoredRedditAccount | None:
-        rows = self._select_all("accounts", lambda q: q.eq("username", username))
+        rows = self._select_all("accounts", eq=("username", username))
         return StoredRedditAccount.model_validate_json(self._payload(rows[0])) if rows else None
 
     def list_accounts(self) -> list[StoredRedditAccount]:
-        rows = self._select_all("accounts", lambda q: q)
+        rows = self._select_all("accounts")
         return [StoredRedditAccount.model_validate_json(self._payload(r)) for r in rows]
 
     def delete_account(self, username: str) -> None:
@@ -298,10 +313,10 @@ class SupabaseStores:
         if status is not None:
             query = query.eq("status", status)
         resp = query.limit(limit).execute()
-        return [Opportunity.model_validate_json(self._payload(r)) for r in (resp.data or [])]
+        return [Opportunity.model_validate_json(self._payload(r)) for r in self._rows(resp)]
 
     def update_opportunity_status(self, opportunity_id: str, status: OpportunityStatus) -> None:
-        rows = self._select_all("opportunities", lambda q: q.eq("opportunity_id", opportunity_id))
+        rows = self._select_all("opportunities", eq=("opportunity_id", opportunity_id))
         if not rows:
             return
         opp = Opportunity.model_validate_json(self._payload(rows[0])).model_copy(
@@ -332,10 +347,10 @@ class SupabaseStores:
         if unread_only:
             query = query.eq("read", False)
         resp = query.limit(limit).execute()
-        return [InboxItem.model_validate_json(self._payload(r)) for r in (resp.data or [])]
+        return [InboxItem.model_validate_json(self._payload(r)) for r in self._rows(resp)]
 
     def mark_inbox_read(self, message_id: str) -> None:
-        rows = self._select_all("inbox", lambda q: q.eq("message_id", message_id))
+        rows = self._select_all("inbox", eq=("message_id", message_id))
         if not rows:
             return
         item = InboxItem.model_validate_json(self._payload(rows[0])).model_copy(

@@ -79,5 +79,5 @@ class _StubClient:
 
 def test_select_all_paginates_to_exhaustion() -> None:
     store = SupabaseStores(client=_StubClient(2345))
-    rows = store._select_all("comments", lambda q: q)  # noqa: SLF001
+    rows = store._select_all("comments")  # noqa: SLF001
     assert len(rows) == 2345, "pagination stopped early — the max-rows truncation bug"
