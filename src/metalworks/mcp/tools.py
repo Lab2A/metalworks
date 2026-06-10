@@ -1,0 +1,568 @@
+"""MCP tool bodies as plain, unit-testable functions.
+
+Each public function here is the *body* of one MCP tool; the FastMCP server in
+:mod:`metalworks.mcp.server` registers a thin async wrapper around each. Keeping
+the bodies plain means they're testable on a bare install with no ``mcp`` SDK.
+
+Error contract: every body returns either its success payload or an error
+*envelope* (``{error_code, message, fix, docs_url}``). The :func:`guard`
+decorator turns any raised exception — typed or not — into that envelope, so a
+host model never sees a raw traceback. Tier-2 bodies that need a credential
+surface a :class:`~metalworks.errors.MissingKeyError` envelope naming the env
+var and extra.
+
+The posting tool is the security boundary. ``reddit_post_comment`` requires a
+``confirm_token`` that only :func:`compliance_lint` emits, over the *exact* text,
+and the env flag ``METALWORKS_ALLOW_POSTING=1`` — so a model cannot post without
+a prior passing compliance check on the identical text plus an operator opt-in.
+"""
+
+from __future__ import annotations
+
+import functools
+import hashlib
+import hmac
+import os
+import uuid
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from metalworks.errors import MetalworksError, MissingKeyError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+ToolResult = dict[str, Any]
+F = TypeVar("F", bound="Callable[..., ToolResult]")
+
+_DOCS_BASE = "https://github.com/Lab2A/metalworks"
+
+# Default caps for the zero-key Arctic pull tool — bounded so a Tier-1 caller
+# can't trigger an unbounded network read.
+_ARCTIC_DEFAULT_MONTHS = 1
+_ARCTIC_MAX_MONTHS = 3
+_ARCTIC_DEFAULT_LIMIT = 200
+_ARCTIC_MAX_LIMIT = 1000
+
+
+def _unexpected_envelope(exc: Exception) -> ToolResult:
+    return {
+        "error_code": "internal_error",
+        "message": f"{type(exc).__name__}: {str(exc)[:300]}",
+        "fix": "Retry; if this persists, file an issue with the message above.",
+        "docs_url": _DOCS_BASE,
+    }
+
+
+def guard(fn: F) -> F:
+    """Wrap a tool body so any exception becomes an error envelope.
+
+    Typed :class:`MetalworksError` carries its own actionable envelope; anything
+    else is normalized into an ``internal_error`` envelope.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> ToolResult:
+        try:
+            return fn(*args, **kwargs)
+        except MetalworksError as exc:
+            return {"error": exc.envelope()}
+        except Exception as exc:
+            return {"error": _unexpected_envelope(exc)}
+
+    return wrapper  # type: ignore[return-value]
+
+
+# ── Confirm-token (the posting gate) ────────────────────────────────────────
+
+
+# Per-process HMAC key for confirm tokens, lazily initialized. Stable within a
+# process so a token emitted by ``compliance_lint`` verifies in a later
+# ``reddit_post_comment`` call against the *same* server; a per-process random
+# key (not a fixed constant) means tokens don't survive a restart, which is the
+# safe default.
+_confirm_key: bytes | None = None
+
+
+def _confirm_secret() -> bytes:
+    global _confirm_key
+    if _confirm_key is None:
+        _confirm_key = os.urandom(32)
+    return _confirm_key
+
+
+def _confirm_token_for(text: str) -> str:
+    digest = hmac.new(_confirm_secret(), text.encode("utf-8"), hashlib.sha256)
+    return digest.hexdigest()
+
+
+def _confirm_token_valid(text: str, token: str) -> bool:
+    return hmac.compare_digest(_confirm_token_for(text), token or "")
+
+
+# ── Tier 1 — zero-key ───────────────────────────────────────────────────────
+
+
+@guard
+def compliance_lint(text: str, subreddit_rules: list[str] | None = None) -> ToolResult:
+    """TIER 1. Deterministic, fully-offline compliance check on reply text.
+
+    Returns the verdict plus, when it passes, a ``confirm_token`` over this exact
+    text — the only way to later authorize ``reddit_post_comment`` on it.
+    """
+    from metalworks.reddit import heuristic_check
+
+    verdict = heuristic_check(text, subreddit_rules)
+    payload: ToolResult = {
+        "pass": verdict.pass_,
+        "violations": list(verdict.violations),
+        "confidence": verdict.confidence,
+    }
+    if verdict.pass_:
+        payload["confirm_token"] = _confirm_token_for(text)
+    return payload
+
+
+@guard
+def reddit_search_posts(
+    query: str,
+    *,
+    subreddit: str | None = None,
+    limit: int = 15,
+) -> ToolResult:
+    """TIER 1. Search public Reddit submissions → list of posts. Needs the
+    ``[reddit]`` extra (no API key)."""
+    from metalworks.reddit import RedditSearch
+
+    posts = RedditSearch().search_posts(query, subreddit=subreddit, limit=limit)
+    return {"posts": [p.model_dump(mode="json") for p in posts]}
+
+
+@guard
+def reddit_get_post_comments(url: str, *, limit: int = 10) -> ToolResult:
+    """TIER 1. Top-level comments for a public post URL. Needs ``[reddit]``."""
+    from metalworks.reddit import RedditSearch
+
+    comments = RedditSearch().get_post_comments(url, limit=limit)
+    return {"comments": [c.model_dump(mode="json") for c in comments]}
+
+
+@guard
+def reddit_subreddit_info(name: str) -> ToolResult:
+    """TIER 1. Community intel (description, rules, top titles). Needs ``[reddit]``."""
+    from metalworks.reddit import fetch_subreddit_intel
+
+    return {"intel": fetch_subreddit_intel(name).model_dump(mode="json")}
+
+
+@guard
+def reddit_subreddit_rules(name: str) -> ToolResult:
+    """TIER 1. The subreddit's posting rules → list of strings. Needs ``[reddit]``."""
+    from metalworks.reddit import RedditSearch
+
+    return {"rules": RedditSearch().get_subreddit_rules(name)}
+
+
+@guard
+def arctic_list_months(content_type: str = "submissions") -> ToolResult:
+    """TIER 1. The latest available month in the Arctic corpus. Needs ``[arctic]``."""
+    from metalworks.research.arctic import ArcticReader
+
+    reader = ArcticReader(probe_sleep_s=0.0)
+    try:
+        latest = reader.latest_available_month(content_type)
+        return {"latest_available_month": str(latest), "content_type": content_type}
+    finally:
+        reader.close()
+
+
+@guard
+def arctic_pull_threads(
+    subreddit: str,
+    *,
+    months: int = _ARCTIC_DEFAULT_MONTHS,
+    limit: int = _ARCTIC_DEFAULT_LIMIT,
+) -> ToolResult:
+    """TIER 1. Pull submissions for one subreddit from the Arctic corpus.
+
+    Scoped: ``months`` is capped at 3 (default 1) and ``limit`` at 1000 (default
+    200) so a Tier-1 caller can't kick off an unbounded archive read. Needs
+    ``[arctic]``.
+    """
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.types import months_back
+
+    months = max(1, min(int(months), _ARCTIC_MAX_MONTHS))
+    limit = max(1, min(int(limit), _ARCTIC_MAX_LIMIT))
+    sub = subreddit.strip().lstrip("r/").lstrip("/")
+
+    reader = ArcticReader(probe_sleep_s=0.0)
+    try:
+        window = months_back(months, anchor=reader.latest_available_month("submissions"))
+        rows = list(
+            reader.pull_subreddit(
+                subreddit=sub,
+                content_type="submissions",
+                months=window,
+                select_cols=["id", "title", "selftext", "subreddit", "score", "num_comments"],
+                limit=limit,
+            )
+        )
+        return {
+            "subreddit": sub,
+            "months": [str(m) for m in window],
+            "count": len(rows),
+            "threads": rows,
+        }
+    finally:
+        reader.close()
+
+
+@guard
+def corpus_stats(store_path: str | None = None) -> ToolResult:
+    """TIER 1. Counts of persisted runs and reports in the local store (offline)."""
+    from metalworks import config
+
+    store = config.default_store(store_path)
+    runs = store.list_runs(limit=10_000)
+    return {
+        "total_runs": len(runs),
+        "complete_runs": sum(1 for r in runs if r.status == "complete"),
+        "failed_runs": sum(1 for r in runs if r.status == "failed"),
+        "in_flight_runs": sum(
+            1 for r in runs if r.status not in ("complete", "failed", "compile_failed")
+        ),
+    }
+
+
+@guard
+def research_list_runs(store_path: str | None = None, *, limit: int = 50) -> ToolResult:
+    """TIER 1. List runs (including in-flight) from the local store."""
+    from metalworks import config
+
+    store = config.default_store(store_path)
+    runs = store.list_runs(limit=limit)
+    return {"runs": [r.model_dump(mode="json") for r in runs]}
+
+
+@guard
+def research_get_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 1. Fetch a finished report from the local store by id."""
+    from metalworks import config
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    return {"report": report.model_dump(mode="json")}
+
+
+# ── Tier 2 — key-gated ──────────────────────────────────────────────────────
+
+
+def _build_deps(store_path: str | None) -> Any:
+    """Assemble ResearchDeps from the environment. Raises MissingKeyError when a
+    required provider key is absent (the envelope names the key + extra)."""
+    from metalworks import config
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = config.resolve_chat()
+    embeddings = config.resolve_embeddings()
+    store = config.default_store(store_path)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    return ResearchDeps(
+        chat=chat,
+        embeddings=embeddings,
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+
+
+@guard
+def research_plan_brief(prompt: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Walk the D1-D8 planner with default answers and return
+    an assembled ResearchBrief for this prompt. Needs a chat-model key."""
+    from metalworks import config
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.planner import QUESTIONS, BriefState, assemble_brief, provide_content
+
+    chat = config.resolve_chat()
+    store = config.default_store(store_path)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    state = BriefState(brief_id=str(uuid.uuid4()), prompt=prompt)
+    for spec in QUESTIONS:
+        brief = provide_content(
+            deps, question_spec=spec, prompt=prompt, prior_answers=dict(state.answers)
+        )
+        recommended = next(
+            (i for i, o in enumerate(brief.options) if o.is_recommended), 0 if brief.options else -1
+        )
+        labels = [brief.options[recommended].label] if recommended >= 0 else []
+        state.answers[spec.decision_id] = {
+            "option_indices": [recommended] if recommended >= 0 else [],
+            "custom_text": "",
+            "selected_labels": labels,
+        }
+    research_brief = assemble_brief(deps, state=state)
+    return {"brief": research_brief.model_dump(mode="json")}
+
+
+@guard
+def research_start(
+    brief: dict[str, Any],
+    *,
+    months: int | None = None,
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Start the pipeline as a background job and
+    return a ``run_id`` immediately. Poll with ``research_status`` /
+    ``research_result``. The pipeline takes minutes, so it never runs inline."""
+    from metalworks.contract import ResearchBrief
+    from metalworks.mcp.jobs import start_research_job
+
+    research_brief = ResearchBrief.model_validate(brief)
+    if months is not None:
+        research_brief = research_brief.model_copy(update={"time_window_months": int(months)})
+    deps = _build_deps(store_path)
+    run_id = str(uuid.uuid4())
+    start_research_job(run_id=run_id, deps=deps, brief=research_brief, runs=deps.corpus)
+    return {"run_id": run_id, "status": "queued"}
+
+
+@guard
+def research_status(run_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2. Status of a background research job."""
+    from metalworks import config
+
+    store = config.default_store(store_path)
+    run = store.get_run(run_id)
+    if run is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No run with id {run_id!r}.",
+                "fix": "Use the run_id returned by research_start.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    return {"run": run.model_dump(mode="json")}
+
+
+@guard
+def research_result(run_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2. The finished report for a completed job, or a status payload while
+    it's still running."""
+    from metalworks import config
+
+    store = config.default_store(store_path)
+    report = store.get_report(run_id)
+    if report is not None:
+        return {"report": report.model_dump(mode="json")}
+    run = store.get_run(run_id)
+    status = run.status if run is not None else "not_found"
+    return {"ready": False, "status": status}
+
+
+@guard
+def generate_reply(thread_url: str, *, voice: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Draft a Reddit reply for a thread and run it through
+    the deterministic compliance gate. Returns the draft, the verdict, and — when
+    it passes — a ``confirm_token`` usable with ``reddit_post_comment``."""
+    from metalworks import config
+    from metalworks.reddit import RedditSearch, heuristic_check
+
+    chat = config.resolve_chat()
+    post = RedditSearch().get_post(thread_url)
+    if post is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"Could not fetch a post from {thread_url!r}.",
+                "fix": "Pass a full Reddit thread URL (https://reddit.com/r/.../comments/...).",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    system = (
+        "You write authentic, disclosed, genuinely-helpful Reddit replies. No marketing voice, "
+        "no AI tells, no em-dashes, no calls to action. Be specific and human."
+        + (f" Voice: {voice}." if voice else "")
+    )
+    user = f"Thread title: {post.title}\n\nThread body:\n{post.selftext}\n\nWrite a helpful reply."
+    draft = chat.complete_text(system=system, user=user).text
+    verdict = heuristic_check(draft)
+    payload: ToolResult = {
+        "draft": draft,
+        "compliance": {
+            "pass": verdict.pass_,
+            "violations": list(verdict.violations),
+            "confidence": verdict.confidence,
+        },
+    }
+    if verdict.pass_:
+        payload["confirm_token"] = _confirm_token_for(draft)
+    return payload
+
+
+@guard
+def reddit_post_comment(
+    url: str,
+    text: str,
+    confirm_token: str,
+    *,
+    username: str | None = None,
+) -> ToolResult:
+    """TIER 2 — THE SECURITY BOUNDARY. Post a reply to a public Reddit thread.
+
+    Triple-gated:
+    1. ``METALWORKS_ALLOW_POSTING=1`` must be set (operator opt-in).
+    2. ``confirm_token`` must be the token a prior ``compliance_lint`` /
+       ``generate_reply`` pass emitted over this *exact* text (proof the text
+       cleared the deterministic gate unchanged).
+    3. A re-run of the compliance gate must still pass (defense in depth).
+
+    Needs ``[reddit]`` plus ``REDDIT_CLIENT_ID`` / ``REDDIT_CLIENT_SECRET`` and a
+    connected account (``metalworks reddit auth login``).
+    """
+    from metalworks.reddit import heuristic_check
+
+    if os.environ.get("METALWORKS_ALLOW_POSTING") != "1":
+        raise MissingKeyError(
+            "METALWORKS_ALLOW_POSTING=1", provider="posting (disabled by default)"
+        )
+
+    if not _confirm_token_valid(text, confirm_token):
+        return {
+            "error": {
+                "error_code": "confirm_token_invalid",
+                "message": "confirm_token does not match this exact text.",
+                "fix": "Call compliance_lint on the exact text first and pass its confirm_token.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+
+    verdict = heuristic_check(text)
+    if not verdict.pass_:
+        return {
+            "error": {
+                "error_code": "compliance_block",
+                "message": f"Compliance gate blocked this text: {list(verdict.violations)}",
+                "fix": "Revise the text until compliance_lint passes, then re-confirm.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+
+    return _do_post(url=url, text=text, username=username)
+
+
+@guard
+def discovery_run(
+    queries: list[str],
+    *,
+    subreddits: list[str] | None = None,
+    max_opportunities: int = 10,
+    voice: str | None = None,
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat key). Run the discovery loop over `queries`: search Reddit,
+    filter for intent, draft replies, and gate each through the compliance check.
+
+    Returns draft opportunities only — discovery NEVER posts. Posting is a
+    separate, explicitly-confirmed `reddit_post_comment` call. Needs a chat-model
+    key and the `[reddit]` extra.
+    """
+    from metalworks import config
+    from metalworks.contract import DiscoveryContext
+    from metalworks.discovery import DiscoveryDeps, run_discovery
+    from metalworks.reddit import RedditSearch
+
+    chat = config.resolve_chat()
+    store = config.default_store(store_path)
+    context = DiscoveryContext(voice_guidelines=[voice] if voice else [])
+    deps = DiscoveryDeps(
+        chat=chat,
+        search=RedditSearch(),
+        opportunities=store,
+        context=context,
+    )
+    opportunities = run_discovery(
+        deps,
+        queries=queries,
+        subreddits=subreddits,
+        max_opportunities=max_opportunities,
+    )
+    return {"opportunities": [o.model_dump(mode="json") for o in opportunities]}
+
+
+def _do_post(*, url: str, text: str, username: str | None) -> ToolResult:
+    """Resolve a connected account and post via RedditOAuth. Factored out so the
+    gate logic above stays readable."""
+    from metalworks import config
+    from metalworks.reddit import RedditOAuth
+    from metalworks.stores import TokenCipher
+
+    store = config.default_store(None)
+    accounts = store.list_accounts()
+    if not accounts:
+        return {
+            "error": {
+                "error_code": "reauth_required",
+                "message": "No connected Reddit account.",
+                "fix": "Run: metalworks reddit auth login",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    target = username or accounts[0].username
+    oauth = RedditOAuth(accounts=store, cipher=TokenCipher())
+    try:
+        result = oauth.post_comment(username=target, post_url=url, text=text)
+    finally:
+        oauth.close()
+    if not result.success:
+        return {
+            "error": {
+                "error_code": "reddit_error",
+                "message": result.error or "Post failed.",
+                "fix": "Check the account's auth and that the thread still accepts comments.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    return {
+        "posted": True,
+        "comment_id": result.comment_id,
+        "comment_url": result.comment_url,
+        "username": result.username,
+    }
+
+
+__all__ = [
+    "arctic_list_months",
+    "arctic_pull_threads",
+    "compliance_lint",
+    "corpus_stats",
+    "discovery_run",
+    "generate_reply",
+    "guard",
+    "reddit_get_post_comments",
+    "reddit_post_comment",
+    "reddit_search_posts",
+    "reddit_subreddit_info",
+    "reddit_subreddit_rules",
+    "research_get_report",
+    "research_list_runs",
+    "research_plan_brief",
+    "research_result",
+    "research_start",
+    "research_status",
+]

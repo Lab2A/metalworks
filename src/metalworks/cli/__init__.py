@@ -1,29 +1,730 @@
-"""metalworks CLI entry point.
+"""metalworks CLI — the ``metalworks`` console script.
 
-typer + rich are core dependencies by design: a CLI-first tool whose console
-script can crash with ModuleNotFoundError at first touch is fighting its own
-product. Subcommands (research, reddit, arctic, discovery, mcp) land in M5.
+typer + rich are core dependencies by design: a CLI-first tool whose entry
+point can crash with ModuleNotFoundError on first touch is fighting its own
+product. Everything heavier (provider SDKs, duckdb, redditwarp, mcp) is
+lazy-imported inside the command that needs it, so ``metalworks --help`` and
+``metalworks version`` work on a bare install with no extras.
+
+Sub-apps: ``research``, ``reddit``, ``arctic``, ``config``, plus ``mcp serve``.
+Secrets come from the environment only; every Reddit write goes through the
+deterministic compliance gate and requires an explicit ``--yes``.
 """
 
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated
+
 import typer
+from rich.console import Console
+from rich.table import Table
 
 import metalworks
+from metalworks import config
+
+if TYPE_CHECKING:
+    from metalworks.llm import ChatModel
 
 app = typer.Typer(
     name="metalworks",
     help="Marketing research and Reddit engagement toolkit.",
     no_args_is_help=True,
 )
+console = Console()
+err_console = Console(stderr=True)
+
+# Sub-apps registered at the bottom of the module.
+research_app = typer.Typer(help="Plan and run demand-research reports.", no_args_is_help=True)
+reddit_app = typer.Typer(help="Search Reddit, fetch intel, post (gated).", no_args_is_help=True)
+arctic_app = typer.Typer(help="Read the Arctic Shift historical corpus.", no_args_is_help=True)
+config_app = typer.Typer(help="Read and write non-secret config.", no_args_is_help=True)
+mcp_app = typer.Typer(help="Run the metalworks MCP server.", no_args_is_help=True)
+
+_ENV_EXAMPLE = """\
+# metalworks — secrets come from the environment ONLY (never the config file).
+# Set the key(s) for the provider you want; the CLI auto-resolves by which is present.
+
+# Chat model (first present wins: anthropic > openai > google):
+# ANTHROPIC_API_KEY=
+# OPENAI_API_KEY=
+# GOOGLE_API_KEY=          # or GEMINI_API_KEY
+
+# External web search (optional; exa preferred, then tavily):
+# EXA_API_KEY=
+# TAVILY_API_KEY=
+
+# Reddit posting (optional; only needed for the engagement path):
+# REDDIT_CLIENT_ID=
+# REDDIT_CLIENT_SECRET=
+# METALWORKS_FERNET_KEY=   # token-at-rest encryption key
+"""
+
+
+# ── Top-level commands ──────────────────────────────────────────────────────
 
 
 @app.command()
 def version() -> None:
     """Print the installed metalworks version."""
-    typer.echo(f"metalworks {metalworks.__version__}")
+    console.print(f"metalworks {metalworks.__version__}")
 
 
 @app.command()
 def doctor() -> None:
-    """Check installed extras, keys, and data-source reachability."""
-    typer.echo(f"metalworks {metalworks.__version__} (pre-release scaffold)")
-    typer.echo("doctor: full checks land with the first vertical (M2).")
+    """Report installed extras, configured keys, store path, and Reddit auth."""
+    console.print(f"[bold]metalworks {metalworks.__version__}[/bold]")
+
+    console.print("\n[bold]Optional extras[/bold]")
+    for extra, module in _EXTRA_PROBES:
+        present = _module_available(module)
+        mark = "[green]installed[/green]" if present else "[dim]not installed[/dim]"
+        console.print(f"  {extra:<10} {mark}")
+
+    console.print("\n[bold]API keys (from environment)[/bold]")
+    for label, env_vars in _KEY_PROBES:
+        found = next((v for v in env_vars if os.environ.get(v)), None)
+        status = f"[green]set[/green] ({found})" if found else "[dim]unset[/dim]"
+        console.print(f"  {label:<14} {status}")
+
+    store_path = config.setting("store") or str(Path.home() / ".metalworks" / "store.db")
+    console.print("\n[bold]Store[/bold]")
+    console.print(f"  path  {store_path}")
+
+    console.print("\n[bold]Reddit auth[/bold]")
+    try:
+        store = config.default_store()
+        accounts = store.list_accounts()
+        if accounts:
+            console.print(
+                f"  [green]{len(accounts)} account(s)[/green]: "
+                + ", ".join(a.username for a in accounts)
+            )
+        else:
+            console.print("  [dim]no connected accounts[/dim] (run: metalworks reddit auth login)")
+    except Exception as exc:
+        console.print(f"  [yellow]could not read store: {exc}[/yellow]")
+
+
+@app.command()
+def init() -> None:
+    """Scaffold a metalworks.toml and a .env.example in the current directory."""
+    cfg_path = config.default_config_path()
+    if cfg_path.exists():
+        console.print(f"[yellow]{cfg_path.name} already exists; leaving it untouched.[/yellow]")
+    else:
+        config.save_config({"provider": "anthropic", "store": "~/.metalworks/store.db"})
+        console.print(f"[green]Wrote[/green] {cfg_path}")
+
+    env_path = Path.cwd() / ".env.example"
+    if env_path.exists():
+        console.print("[yellow].env.example already exists; leaving it untouched.[/yellow]")
+    else:
+        env_path.write_text(_ENV_EXAMPLE, encoding="utf-8")
+        console.print(f"[green]Wrote[/green] {env_path}")
+    console.print("\nNext: set a provider key in your shell, then `metalworks doctor`.")
+
+
+@app.command()
+def quickstart() -> None:
+    """Run an OFFLINE demo report (zero keys, zero network) over a local corpus."""
+    if not _module_available("duckdb"):
+        console.print(
+            "[yellow]quickstart needs the [arctic] extra (duckdb) for the local corpus.[/yellow]\n"
+            'Install it with: pip install "metalworks[arctic]"'
+        )
+        raise typer.Exit(code=0)
+
+    import tempfile
+
+    from metalworks.cli._demo import DEMO_SUBREDDIT, write_demo_corpus
+    from metalworks.contract import ResearchBrief, TargetSubreddit, TriageThresholds
+    from metalworks.embeddings import FakeEmbedding
+    from metalworks.llm import FakeChatModel
+    from metalworks.research import ResearchDeps, run_research
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.stores import MemoryStores
+
+    console.print("[bold]metalworks quickstart[/bold] — offline demo (Fake models, local corpus)\n")
+
+    with tempfile.TemporaryDirectory(prefix="metalworks-demo-") as tmp:
+        root = write_demo_corpus(Path(tmp))
+        reader = ArcticReader(data_root=str(root), probe_sleep_s=0.0)
+        store = MemoryStores()
+
+        # An unscripted FakeChatModel is enough: the subreddit picker and
+        # planner both catch and fall back on a missing scripted response, and
+        # with no comment source the synthesis stage takes its deterministic
+        # empty-corpus path (slot plan + verdict are computed, not LLM'd).
+        chat = FakeChatModel()
+
+        deps = ResearchDeps(chat=chat, embeddings=FakeEmbedding(), corpus=store, reader=reader)
+        brief = ResearchBrief(
+            brief_id="demo-brief",
+            question="Is there demand for an affordable jitter-free focus supplement?",
+            decision_context="Validating a v0 before committing to manufacturing.",
+            success_criteria=["Surfaces what consumers actually say in their own words"],
+            must_address=["What price point does the audience accept?"],
+            target_subreddits=[
+                TargetSubreddit(name=DEMO_SUBREDDIT, rationale="Highest-intent demo community.")
+            ],
+            web_research_directions=["Competitive landscape and pricing"],
+            time_window_months=1,
+            relevance_rubric="Threads expressing a want, complaint, or price signal about "
+            "focus supplements.",
+            triage_thresholds=TriageThresholds(),
+        )
+        try:
+            report = run_research(deps, brief=brief)
+        finally:
+            reader.close()
+
+    _print_report(report)
+    console.print(
+        "\n[dim]This ran with Fake models on a local Parquet corpus — no keys, no network. "
+        "Add a provider key and run `metalworks research run` for the real pipeline.[/dim]"
+    )
+
+
+# ── config sub-app ──────────────────────────────────────────────────────────
+
+
+@config_app.command("list")
+def config_list() -> None:
+    """Print the merged non-secret config (cwd over ~/.config/metalworks/)."""
+    cfg = config.load_config()
+    if not cfg:
+        console.print("[dim]No config set. Run `metalworks init` to scaffold one.[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("key")
+    table.add_column("value")
+    for key, value in sorted(cfg.items()):
+        table.add_row(key, str(value))
+    console.print(table)
+
+
+@config_app.command("get")
+def config_get(key: str) -> None:
+    """Print one config value (env/arg precedence not applied — file only)."""
+    value = config.load_config().get(key)
+    if value is None:
+        err_console.print(f"[yellow]{key} is not set.[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(str(value))
+
+
+@config_app.command("set")
+def config_set(key: str, value: str) -> None:
+    """Set one non-secret config value in the cwd metalworks.toml."""
+    if key in _SECRET_KEYS:
+        err_console.print(
+            f"[red]{key} is a secret and must come from the environment, not the config file.[/red]"
+        )
+        raise typer.Exit(code=1)
+    cfg = config.load_config()
+    cfg[key] = value
+    path = config.save_config(cfg)
+    console.print(f"[green]Set[/green] {key} = {value} [dim]({path})[/dim]")
+
+
+# ── research sub-app ────────────────────────────────────────────────────────
+
+
+@research_app.command("plan")
+def research_plan(
+    prompt: str,
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the brief.")] = Path(
+        "brief.json"
+    ),
+) -> None:
+    """Walk the D1-D8 planner over a prompt and write a brief.json.
+
+    Uses the configured chat model (auto-resolved from env) to draft each turn;
+    the recommended option is auto-selected so this is non-interactive. Edit the
+    emitted brief.json before `research run` if you want different answers.
+    """
+    import uuid
+
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.planner import (
+        QUESTIONS,
+        BriefState,
+        assemble_brief,
+        provide_content,
+    )
+
+    chat = _resolve_chat_or_exit()
+    embeddings = config.resolve_embeddings()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(chat=chat, embeddings=embeddings, corpus=store, reader=reader)
+
+    state = BriefState(brief_id=str(uuid.uuid4()), prompt=prompt)
+    for spec in QUESTIONS:
+        brief_turn = provide_content(
+            deps, question_spec=spec, prompt=prompt, prior_answers=dict(state.answers)
+        )
+        rec = next((i for i, o in enumerate(brief_turn.options) if o.is_recommended), 0)
+        labels = [brief_turn.options[rec].label] if brief_turn.options else []
+        state.answers[spec.decision_id] = {
+            "option_indices": [rec] if brief_turn.options else [],
+            "custom_text": "",
+            "selected_labels": labels,
+        }
+        console.print(f"  [dim]{spec.header_chip}[/dim] -> {labels[0] if labels else '(none)'}")
+
+    research_brief = assemble_brief(deps, state=state)
+    out.write_text(research_brief.model_dump_json(indent=2), encoding="utf-8")
+    console.print(f"\n[green]Wrote brief[/green] {out}")
+
+
+@research_app.command("run")
+def research_run(
+    brief: Annotated[Path, typer.Option("--brief", help="Path to a brief.json.")],
+    months: Annotated[
+        int | None, typer.Option("--months", help="Override the time window.")
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
+    ] = None,
+) -> None:
+    """Run the research pipeline against a brief.json and print/save the report."""
+    from metalworks.contract import ResearchBrief
+    from metalworks.research import run_research
+    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+    from metalworks.research.deps import ResearchDeps
+
+    if not brief.is_file():
+        err_console.print(f"[red]No such brief file: {brief}[/red]")
+        raise typer.Exit(code=1)
+    research_brief = ResearchBrief.model_validate_json(brief.read_text(encoding="utf-8"))
+    if months is not None:
+        research_brief = research_brief.model_copy(update={"time_window_months": months})
+
+    chat = _resolve_chat_or_exit()
+    embeddings = config.resolve_embeddings()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=embeddings,
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+        comments=ArcticShiftApiClient(),
+    )
+    console.print(f"[bold]Running research[/bold] for: {research_brief.question}")
+    try:
+        report = run_research(deps, brief=research_brief)
+    finally:
+        reader.close()
+
+    store.save_report(report)
+    if out is not None:
+        out.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote report[/green] {out}")
+    _print_report(report)
+
+
+# ── reddit sub-app ──────────────────────────────────────────────────────────
+
+
+@reddit_app.command("search")
+def reddit_search(
+    query: str,
+    subreddit: Annotated[str | None, typer.Option("--subreddit", help="Restrict to r/X.")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Max results.")] = 15,
+) -> None:
+    """Search public Reddit submissions ([reddit] extra, no key needed)."""
+    from metalworks.reddit import RedditSearch
+
+    posts = RedditSearch().search_posts(query, subreddit=subreddit, limit=limit)
+    if not posts:
+        console.print("[dim]No results.[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("score", justify="right")
+    table.add_column("subreddit")
+    table.add_column("title")
+    for p in posts:
+        table.add_row(str(p.score), p.subreddit, p.title)
+    console.print(table)
+
+
+subreddit_app = typer.Typer(help="Per-subreddit intel and rules.", no_args_is_help=True)
+auth_app = typer.Typer(help="Connect a Reddit account (OAuth).", no_args_is_help=True)
+
+
+@subreddit_app.command("info")
+def subreddit_info(name: str) -> None:
+    """Fetch a subreddit's intel (description, subscribers, top titles, rules)."""
+    from metalworks.reddit import fetch_subreddit_intel
+
+    intel = fetch_subreddit_intel(name)
+    console.print(f"[bold]r/{intel.name}[/bold]")
+    if intel.subscribers is not None:
+        console.print(f"  subscribers: {intel.subscribers:,}")
+    if intel.description:
+        console.print(f"  {intel.description}")
+    if intel.rules:
+        console.print("  [bold]rules:[/bold]")
+        for rule in intel.rules:
+            console.print(f"    - {rule}")
+
+
+@subreddit_app.command("rules")
+def subreddit_rules(name: str) -> None:
+    """List a subreddit's posting rules."""
+    from metalworks.reddit import RedditSearch
+
+    rules = RedditSearch().get_subreddit_rules(name)
+    if not rules:
+        console.print("[dim]No rules found.[/dim]")
+        return
+    for rule in rules:
+        console.print(f"- {rule}")
+
+
+@auth_app.command("login")
+def auth_login(
+    redirect_uri: Annotated[
+        str, typer.Option("--redirect-uri", help="Registered redirect URI.")
+    ] = "http://localhost:8765/callback",
+) -> None:
+    """Start the Reddit OAuth loopback flow and store the connected account.
+
+    Builds the authorize URL and exchanges the returned code via
+    ``RedditOAuth.exchange_code``. The localhost loopback HTTP listener that
+    auto-captures the ``code`` is STUBBED — see the TODO below — so for now you
+    paste the ``code`` from the redirect URL.
+    """
+    import urllib.parse
+    import uuid
+
+    from metalworks.reddit import RedditOAuth
+    from metalworks.stores import TokenCipher
+
+    client_id = os.environ.get("REDDIT_CLIENT_ID")
+    if not client_id:
+        err_console.print("[red]Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET first.[/red]")
+        raise typer.Exit(code=1)
+
+    state = uuid.uuid4().hex
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "state": state,
+        "redirect_uri": redirect_uri,
+        "duration": "permanent",
+        "scope": "identity submit read",
+    }
+    authorize_url = "https://www.reddit.com/api/v1/authorize?" + urllib.parse.urlencode(params)
+    console.print("[bold]Open this URL, approve, then copy the `code` from the redirect:[/bold]")
+    console.print(authorize_url)
+    # TODO(oauth-loopback): run a one-shot localhost HTTP server on the redirect
+    # port to auto-capture `code` (and verify `state`) instead of pasting. The
+    # exchange below is the real, wired path; only the capture is manual.
+    code = typer.prompt("Paste the code")
+
+    store = config.default_store()
+    oauth = RedditOAuth(accounts=store, cipher=TokenCipher())
+    try:
+        bundle = oauth.exchange_code(code, redirect_uri)
+        account = oauth.store_account(bundle)
+    finally:
+        oauth.close()
+    console.print(f"[green]Connected[/green] u/{account.username}")
+
+
+@reddit_app.command("post")
+def reddit_post(
+    url: Annotated[str, typer.Argument(help="The thread URL to reply to.")],
+    text: Annotated[str, typer.Option("--text", help="The reply text.")],
+    username: Annotated[
+        str | None, typer.Option("--username", help="Which connected account to post as.")
+    ] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Actually send (default: dry-run).")] = False,
+) -> None:
+    """Reply to a Reddit thread. Runs the compliance gate FIRST; refuses on fail.
+
+    Without ``--yes`` this is a dry-run: it prints the verdict and stops. With
+    ``--yes`` it posts via the connected account — but still refuses if the
+    deterministic compliance gate fails.
+    """
+    from metalworks.reddit import RedditOAuth, heuristic_check
+    from metalworks.stores import TokenCipher
+
+    verdict = heuristic_check(text)
+    _print_verdict(verdict)
+    if not verdict.pass_:
+        err_console.print("[red]Compliance gate FAILED — refusing to post.[/red]")
+        raise typer.Exit(code=1)
+
+    if not yes:
+        console.print("[yellow]Dry-run.[/yellow] Re-run with --yes to actually post.")
+        return
+
+    store = config.default_store()
+    accounts = store.list_accounts()
+    if not accounts:
+        err_console.print("[red]No connected account. Run: metalworks reddit auth login[/red]")
+        raise typer.Exit(code=1)
+    target = username or accounts[0].username
+    oauth = RedditOAuth(accounts=store, cipher=TokenCipher())
+    try:
+        result = oauth.post_comment(username=target, post_url=url, text=text)
+    finally:
+        oauth.close()
+    if not result.success:
+        err_console.print(f"[red]Post failed: {result.error}[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Posted[/green] as u/{result.username}: {result.comment_url}")
+
+
+# ── arctic sub-app ──────────────────────────────────────────────────────────
+
+
+@arctic_app.command("months")
+def arctic_months(subreddit: str) -> None:
+    """Print the latest available submissions month in the Arctic corpus."""
+    from metalworks.research.arctic import ArcticReader
+
+    _ = subreddit  # availability is corpus-wide; arg kept for symmetry/UX
+    reader = ArcticReader(probe_sleep_s=0.0)
+    try:
+        latest = reader.latest_available_month("submissions")
+        console.print(f"latest available month: [bold]{latest}[/bold]")
+    finally:
+        reader.close()
+
+
+@arctic_app.command("pull")
+def arctic_pull(
+    subreddit: str,
+    months: Annotated[int, typer.Option("--months", help="How many months back.")] = 1,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write rows as JSONL here.")
+    ] = None,
+) -> None:
+    """Pull submissions for a subreddit from the Arctic corpus → table or JSONL."""
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.types import months_back
+
+    sub = subreddit.strip().lstrip("r/").lstrip("/")
+    reader = ArcticReader(probe_sleep_s=0.0)
+    try:
+        window = months_back(months, anchor=reader.latest_available_month("submissions"))
+        rows = list(
+            reader.pull_subreddit(
+                subreddit=sub,
+                content_type="submissions",
+                months=window,
+                select_cols=["id", "title", "score", "num_comments"],
+            )
+        )
+    finally:
+        reader.close()
+
+    if out is not None:
+        with out.open("w", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row, default=str) + "\n")
+        console.print(f"[green]Wrote[/green] {len(rows)} rows -> {out}")
+        return
+    console.print(f"Pulled {len(rows)} threads from r/{sub} across {len(window)} month(s).")
+    for row in rows[:20]:
+        console.print(f"  [dim]{row.get('score')}[/dim]  {row.get('title')}")
+
+
+# ── mcp sub-app ─────────────────────────────────────────────────────────────
+
+
+@mcp_app.command("serve")
+def mcp_serve(
+    transport: Annotated[
+        str, typer.Option("--transport", help="stdio (default) or sse.")
+    ] = "stdio",
+    port: Annotated[int, typer.Option("--port", help="SSE port.")] = 8000,
+    host: Annotated[str, typer.Option("--host", help="SSE bind host.")] = "127.0.0.1",
+    token: Annotated[
+        str | None, typer.Option("--token", help="Bearer token (REQUIRED for sse).")
+    ] = None,
+) -> None:
+    """Launch the metalworks MCP server.
+
+    ``stdio`` is the keyless default. ``sse`` is network-exposed and REQUIRES a
+    bearer token (``--token`` or METALWORKS_MCP_TOKEN) — it refuses to start
+    without one.
+    """
+    from metalworks.errors import MetalworksError
+    from metalworks.mcp import server as mcp_server
+
+    try:
+        mcp_server.serve(transport=transport, host=host, port=port, token=token)
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+
+# ── Shared helpers ──────────────────────────────────────────────────────────
+
+_EXTRA_PROBES: tuple[tuple[str, str], ...] = (
+    ("anthropic", "anthropic"),
+    ("openai", "openai"),
+    ("google", "google.genai"),
+    ("reddit", "redditwarp"),
+    ("arctic", "duckdb"),
+    ("exa", "exa_py"),
+    ("tavily", "tavily"),
+    ("mcp", "mcp"),
+)
+
+_KEY_PROBES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("anthropic", ("ANTHROPIC_API_KEY",)),
+    ("openai", ("OPENAI_API_KEY",)),
+    ("google", ("GOOGLE_API_KEY", "GEMINI_API_KEY")),
+    ("exa", ("EXA_API_KEY",)),
+    ("tavily", ("TAVILY_API_KEY",)),
+    ("reddit", ("REDDIT_CLIENT_ID",)),
+)
+
+_SECRET_KEYS = frozenset(
+    {
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+        "EXA_API_KEY",
+        "TAVILY_API_KEY",
+        "REDDIT_CLIENT_ID",
+        "REDDIT_CLIENT_SECRET",
+        "METALWORKS_FERNET_KEY",
+        "METALWORKS_MCP_TOKEN",
+    }
+)
+
+
+def _module_available(module: str) -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _resolve_chat_or_exit() -> ChatModel:
+    from metalworks.errors import MetalworksError
+
+    try:
+        return config.resolve_chat()
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+
+def _print_verdict(verdict: object) -> None:
+    pass_ = getattr(verdict, "pass_", False)
+    violations = getattr(verdict, "violations", [])
+    confidence = getattr(verdict, "confidence", 0.0)
+    color = "green" if pass_ else "red"
+    console.print(
+        f"compliance: [{color}]{'PASS' if pass_ else 'FAIL'}[/{color}] "
+        f"(confidence {confidence:.2f})"
+    )
+    if violations:
+        for v in violations:
+            console.print(f"  - {v}")
+
+
+def _print_report(report: object) -> None:
+    query = getattr(report, "query", "")
+    total = getattr(report, "total_threads", 0)
+    partial = getattr(report, "partial", False)
+    clusters = getattr(report, "ranked_clusters", [])
+    console.print(f"\n[bold]Report[/bold] — {query}")
+    console.print(f"  threads: {total}   partial: {partial}")
+    caveat = getattr(report, "caveat", None)
+    if caveat:
+        console.print(f"  [yellow]caveat:[/yellow] {caveat}")
+    if clusters:
+        console.print("  [bold]top clusters:[/bold]")
+        for c in clusters[:5]:
+            console.print(f"    - {getattr(c, 'claim', c)}")
+
+
+# ── Discovery ───────────────────────────────────────────────────────────────
+
+discovery_app = typer.Typer(help="Find and draft Reddit reply opportunities.", no_args_is_help=True)
+
+
+@discovery_app.command("run")
+def discovery_run(
+    query: Annotated[list[str], typer.Option("--query", "-q", help="Search query (repeatable).")],
+    subreddit: Annotated[
+        list[str] | None, typer.Option("--subreddit", help="Restrict to these subs (repeatable).")
+    ] = None,
+    max_opportunities: Annotated[
+        int, typer.Option("--max", help="Stop after this many opportunities.")
+    ] = 10,
+    voice: Annotated[
+        str | None, typer.Option("--voice", help="Voice guideline for drafts.")
+    ] = None,
+) -> None:
+    """Search Reddit, draft replies, and gate each through the compliance check.
+
+    Produces draft opportunities only. It never posts. Review the drafts, then
+    post a chosen one with `metalworks reddit post comment <url> --text ...`.
+    """
+    from metalworks.contract import DiscoveryContext
+    from metalworks.discovery import DiscoveryDeps, run_discovery
+    from metalworks.reddit import RedditSearch
+
+    chat = config.resolve_chat()
+    store = config.default_store()
+    deps = DiscoveryDeps(
+        chat=chat,
+        search=RedditSearch(),
+        opportunities=store,
+        context=DiscoveryContext(voice_guidelines=[voice] if voice else []),
+    )
+    opportunities = run_discovery(
+        deps, queries=query, subreddits=subreddit, max_opportunities=max_opportunities
+    )
+    if not opportunities:
+        console.print("[dim]No opportunities found.[/dim]")
+        return
+    for opp in opportunities:
+        gate = opp.compliance
+        mark = "[green]pass[/green]" if (gate and gate.pass_) else "[yellow]review[/yellow]"
+        console.print(f"\n[bold]{opp.post.subreddit}[/bold] {mark}  {opp.post.url}")
+        console.print(f"  {opp.post.title}")
+        console.print(f"  [dim]draft:[/dim] {opp.draft_reply[:240]}")
+    console.print(
+        f"\n[dim]{len(opportunities)} draft(s). Nothing was posted. "
+        "Post a chosen one with: metalworks reddit post comment <url> --text ...[/dim]"
+    )
+
+
+# ── Register sub-apps ───────────────────────────────────────────────────────
+
+reddit_app.add_typer(subreddit_app, name="subreddit")
+reddit_app.add_typer(auth_app, name="auth")
+
+app.add_typer(research_app, name="research")
+app.add_typer(reddit_app, name="reddit")
+app.add_typer(arctic_app, name="arctic")
+app.add_typer(discovery_app, name="discovery")
+app.add_typer(config_app, name="config")
+app.add_typer(mcp_app, name="mcp")
+
+
+__all__ = ["app"]

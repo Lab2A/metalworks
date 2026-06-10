@@ -1,0 +1,45 @@
+# metalworks
+
+> Open-source Python library for marketing research and Reddit engagement.
+> Produces demand reports from real Reddit conversations and provides the
+> OAuth / search / compliance primitives to act on them. MIT licensed, built by
+> the team behind Clique. Pre-release (0.0.1): APIs below 1.0 are unstable
+> except `metalworks.contract` models and the MCP tool contracts.
+
+Core is dependency-light (pydantic, httpx, typer, rich). Provider SDKs live
+behind extras and are lazy-imported; a bare `import metalworks` pulls in no
+provider modules. Install only what matches the API key you have:
+`pip install "metalworks[google]"` (or `[anthropic]`, `[openai]`, `[reddit]`,
+`[research]`, `[all]`).
+
+## Entry points
+
+- `metalworks.research.run_research(deps, *, brief)` -> `DemandReport`. The
+  research vertical: a `ResearchBrief` becomes a clustered demand report whose
+  quotes are exact-matched to stored Reddit comments and whose web findings
+  carry source URLs from grounding metadata (never model prose). `deps` is a
+  `ResearchDeps` carrying a `ChatModel`, an `EmbeddingProvider`, a corpus repo,
+  and an Arctic Shift reader.
+- `metalworks.reddit`: `RedditSearch`, `RedditOAuth` (httpx, typed errors,
+  encrypted tokens via `TokenCipher`), `RedditMetrics`, `fetch_subreddit_intel`,
+  `RateLimiter`, and `heuristic_check` / `heuristic_check_post` (a deterministic,
+  zero-key compliance gate over reply and post text).
+- `metalworks.contract`: the stable Pydantic wire models.
+- `metalworks.testing`: public conformance suites for third-party adapters and
+  repo backends.
+
+## Protocols (the seam everything speaks through)
+
+- `ChatModel` (`complete_text`, `complete_structured`), `GroundedChatModel`
+  (adds `complete_grounded` with char-offset provenance).
+- `SearchProvider`, `EmbeddingProvider` (with a hard index-identity guard).
+- Typed repos: `CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`,
+  `OpportunityRepo`, `InboxRepo`. Backends: `MemoryStores`, `SqliteStores`,
+  `SupabaseStores` (extra).
+
+## Usage policy
+
+For authentic, disclosed engagement only. No fake personas, no invented account
+backstories, no vote manipulation, no coordinated inauthentic behavior. The
+account-backstory tooling from the source pipeline was deliberately not
+open-sourced. See USAGE_POLICY.md.

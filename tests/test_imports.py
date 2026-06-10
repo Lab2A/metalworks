@@ -13,6 +13,7 @@ Two guarantees, both load-bearing for the extras model:
 
 import importlib
 import pkgutil
+import subprocess
 import sys
 
 import metalworks
@@ -33,11 +34,24 @@ def test_every_submodule_imports_clean() -> None:
 
 
 def test_no_provider_sdks_in_sys_modules() -> None:
-    for name in _walk_submodules():
-        importlib.import_module(name)
-    loaded = {m.split(".")[0] for m in sys.modules}
-    offenders = loaded.intersection(PROVIDER_MODULES)
-    assert not offenders, f"bare import pulled provider SDKs: {sorted(offenders)}"
+    """Importing every metalworks submodule must not pull a provider SDK.
+
+    Run in a clean subprocess so the assertion is immune to test ordering — a
+    sibling test that constructs a real adapter pollutes this process's
+    sys.modules, but a fresh interpreter only loads what metalworks imports.
+    """
+    code = (
+        "import importlib, pkgutil, sys, metalworks\n"
+        "names = ['metalworks']\n"
+        "names += [i.name for i in pkgutil.walk_packages("
+        "metalworks.__path__, prefix='metalworks.')]\n"
+        "[importlib.import_module(n) for n in names]\n"
+        "providers = {'anthropic','openai','google','litellm'}\n"
+        "offenders = {m.split('.')[0] for m in sys.modules} & providers\n"
+        "assert not offenders, sorted(offenders)\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, f"metalworks import pulled provider SDKs: {result.stderr}"
 
 
 def test_version_exposed() -> None:
