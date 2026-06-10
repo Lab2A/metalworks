@@ -40,7 +40,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv venv --clear
-      - run: uv pip install -e ".[dev]"
+      # All extras so pyright resolves real provider SDK imports (crypto,
+      # supabase, etc.). Adapters keep SDK objects behind Any regardless, but
+      # the few real `from x import y` lines need x present to typecheck.
+      - run: uv pip install -e ".[all,dev]"
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright
