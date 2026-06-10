@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Any
 
-import duckdb
 import httpx
 import pytest
 import respx
@@ -33,6 +32,11 @@ from metalworks.research.arctic.reader import (
 from metalworks.research.deps import ResearchDeps
 from metalworks.research.types import MonthRef
 from metalworks.stores.memory import MemoryStores
+
+# duckdb is the [arctic]/[all] extra; skip this module entirely without it
+# (the bare-install CI matrix has no duckdb). The metalworks imports above are
+# lazy w.r.t. duckdb, so importing them without the extra is safe.
+duckdb = pytest.importorskip("duckdb")
 
 # ── Local parquet fixture ────────────────────────────────────────────────
 

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from metalworks.contract import TriageThresholds
 from metalworks.embeddings import FakeEmbedding
 from metalworks.llm import FakeChatModel
@@ -66,6 +68,7 @@ def _items(n: int) -> list[ExplorationItem]:
 
 
 def test_triage_three_bucket_split_disjoint_and_complete() -> None:
+    pytest.importorskip("rank_bm25")  # triage needs the [research] extra
     deps = _deps()
     items = _items(10)
     thresholds = TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.5)
@@ -94,6 +97,7 @@ def test_triage_empty_items_returns_empty_buckets() -> None:
 
 
 def test_triage_accept_plus_reject_over_n_squeezes_middle() -> None:
+    pytest.importorskip("rank_bm25")  # triage needs the [research] extra
     deps = _deps()
     items = _items(4)
     # 0.8 + 0.8 = 1.6 > 1.0 → middle squeezed to zero, no overlap.
@@ -184,6 +188,7 @@ def test_classify_middle_empty_indices_returns_empty() -> None:
 
 
 def test_run_exploration_triage_returns_indices_and_report() -> None:
+    pytest.importorskip("rank_bm25")  # triage needs the [research] extra
     chat = FakeChatModel()
     chat.script(_BatchVerdicts, _BatchVerdicts(verdicts=[]))  # middle all backfill→other
     deps = _deps(fast_chat=chat)
