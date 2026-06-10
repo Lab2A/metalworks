@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "metalworks": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "metalworks[mcp,arctic,reddit] @ git+https://github.com/Lab2A/metalworks@main",
+        "metalworks",
+        "mcp",
+        "serve",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "UV_CACHE_DIR": "${CLAUDE_PLUGIN_DATA}/uv-cache"
+      }
+    }
+  }
+}
