@@ -1,4 +1,7 @@
-# Reference: protocols
+---
+title: "Protocols"
+description: "The versioned ChatModel, SearchProvider, EmbeddingProvider, and storage-repo protocols metalworks owns."
+---
 
 The protocols metalworks owns. They are versioned as a unit
 (`metalworks.PROTOCOLS_VERSION`); minor versions add keyword-only parameters

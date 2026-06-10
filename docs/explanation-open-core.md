@@ -1,4 +1,7 @@
-# Explanation: open-core, and what stays in Clique
+---
+title: "Open-core, and what stays in Clique"
+description: "Why metalworks is open-core, the boundary with Clique, and the structural-provenance principle."
+---
 
 metalworks is the open-source core of [Clique](https://clique.so)'s production
 pipeline. Clique runs on metalworks. This document explains the boundary and the

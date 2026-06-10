@@ -1,4 +1,7 @@
-# How-to: bind a Supabase store
+---
+title: "Bind a Supabase store"
+description: "Back the typed repos with a Supabase / PostgREST project, including binding to pre-existing tables."
+---
 
 The typed repos are the storage protocol. `MemoryStores` and `SqliteStores`
 ship in core; `SupabaseStores` (behind the `[supabase]` extra) binds the same

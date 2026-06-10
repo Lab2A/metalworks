@@ -1,4 +1,7 @@
-# Tutorial: your first demand report
+---
+title: "Your first demand report"
+description: "From the zero-key offline demo to a real, grounded demand report."
+---
 
 This walks from the zero-key demo to a real demand report.
 

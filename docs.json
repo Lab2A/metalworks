@@ -1,0 +1,53 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "metalworks",
+  "description": "Open-source marketing research and Reddit engagement: demand reports from real conversations, as a library, CLI, MCP server, and Claude Code plugin.",
+  "colors": {
+    "primary": "#111111",
+    "light": "#f5f5f5",
+    "dark": "#111111"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": ["docs/index", "docs/quickstart"]
+      },
+      {
+        "group": "Tutorials",
+        "pages": ["docs/tutorial-first-demand-report"]
+      },
+      {
+        "group": "How-to guides",
+        "pages": ["docs/how-to-custom-chatmodel", "docs/how-to-supabase-store"]
+      },
+      {
+        "group": "Reference",
+        "pages": ["docs/reference-protocols"]
+      },
+      {
+        "group": "Explanation",
+        "pages": ["docs/explanation-open-core"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Usage policy",
+        "href": "https://github.com/Lab2A/metalworks/blob/main/USAGE_POLICY.md"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Lab2A/metalworks"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Lab2A/metalworks"
+    }
+  }
+}

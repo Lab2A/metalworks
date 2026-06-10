@@ -1,4 +1,7 @@
-# How-to: implement a custom ChatModel
+---
+title: "Implement a custom ChatModel"
+description: "Use any provider or gateway by implementing the ChatModel protocol and running the conformance checks."
+---
 
 metalworks talks to LLMs through a small `ChatModel` protocol. To use a
 provider or gateway metalworks does not ship an adapter for, implement the
