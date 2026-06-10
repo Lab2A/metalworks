@@ -19,7 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: uv venv
+      - run: uv venv --clear
       - name: Install (bare)
         if: matrix.extras == 'bare'
         run: uv pip install -e ".[dev]"
@@ -39,7 +39,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - run: uv venv
+      - run: uv venv --clear
       - run: uv pip install -e ".[dev]"
       - run: uv run ruff check .
       - run: uv run ruff format --check .
