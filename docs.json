@@ -9,6 +9,12 @@
     "dark": "#111111"
   },
   "favicon": "/favicon.svg",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/docs"
+    }
+  ],
   "navigation": {
     "groups": [
       {
