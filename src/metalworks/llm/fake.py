@@ -7,7 +7,7 @@ integrations the same way (`metalworks.testing` re-exports it).
 
 from __future__ import annotations
 
-from typing import ClassVar, TypeVar
+from typing import ClassVar, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -91,7 +91,7 @@ class FakeChatModel:
             )
         result: object
         if isinstance(scripted, list):
-            queue: list[object] = scripted
+            queue = cast("list[object]", scripted)
             if not queue:
                 raise AssertionError(
                     f"FakeChatModel scripted responses for {output_model.__name__} exhausted."
