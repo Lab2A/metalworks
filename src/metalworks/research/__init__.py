@@ -11,7 +11,8 @@ Public surface lands incrementally across M2; this package is import-safe with
 no provider dependencies (the heavy bits live behind the `[research]` extra).
 """
 
-from metalworks.research.deps import ResearchDeps
+from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
+from metalworks.research.pipeline import run_research
 from metalworks.research.types import (
     ClassifierVerdict,
     ExplorationItem,
@@ -26,6 +27,8 @@ from metalworks.research.types import (
 
 __all__ = [
     "ClassifierVerdict",
+    "CommentSource",
+    "CorpusReader",
     "ExplorationItem",
     "HydrationResult",
     "LoadedComment",
@@ -35,4 +38,5 @@ __all__ = [
     "SynthesisOutput",
     "TriageBuckets",
     "TriangulationOutput",
+    "run_research",
 ]
