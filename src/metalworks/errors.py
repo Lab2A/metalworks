@@ -117,6 +117,19 @@ class StoreError(MetalworksError):
     error_code = "store_error"
 
 
+class RedditError(MetalworksError):
+    """A Reddit API call failed in a way that isn't auth or rate limiting."""
+
+    error_code = "reddit_error"
+
+    def __init__(self, message: str, *, status: int | None = None):
+        self.status = status
+        super().__init__(
+            message,
+            fix="Check the Reddit app credentials, scopes, and that the target still exists.",
+        )
+
+
 class EmbeddingModelMismatch(MetalworksError):
     """A persisted vector index was built with a different embedding model."""
 
