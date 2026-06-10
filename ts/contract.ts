@@ -1,0 +1,384 @@
+// GENERATED FILE — do not edit by hand.
+// Source of truth: metalworks/contract (Python, Pydantic).
+// Regenerate: python scripts/gen_ts_types.py
+
+export type Fork = "product_pinned" | "demographic_pinned" | "both";
+export type SignalStrength = "low" | "medium" | "high";
+
+export interface QuoteCitation {
+  /** Verbatim quote, exact-matched to the source comment. */
+  text: string;
+  /** Direct link to the source thread/comment. */
+  permalink: string;
+  /** Source subreddit, e.g. 'r/Supplements'. */
+  subreddit: string;
+  /** Stable pseudonymous author id (salted hash) — for distinct-author counting, never the raw username. Pseudonymization, not anonymization. */
+  author_hash: string;
+  /** Upvotes on the source comment, for context. */
+  upvotes?: number;
+}
+
+export interface InsightCluster {
+  /** 1-based rank within the report (by demand_score). */
+  rank: number;
+  /** One-line synthesized insight (what consumers want/feel/struggle with). */
+  claim: string;
+  /** Ranking signal. Weights distinct-author breadth ABOVE single-post virality (50 authors x 2 upvotes outranks 1 author x 200 upvotes). */
+  demand_score: number;
+  /** Number of DISTINCT authors expressing this — the honest base rate, not mention count. */
+  distinct_author_count: number;
+  /** Total mentions (>= distinct_author_count). Kept separate so base-rate honesty is visible. */
+  mention_count: number;
+  /** Confidence chip, derived from distinct_author_count. */
+  signal: SignalStrength;
+  /** 2-3 verified quotes. A cluster with zero verified quotes is never shipped (no-quote-no-theme). */
+  quotes: QuoteCitation[];
+  attribution_method?: string | null;
+  attribution_confidence?: string | null;
+  demographic_match?: number | null;
+}
+
+export interface SlotPlan {
+  product?: string | null;
+  audience?: string | null;
+  price?: number | null;
+  given?: string[];
+  find?: string[];
+}
+
+export interface AudienceAttribute {
+  estimate: string;
+  confidence: SignalStrength;
+  evidence: string;
+}
+
+export interface AudienceProfile {
+  age_range?: AudienceAttribute | null;
+  income_band?: AudienceAttribute | null;
+  geography?: AudienceAttribute | null;
+  buying_behavior?: AudienceAttribute | null;
+  caveat?: string | null;
+}
+
+export interface AudienceSegment {
+  name: string;
+  profile: AudienceProfile;
+  preferences?: string[];
+  demand_score: number;
+  distinct_author_count: number;
+}
+
+export interface PriceEvidence {
+  text: string;
+  kind: string;
+  amount?: number | null;
+  permalink?: string | null;
+}
+
+export interface PriceFinding {
+  low?: number | null;
+  high?: number | null;
+  currency?: string;
+  confidence?: SignalStrength | null;
+  evidence?: PriceEvidence[];
+  insufficient_signal?: boolean;
+}
+
+export interface SourceMapEntry {
+  subreddit: string;
+  subscribers?: number | null;
+  threads_examined?: number;
+  skew?: string | null;
+}
+
+export interface MarketSizing {
+  reddit_floor: number;
+  addressable_market: number;
+  penetration: Record<string, number>;
+}
+
+export interface TargetSubreddit {
+  /** Subreddit name without 'r/' prefix. */
+  name: string;
+  /** One-line reason this sub was suggested. */
+  rationale: string;
+}
+
+export interface TriageThresholds {
+  auto_accept_pct?: number;
+  auto_reject_pct?: number;
+  /** Absolute cosine below which to auto-reject regardless of percentile. None = percentile-only. */
+  cosine_floor?: number | null;
+  /** Absolute cosine above which to auto-accept regardless of percentile. None = percentile-only. */
+  cosine_ceiling?: number | null;
+}
+
+export interface ResearchBrief {
+  /** Stable UUID for this version of the brief. */
+  brief_id: string;
+  /** Owning tenant. Defaults to 'local' for library/CLI use. */
+  workspace_id?: string;
+  /** Monotonic version counter within the supersedes chain. */
+  version?: number;
+  /** Prior brief_id this version replaces. None for the first version. */
+  supersedes?: string | null;
+  /** The refined research question after the planner conversation. */
+  question: string;
+  /** What decision will this research inform. */
+  decision_context: string;
+  /** How the user will judge if the report did its job. */
+  success_criteria: string[];
+  /** Specific sub-questions the report MUST answer. Surfaced in must_address_resolution. */
+  must_address: string[];
+  /** Reddit communities the corpus pull will cover. */
+  target_subreddits: TargetSubreddit[];
+  /** External angles to pursue in the web stream. */
+  web_research_directions: string[];
+  /** Explicitly out of scope. */
+  excluded_sources?: string[];
+  /** How far back to pull from the historical corpus. */
+  time_window_months?: number;
+  /** One-paragraph definition of relevance the exploration classifier follows. Goes in the user role of the classifier prompt, never system. */
+  relevance_rubric: string;
+  triage_thresholds?: TriageThresholds;
+  output_template?: "full" | "brief_only";
+  confidence_threshold?: SignalStrength;
+  /** When the user confirmed the brief preview and kicked off the run. */
+  finalized_at?: string | null;
+}
+
+export interface WebFinding {
+  /** 1-based index within this report's web_findings list. */
+  finding_index: number;
+  /** One-line factual claim from the web. */
+  claim: string;
+  /** The number, date, name, or quote that anchors the claim. */
+  specifics: string;
+  /** From the grounding tool's citation metadata. */
+  source_url: string;
+  /** From the grounding tool's citation metadata. */
+  source_title: string;
+  /** From the grounding metadata when available. */
+  published_at?: string | null;
+  /** Service-assigned, not LLM-assigned. */
+  confidence: SignalStrength;
+}
+
+export interface ExplorationReport {
+  threads_pulled: number;
+  threads_auto_accepted: number;
+  threads_auto_rejected: number;
+  threads_classified: number;
+  threads_relevant: number;
+  threads_synthesized: number;
+  noise_composition?: Record<string, number>;
+  similarity_percentiles?: Record<string, number>;
+  /** Percentile bands (p10..p90) of the blended cosine + BM25 hybrid score that actually drives the bucketing. Empty for legacy reports that ran on cosine-only triage. */
+  hybrid_percentiles?: Record<string, number>;
+}
+
+export interface CorpusStats {
+  /** Decile → thread count. */
+  percentile_bands?: Record<string, number>;
+  subreddit_distribution?: SourceMapEntry[];
+  /** ISO month → thread count. */
+  time_distribution?: Record<string, number>;
+}
+
+export interface CrossReference {
+  /** 1-based rank, references InsightCluster.rank. */
+  cluster_rank: number;
+  /** 1-based indices, reference WebFinding.finding_index. */
+  web_finding_indices: number[];
+  /** How the streams relate on this claim. */
+  agreement: "agree" | "silent_web" | "silent_corpus" | "disagree";
+  /** One-line synthesis: where they converge, or what the disagreement is. */
+  note: string;
+}
+
+export interface DemandReport {
+  report_id: string;
+  /** Owning tenant. Set by the service, never the LLM. Defaults to 'local' for library/CLI use. */
+  client_id?: string;
+  query: string;
+  fork: Fork;
+  pinned_axis: string;
+  optimized_axis: string;
+  /** Provenance: 'reddit_arctic_shift' | 'reddit_live' | 'mixed'. */
+  source?: string;
+  date_range_start: string;
+  date_range_end: string;
+  total_threads: number;
+  total_distinct_authors: number;
+  ranked_clusters: InsightCluster[];
+  partial?: boolean;
+  caveat?: string | null;
+  /** 'library' | 'cli' | 'mcp' | 'ui' | 'agent'. */
+  created_by?: string;
+  generated_at: string;
+  verdict?: string | null;
+  slot_plan?: SlotPlan | null;
+  audience_profile?: AudienceProfile | null;
+  segments?: AudienceSegment[];
+  market_sizing?: MarketSizing | null;
+  price_finding?: PriceFinding | null;
+  source_map?: SourceMapEntry[];
+  /** The brief this run was produced against (frozen-version FK). */
+  brief?: ResearchBrief | null;
+  web_findings?: WebFinding[];
+  corpus_stats?: CorpusStats | null;
+  corpus_shape?: ExplorationReport | null;
+  cross_references?: CrossReference[];
+  /** must_address item → 'cluster:N' | 'web:N' | 'unaddressable: <reason>'. */
+  must_address_resolution?: Record<string, string>;
+}
+
+export interface ReportSummary {
+  report_id: string;
+  query: string;
+  fork: Fork;
+  total_threads: number;
+  total_distinct_authors: number;
+  generated_at: string;
+  top_claims?: string[];
+  brief_id?: string | null;
+}
+
+export interface RunSummary {
+  report_id: string;
+  brief_id?: string | null;
+  query: string;
+  status: "queued" | "planning_brief" | "pulling_arctic_shift" | "embedding_triage" | "llm_classifying" | "analyzing_relevant" | "web_research" | "compiling" | "complete" | "failed" | "compile_failed" | "oom_chunked";
+  progress?: string | null;
+  error?: string | null;
+  total_distinct_authors?: number | null;
+  created_at: string;
+  generated_at?: string | null;
+  ready_at?: string | null;
+}
+
+export interface ComplianceVerdict {
+  /** True if the reply is OK to post. */
+  pass: boolean;
+  /** Specific issues — empty when pass=True. */
+  violations?: string[];
+  /** Confidence in the verdict. */
+  confidence: number;
+}
+
+export interface LintViolation {
+  /** Stable identifier for the rule that fired (e.g., 'title_too_short'). */
+  code: string;
+  /** error blocks submit; warn surfaces but allows it. */
+  severity: "error" | "warn";
+  /** Human-readable explanation suitable for inline UI. */
+  message: string;
+  /** Optional [start,end] char offsets in the offending field. */
+  span?: [number, number] | null;
+  /** Which field the violation applies to. */
+  field?: "title" | "body" | "flair" | "draft";
+}
+
+export interface PostLintVerdict {
+  /** True when no `error`-severity violations fired. */
+  pass: boolean;
+  violations?: LintViolation[];
+}
+
+export interface RedditPost {
+  /** Reddit base36 id without the 't3_' prefix. */
+  post_id: string;
+  /** Subreddit name without 'r/' prefix. */
+  subreddit: string;
+  title: string;
+  /** Body text; empty for link posts. */
+  selftext?: string;
+  /** Full permalink to the post. */
+  url: string;
+  /** Username when sourced live; None when the source pseudonymizes. */
+  author?: string | null;
+  score?: number;
+  num_comments?: number;
+  created_utc?: string | null;
+  flair?: string | null;
+}
+
+export interface RedditComment {
+  /** Reddit base36 id without the 't1_' prefix. */
+  comment_id: string;
+  /** Parent submission id. */
+  post_id: string;
+  subreddit: string;
+  body: string;
+  permalink: string;
+  /** Salted pseudonymous author id — pseudonymization, not anonymization. */
+  author_hash: string;
+  score?: number;
+  created_utc?: string | null;
+  /** Parent comment id for nested replies; None for top-level. */
+  parent_id?: string | null;
+}
+
+export interface SubredditIntel {
+  /** Subreddit name without 'r/' prefix. */
+  name: string;
+  title?: string | null;
+  description?: string | null;
+  subscribers?: number | null;
+  rules?: string[];
+  /** Recent top posts, for tone calibration. */
+  top_post_titles?: string[];
+  fetched_at?: string | null;
+}
+
+export interface InboxItem {
+  message_id: string;
+  /** Classification from the inbox poller. */
+  kind: "comment_reply" | "post_reply" | "dm" | "mention" | "mod";
+  author?: string | null;
+  subject?: string | null;
+  body: string;
+  permalink?: string | null;
+  created_utc?: string | null;
+  read?: boolean;
+}
+
+export interface Opportunity {
+  opportunity_id: string;
+  post: RedditPost;
+  /** Generated draft — a starting point, not a send. */
+  draft_reply: string;
+  /** Which persona the draft was written for. */
+  account_type?: string | null;
+  /** Why the filter kept this thread. */
+  relevance_reason?: string | null;
+  confidence?: number | null;
+  risks?: string[];
+  compliance?: ComplianceVerdict | null;
+  status?: "new" | "approved" | "cancelled" | "posted";
+  discovered_at?: string | null;
+}
+
+export interface Persona {
+  /** Real writing samples that define the voice. */
+  example_posts?: string[];
+  /** Distilled description of the voice (tone, quirks, register). */
+  voice_rubric?: string | null;
+  /** AUTHENTIC background of the human/brand behind the account. Never fabricated. See USAGE_POLICY. */
+  background?: string | null;
+}
+
+export interface PersonaSet {
+  personas?: Record<string, Persona>;
+}
+
+export interface DiscoveryContext {
+  voice_guidelines?: string[];
+  /** Replies that performed well — style anchors. */
+  winning_examples?: string[];
+  /** Standing instructions from the caller. */
+  pinned_notes?: string[];
+  /** Topics, claims, or phrasings to never use. */
+  avoid?: string[];
+  personas?: PersonaSet;
+}

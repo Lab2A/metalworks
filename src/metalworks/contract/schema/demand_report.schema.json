@@ -1,0 +1,1119 @@
+{
+  "$defs": {
+    "AudienceAttribute": {
+      "properties": {
+        "confidence": {
+          "$ref": "#/$defs/SignalStrength"
+        },
+        "estimate": {
+          "title": "Estimate",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "estimate",
+        "confidence",
+        "evidence"
+      ],
+      "title": "AudienceAttribute",
+      "type": "object"
+    },
+    "AudienceProfile": {
+      "properties": {
+        "age_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudienceAttribute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "buying_behavior": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudienceAttribute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "caveat": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caveat"
+        },
+        "geography": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudienceAttribute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "income_band": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudienceAttribute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "AudienceProfile",
+      "type": "object"
+    },
+    "AudienceSegment": {
+      "properties": {
+        "demand_score": {
+          "title": "Demand Score",
+          "type": "number"
+        },
+        "distinct_author_count": {
+          "title": "Distinct Author Count",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "preferences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Preferences",
+          "type": "array"
+        },
+        "profile": {
+          "$ref": "#/$defs/AudienceProfile"
+        }
+      },
+      "required": [
+        "name",
+        "profile",
+        "demand_score",
+        "distinct_author_count"
+      ],
+      "title": "AudienceSegment",
+      "type": "object"
+    },
+    "CorpusStats": {
+      "description": "Statistical aggregates across the relevant corpus.\n\nDistinct from ExplorationReport (which is the funnel) \u2014 these are\ndistributions over the threads that survived triage and were synthesized.",
+      "properties": {
+        "percentile_bands": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Decile \u2192 thread count.",
+          "title": "Percentile Bands",
+          "type": "object"
+        },
+        "subreddit_distribution": {
+          "items": {
+            "$ref": "#/$defs/SourceMapEntry"
+          },
+          "title": "Subreddit Distribution",
+          "type": "array"
+        },
+        "time_distribution": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "ISO month \u2192 thread count.",
+          "title": "Time Distribution",
+          "type": "object"
+        }
+      },
+      "title": "CorpusStats",
+      "type": "object"
+    },
+    "CrossReference": {
+      "description": "One verified link between a Reddit cluster and the web findings.\n\nAt the LLM-output boundary, the triangulator returns list-id-prefixed\nindices ('cluster:3', 'web:7'). The triangulator validator strips the\nprefix and enforces that cluster ids are valid InsightCluster ranks and\nweb ids are valid WebFinding finding_indexes before producing this\ncontract. Mixed-list refs are rejected.",
+      "properties": {
+        "agreement": {
+          "description": "How the streams relate on this claim.",
+          "enum": [
+            "agree",
+            "silent_web",
+            "silent_corpus",
+            "disagree"
+          ],
+          "title": "Agreement",
+          "type": "string"
+        },
+        "cluster_rank": {
+          "description": "1-based rank, references InsightCluster.rank.",
+          "title": "Cluster Rank",
+          "type": "integer"
+        },
+        "note": {
+          "description": "One-line synthesis: where they converge, or what the disagreement is.",
+          "title": "Note",
+          "type": "string"
+        },
+        "web_finding_indices": {
+          "description": "1-based indices, reference WebFinding.finding_index.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Web Finding Indices",
+          "type": "array"
+        }
+      },
+      "required": [
+        "cluster_rank",
+        "web_finding_indices",
+        "agreement",
+        "note"
+      ],
+      "title": "CrossReference",
+      "type": "object"
+    },
+    "ExplorationReport": {
+      "description": "What the three-bucket triage actually produced for this run.\n\nSurfaced in the report's corpus_shape banner. The honest funnel:\nthreads_pulled (raw archive) \u2192 threads_auto_{accepted,rejected} by\ncosine triage \u2192 threads_classified by middle-bucket LLM \u2192\nthreads_relevant (passed classifier) \u2192 threads_synthesized (post\nembed-group dedup).\n\n`noise_composition` is binned reason counts from the classifier \u2014 what\nKIND of irrelevant content dominated the rejected pile.",
+      "properties": {
+        "hybrid_percentiles": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Percentile bands (p10..p90) of the blended cosine + BM25 hybrid score that actually drives the bucketing. Empty for legacy reports that ran on cosine-only triage.",
+          "title": "Hybrid Percentiles",
+          "type": "object"
+        },
+        "noise_composition": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Noise Composition",
+          "type": "object"
+        },
+        "similarity_percentiles": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Similarity Percentiles",
+          "type": "object"
+        },
+        "threads_auto_accepted": {
+          "title": "Threads Auto Accepted",
+          "type": "integer"
+        },
+        "threads_auto_rejected": {
+          "title": "Threads Auto Rejected",
+          "type": "integer"
+        },
+        "threads_classified": {
+          "title": "Threads Classified",
+          "type": "integer"
+        },
+        "threads_pulled": {
+          "title": "Threads Pulled",
+          "type": "integer"
+        },
+        "threads_relevant": {
+          "title": "Threads Relevant",
+          "type": "integer"
+        },
+        "threads_synthesized": {
+          "title": "Threads Synthesized",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "threads_pulled",
+        "threads_auto_accepted",
+        "threads_auto_rejected",
+        "threads_classified",
+        "threads_relevant",
+        "threads_synthesized"
+      ],
+      "title": "ExplorationReport",
+      "type": "object"
+    },
+    "Fork": {
+      "description": "Which axis is held fixed while the other is optimized.\n\nCarried forward for backwards compatibility with migrated reports.\nNew-shape briefs use the slot_plan field directly.",
+      "enum": [
+        "product_pinned",
+        "demographic_pinned",
+        "both"
+      ],
+      "title": "Fork",
+      "type": "string"
+    },
+    "InsightCluster": {
+      "description": "One ranked consumer-insight theme with its evidence.",
+      "properties": {
+        "attribution_confidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attribution Confidence"
+        },
+        "attribution_method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attribution Method"
+        },
+        "claim": {
+          "description": "One-line synthesized insight (what consumers want/feel/struggle with).",
+          "title": "Claim",
+          "type": "string"
+        },
+        "demand_score": {
+          "description": "Ranking signal. Weights distinct-author breadth ABOVE single-post virality (50 authors x 2 upvotes outranks 1 author x 200 upvotes).",
+          "title": "Demand Score",
+          "type": "number"
+        },
+        "demographic_match": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Demographic Match"
+        },
+        "distinct_author_count": {
+          "description": "Number of DISTINCT authors expressing this \u2014 the honest base rate, not mention count.",
+          "title": "Distinct Author Count",
+          "type": "integer"
+        },
+        "mention_count": {
+          "description": "Total mentions (>= distinct_author_count). Kept separate so base-rate honesty is visible.",
+          "title": "Mention Count",
+          "type": "integer"
+        },
+        "quotes": {
+          "description": "2-3 verified quotes. A cluster with zero verified quotes is never shipped (no-quote-no-theme).",
+          "items": {
+            "$ref": "#/$defs/QuoteCitation"
+          },
+          "title": "Quotes",
+          "type": "array"
+        },
+        "rank": {
+          "description": "1-based rank within the report (by demand_score).",
+          "title": "Rank",
+          "type": "integer"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalStrength",
+          "description": "Confidence chip, derived from distinct_author_count."
+        }
+      },
+      "required": [
+        "rank",
+        "claim",
+        "demand_score",
+        "distinct_author_count",
+        "mention_count",
+        "signal",
+        "quotes"
+      ],
+      "title": "InsightCluster",
+      "type": "object"
+    },
+    "MarketSizing": {
+      "properties": {
+        "addressable_market": {
+          "title": "Addressable Market",
+          "type": "integer"
+        },
+        "penetration": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Penetration",
+          "type": "object"
+        },
+        "reddit_floor": {
+          "title": "Reddit Floor",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "reddit_floor",
+        "addressable_market",
+        "penetration"
+      ],
+      "title": "MarketSizing",
+      "type": "object"
+    },
+    "PriceEvidence": {
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amount"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "permalink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permalink"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "kind"
+      ],
+      "title": "PriceEvidence",
+      "type": "object"
+    },
+    "PriceFinding": {
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SignalStrength"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "currency": {
+          "default": "USD",
+          "title": "Currency",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/PriceEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "high": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "High"
+        },
+        "insufficient_signal": {
+          "default": false,
+          "title": "Insufficient Signal",
+          "type": "boolean"
+        },
+        "low": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Low"
+        }
+      },
+      "title": "PriceFinding",
+      "type": "object"
+    },
+    "QuoteCitation": {
+      "description": "One verified, real Reddit quote backing a cluster.\n\n`text` MUST exact-match the stored source comment (the quote-verification\ngate) \u2014 the service rejects any quote that doesn't, so a QuoteCitation\nthat reaches this contract is guaranteed real.",
+      "properties": {
+        "author_hash": {
+          "description": "Stable pseudonymous author id (salted hash) \u2014 for distinct-author counting, never the raw username. Pseudonymization, not anonymization.",
+          "title": "Author Hash",
+          "type": "string"
+        },
+        "permalink": {
+          "description": "Direct link to the source thread/comment.",
+          "title": "Permalink",
+          "type": "string"
+        },
+        "subreddit": {
+          "description": "Source subreddit, e.g. 'r/Supplements'.",
+          "title": "Subreddit",
+          "type": "string"
+        },
+        "text": {
+          "description": "Verbatim quote, exact-matched to the source comment.",
+          "title": "Text",
+          "type": "string"
+        },
+        "upvotes": {
+          "default": 0,
+          "description": "Upvotes on the source comment, for context.",
+          "title": "Upvotes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "text",
+        "permalink",
+        "subreddit",
+        "author_hash"
+      ],
+      "title": "QuoteCitation",
+      "type": "object"
+    },
+    "ResearchBrief": {
+      "description": "The contract produced by the conversational planner.\n\nA Brief is the persisted, versioned record of what the planner and the\nuser agreed to research. Briefs are IMMUTABLE: editing a brief writes a\nnew row with a fresh `brief_id` and a `supersedes` pointer to the prior\nversion. Runs FK to a single brief_id; a re-run after edit creates a new\nrun pointing at the new brief.",
+      "properties": {
+        "brief_id": {
+          "description": "Stable UUID for this version of the brief.",
+          "title": "Brief Id",
+          "type": "string"
+        },
+        "confidence_threshold": {
+          "$ref": "#/$defs/SignalStrength",
+          "default": "medium"
+        },
+        "decision_context": {
+          "description": "What decision will this research inform.",
+          "title": "Decision Context",
+          "type": "string"
+        },
+        "excluded_sources": {
+          "description": "Explicitly out of scope.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Excluded Sources",
+          "type": "array"
+        },
+        "finalized_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the user confirmed the brief preview and kicked off the run.",
+          "title": "Finalized At"
+        },
+        "must_address": {
+          "description": "Specific sub-questions the report MUST answer. Surfaced in must_address_resolution.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Must Address",
+          "type": "array"
+        },
+        "output_template": {
+          "default": "full",
+          "enum": [
+            "full",
+            "brief_only"
+          ],
+          "title": "Output Template",
+          "type": "string"
+        },
+        "question": {
+          "description": "The refined research question after the planner conversation.",
+          "title": "Question",
+          "type": "string"
+        },
+        "relevance_rubric": {
+          "description": "One-paragraph definition of relevance the exploration classifier follows. Goes in the user role of the classifier prompt, never system.",
+          "title": "Relevance Rubric",
+          "type": "string"
+        },
+        "success_criteria": {
+          "description": "How the user will judge if the report did its job.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Success Criteria",
+          "type": "array"
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prior brief_id this version replaces. None for the first version.",
+          "title": "Supersedes"
+        },
+        "target_subreddits": {
+          "description": "Reddit communities the corpus pull will cover.",
+          "items": {
+            "$ref": "#/$defs/TargetSubreddit"
+          },
+          "title": "Target Subreddits",
+          "type": "array"
+        },
+        "time_window_months": {
+          "default": 12,
+          "description": "How far back to pull from the historical corpus.",
+          "title": "Time Window Months",
+          "type": "integer"
+        },
+        "triage_thresholds": {
+          "$ref": "#/$defs/TriageThresholds"
+        },
+        "version": {
+          "default": 1,
+          "description": "Monotonic version counter within the supersedes chain.",
+          "title": "Version",
+          "type": "integer"
+        },
+        "web_research_directions": {
+          "description": "External angles to pursue in the web stream.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Web Research Directions",
+          "type": "array"
+        },
+        "workspace_id": {
+          "default": "local",
+          "description": "Owning tenant. Defaults to 'local' for library/CLI use.",
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "brief_id",
+        "question",
+        "decision_context",
+        "success_criteria",
+        "must_address",
+        "target_subreddits",
+        "web_research_directions",
+        "relevance_rubric"
+      ],
+      "title": "ResearchBrief",
+      "type": "object"
+    },
+    "SignalStrength": {
+      "description": "Per-cluster confidence, driven by distinct-author count.\n\nRendered as a text-labelled chip (never color alone) so a thin-evidence\ncluster never reads as authoritative as a well-supported one.",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "SignalStrength",
+      "type": "string"
+    },
+    "SlotPlan": {
+      "properties": {
+        "audience": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audience"
+        },
+        "find": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Find",
+          "type": "array"
+        },
+        "given": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Given",
+          "type": "array"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price"
+        },
+        "product": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product"
+        }
+      },
+      "title": "SlotPlan",
+      "type": "object"
+    },
+    "SourceMapEntry": {
+      "properties": {
+        "skew": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skew"
+        },
+        "subreddit": {
+          "title": "Subreddit",
+          "type": "string"
+        },
+        "subscribers": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subscribers"
+        },
+        "threads_examined": {
+          "default": 0,
+          "title": "Threads Examined",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subreddit"
+      ],
+      "title": "SourceMapEntry",
+      "type": "object"
+    },
+    "TargetSubreddit": {
+      "description": "A subreddit the planner suggested for this brief, with its rationale.\n\nThe rationale is what the planner showed the user during D5 (\"Target\nsubreddits\"). It's persisted so the report can cite back to the\nplanner's reasoning when the user reads the source_map.",
+      "properties": {
+        "name": {
+          "description": "Subreddit name without 'r/' prefix.",
+          "title": "Name",
+          "type": "string"
+        },
+        "rationale": {
+          "description": "One-line reason this sub was suggested.",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "rationale"
+      ],
+      "title": "TargetSubreddit",
+      "type": "object"
+    },
+    "TriageThresholds": {
+      "description": "Three-bucket cutoffs for the exploration step.\n\nTop auto_accept_pct: high cosine to question \u2192 skip LLM, accept.\nBottom auto_reject_pct: low cosine \u2192 skip LLM, reject.\nMiddle: LLM classifier with confidence.\n\nGate on absolute cosine bands AND percentile. Both cosine_floor /\ncosine_ceiling and the percentages are honored; if they disagree by >5%\nrelevance rate, the triage step alerts.",
+      "properties": {
+        "auto_accept_pct": {
+          "default": 0.2,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Auto Accept Pct",
+          "type": "number"
+        },
+        "auto_reject_pct": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Auto Reject Pct",
+          "type": "number"
+        },
+        "cosine_ceiling": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Absolute cosine above which to auto-accept regardless of percentile. None = percentile-only.",
+          "title": "Cosine Ceiling"
+        },
+        "cosine_floor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Absolute cosine below which to auto-reject regardless of percentile. None = percentile-only.",
+          "title": "Cosine Floor"
+        }
+      },
+      "title": "TriageThresholds",
+      "type": "object"
+    },
+    "WebFinding": {
+      "description": "One structured finding from the web research stream.\n\nIndexed by `finding_index` (1-based). The triangulator references\nfindings by index \u2014 never by free text \u2014 preserving the structural-\nprovenance contract across both streams.\n\n`source_url` / `source_title` / `published_at` come from the grounding\ntool's citation metadata, not from the LLM. The LLM produces only\n`claim` + `specifics` + index assignments.",
+      "properties": {
+        "claim": {
+          "description": "One-line factual claim from the web.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/SignalStrength",
+          "description": "Service-assigned, not LLM-assigned."
+        },
+        "finding_index": {
+          "description": "1-based index within this report's web_findings list.",
+          "title": "Finding Index",
+          "type": "integer"
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "From the grounding metadata when available.",
+          "title": "Published At"
+        },
+        "source_title": {
+          "description": "From the grounding tool's citation metadata.",
+          "title": "Source Title",
+          "type": "string"
+        },
+        "source_url": {
+          "description": "From the grounding tool's citation metadata.",
+          "title": "Source Url",
+          "type": "string"
+        },
+        "specifics": {
+          "description": "The number, date, name, or quote that anchors the claim.",
+          "title": "Specifics",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_index",
+        "claim",
+        "specifics",
+        "source_url",
+        "source_title",
+        "confidence"
+      ],
+      "title": "WebFinding",
+      "type": "object"
+    }
+  },
+  "description": "The full report \u2014 the canonical shape returned by every surface.\n\nOptional / default-empty fields keep the additive-contract parity guard\npassing (reports produced by earlier shapes validate against this).",
+  "properties": {
+    "audience_profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AudienceProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "brief": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchBrief"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The brief this run was produced against (frozen-version FK)."
+    },
+    "caveat": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Caveat"
+    },
+    "client_id": {
+      "default": "local",
+      "description": "Owning tenant. Set by the service, never the LLM. Defaults to 'local' for library/CLI use.",
+      "title": "Client Id",
+      "type": "string"
+    },
+    "corpus_shape": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExplorationReport"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "corpus_stats": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CorpusStats"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created_by": {
+      "default": "library",
+      "description": "'library' | 'cli' | 'mcp' | 'ui' | 'agent'.",
+      "title": "Created By",
+      "type": "string"
+    },
+    "cross_references": {
+      "items": {
+        "$ref": "#/$defs/CrossReference"
+      },
+      "title": "Cross References",
+      "type": "array"
+    },
+    "date_range_end": {
+      "format": "date-time",
+      "title": "Date Range End",
+      "type": "string"
+    },
+    "date_range_start": {
+      "format": "date-time",
+      "title": "Date Range Start",
+      "type": "string"
+    },
+    "fork": {
+      "$ref": "#/$defs/Fork"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "market_sizing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MarketSizing"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "must_address_resolution": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "must_address item \u2192 'cluster:N' | 'web:N' | 'unaddressable: <reason>'.",
+      "title": "Must Address Resolution",
+      "type": "object"
+    },
+    "optimized_axis": {
+      "title": "Optimized Axis",
+      "type": "string"
+    },
+    "partial": {
+      "default": false,
+      "title": "Partial",
+      "type": "boolean"
+    },
+    "pinned_axis": {
+      "title": "Pinned Axis",
+      "type": "string"
+    },
+    "price_finding": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PriceFinding"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "query": {
+      "title": "Query",
+      "type": "string"
+    },
+    "ranked_clusters": {
+      "items": {
+        "$ref": "#/$defs/InsightCluster"
+      },
+      "title": "Ranked Clusters",
+      "type": "array"
+    },
+    "report_id": {
+      "title": "Report Id",
+      "type": "string"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/AudienceSegment"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "slot_plan": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SlotPlan"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source": {
+      "default": "reddit_arctic_shift",
+      "description": "Provenance: 'reddit_arctic_shift' | 'reddit_live' | 'mixed'.",
+      "title": "Source",
+      "type": "string"
+    },
+    "source_map": {
+      "items": {
+        "$ref": "#/$defs/SourceMapEntry"
+      },
+      "title": "Source Map",
+      "type": "array"
+    },
+    "total_distinct_authors": {
+      "title": "Total Distinct Authors",
+      "type": "integer"
+    },
+    "total_threads": {
+      "title": "Total Threads",
+      "type": "integer"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verdict"
+    },
+    "web_findings": {
+      "items": {
+        "$ref": "#/$defs/WebFinding"
+      },
+      "title": "Web Findings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "report_id",
+    "query",
+    "fork",
+    "pinned_axis",
+    "optimized_axis",
+    "date_range_start",
+    "date_range_end",
+    "total_threads",
+    "total_distinct_authors",
+    "ranked_clusters",
+    "generated_at"
+  ],
+  "title": "DemandReport",
+  "type": "object"
+}

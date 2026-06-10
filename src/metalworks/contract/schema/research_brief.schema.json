@@ -1,0 +1,218 @@
+{
+  "$defs": {
+    "SignalStrength": {
+      "description": "Per-cluster confidence, driven by distinct-author count.\n\nRendered as a text-labelled chip (never color alone) so a thin-evidence\ncluster never reads as authoritative as a well-supported one.",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "SignalStrength",
+      "type": "string"
+    },
+    "TargetSubreddit": {
+      "description": "A subreddit the planner suggested for this brief, with its rationale.\n\nThe rationale is what the planner showed the user during D5 (\"Target\nsubreddits\"). It's persisted so the report can cite back to the\nplanner's reasoning when the user reads the source_map.",
+      "properties": {
+        "name": {
+          "description": "Subreddit name without 'r/' prefix.",
+          "title": "Name",
+          "type": "string"
+        },
+        "rationale": {
+          "description": "One-line reason this sub was suggested.",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "rationale"
+      ],
+      "title": "TargetSubreddit",
+      "type": "object"
+    },
+    "TriageThresholds": {
+      "description": "Three-bucket cutoffs for the exploration step.\n\nTop auto_accept_pct: high cosine to question \u2192 skip LLM, accept.\nBottom auto_reject_pct: low cosine \u2192 skip LLM, reject.\nMiddle: LLM classifier with confidence.\n\nGate on absolute cosine bands AND percentile. Both cosine_floor /\ncosine_ceiling and the percentages are honored; if they disagree by >5%\nrelevance rate, the triage step alerts.",
+      "properties": {
+        "auto_accept_pct": {
+          "default": 0.2,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Auto Accept Pct",
+          "type": "number"
+        },
+        "auto_reject_pct": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Auto Reject Pct",
+          "type": "number"
+        },
+        "cosine_ceiling": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Absolute cosine above which to auto-accept regardless of percentile. None = percentile-only.",
+          "title": "Cosine Ceiling"
+        },
+        "cosine_floor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Absolute cosine below which to auto-reject regardless of percentile. None = percentile-only.",
+          "title": "Cosine Floor"
+        }
+      },
+      "title": "TriageThresholds",
+      "type": "object"
+    }
+  },
+  "description": "The contract produced by the conversational planner.\n\nA Brief is the persisted, versioned record of what the planner and the\nuser agreed to research. Briefs are IMMUTABLE: editing a brief writes a\nnew row with a fresh `brief_id` and a `supersedes` pointer to the prior\nversion. Runs FK to a single brief_id; a re-run after edit creates a new\nrun pointing at the new brief.",
+  "properties": {
+    "brief_id": {
+      "description": "Stable UUID for this version of the brief.",
+      "title": "Brief Id",
+      "type": "string"
+    },
+    "confidence_threshold": {
+      "$ref": "#/$defs/SignalStrength",
+      "default": "medium"
+    },
+    "decision_context": {
+      "description": "What decision will this research inform.",
+      "title": "Decision Context",
+      "type": "string"
+    },
+    "excluded_sources": {
+      "description": "Explicitly out of scope.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Excluded Sources",
+      "type": "array"
+    },
+    "finalized_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "When the user confirmed the brief preview and kicked off the run.",
+      "title": "Finalized At"
+    },
+    "must_address": {
+      "description": "Specific sub-questions the report MUST answer. Surfaced in must_address_resolution.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Must Address",
+      "type": "array"
+    },
+    "output_template": {
+      "default": "full",
+      "enum": [
+        "full",
+        "brief_only"
+      ],
+      "title": "Output Template",
+      "type": "string"
+    },
+    "question": {
+      "description": "The refined research question after the planner conversation.",
+      "title": "Question",
+      "type": "string"
+    },
+    "relevance_rubric": {
+      "description": "One-paragraph definition of relevance the exploration classifier follows. Goes in the user role of the classifier prompt, never system.",
+      "title": "Relevance Rubric",
+      "type": "string"
+    },
+    "success_criteria": {
+      "description": "How the user will judge if the report did its job.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Success Criteria",
+      "type": "array"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Prior brief_id this version replaces. None for the first version.",
+      "title": "Supersedes"
+    },
+    "target_subreddits": {
+      "description": "Reddit communities the corpus pull will cover.",
+      "items": {
+        "$ref": "#/$defs/TargetSubreddit"
+      },
+      "title": "Target Subreddits",
+      "type": "array"
+    },
+    "time_window_months": {
+      "default": 12,
+      "description": "How far back to pull from the historical corpus.",
+      "title": "Time Window Months",
+      "type": "integer"
+    },
+    "triage_thresholds": {
+      "$ref": "#/$defs/TriageThresholds"
+    },
+    "version": {
+      "default": 1,
+      "description": "Monotonic version counter within the supersedes chain.",
+      "title": "Version",
+      "type": "integer"
+    },
+    "web_research_directions": {
+      "description": "External angles to pursue in the web stream.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Web Research Directions",
+      "type": "array"
+    },
+    "workspace_id": {
+      "default": "local",
+      "description": "Owning tenant. Defaults to 'local' for library/CLI use.",
+      "title": "Workspace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "brief_id",
+    "question",
+    "decision_context",
+    "success_criteria",
+    "must_address",
+    "target_subreddits",
+    "web_research_directions",
+    "relevance_rubric"
+  ],
+  "title": "ResearchBrief",
+  "type": "object"
+}

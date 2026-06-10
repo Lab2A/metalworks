@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "Persona": {
+      "description": "Voice profile for one account type used in reply generation.\n\n`background` MUST be authentic \u2014 a true description of who is posting\n(e.g. \"founder of a sleep-tech startup, former RN\"). Fabricated personas\nand invented account histories are prohibited by the usage policy.",
+      "properties": {
+        "background": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AUTHENTIC background of the human/brand behind the account. Never fabricated. See USAGE_POLICY.",
+          "title": "Background"
+        },
+        "example_posts": {
+          "description": "Real writing samples that define the voice.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Example Posts",
+          "type": "array"
+        },
+        "voice_rubric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Distilled description of the voice (tone, quirks, register).",
+          "title": "Voice Rubric"
+        }
+      },
+      "title": "Persona",
+      "type": "object"
+    },
+    "PersonaSet": {
+      "description": "Personas keyed by account_type (e.g. 'founder', 'team', 'brand').",
+      "properties": {
+        "personas": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Persona"
+          },
+          "title": "Personas",
+          "type": "object"
+        }
+      },
+      "title": "PersonaSet",
+      "type": "object"
+    }
+  },
+  "description": "Everything a caller wants the discovery loop to know.\n\nThis is the contract a memory system (or a human-maintained config file)\nrenders into. Plain lists by design: the discovery loop has no opinion\nabout where this knowledge comes from.",
+  "properties": {
+    "avoid": {
+      "description": "Topics, claims, or phrasings to never use.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Avoid",
+      "type": "array"
+    },
+    "personas": {
+      "$ref": "#/$defs/PersonaSet"
+    },
+    "pinned_notes": {
+      "description": "Standing instructions from the caller.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Pinned Notes",
+      "type": "array"
+    },
+    "voice_guidelines": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Voice Guidelines",
+      "type": "array"
+    },
+    "winning_examples": {
+      "description": "Replies that performed well \u2014 style anchors.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Winning Examples",
+      "type": "array"
+    }
+  },
+  "title": "DiscoveryContext",
+  "type": "object"
+}
