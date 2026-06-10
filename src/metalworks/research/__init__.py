@@ -1,0 +1,38 @@
+"""The research vertical: brief → Reddit corpus → triage → clustered demand
+report with verified, permalinked quotes.
+
+Ported from Clique's production pipeline (clique-research-api). The single
+behavioural change from the source is dependency injection: every stage takes
+a `ResearchDeps` instead of reaching for module-level LLM / embedding /
+storage singletons, so the pipeline runs offline with fakes and against any
+provider with real adapters.
+
+Public surface lands incrementally across M2; this package is import-safe with
+no provider dependencies (the heavy bits live behind the `[research]` extra).
+"""
+
+from metalworks.research.deps import ResearchDeps
+from metalworks.research.types import (
+    ClassifierVerdict,
+    ExplorationItem,
+    HydrationResult,
+    LoadedComment,
+    LoadedPost,
+    MonthRef,
+    SynthesisOutput,
+    TriageBuckets,
+    TriangulationOutput,
+)
+
+__all__ = [
+    "ClassifierVerdict",
+    "ExplorationItem",
+    "HydrationResult",
+    "LoadedComment",
+    "LoadedPost",
+    "MonthRef",
+    "ResearchDeps",
+    "SynthesisOutput",
+    "TriageBuckets",
+    "TriangulationOutput",
+]
