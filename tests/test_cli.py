@@ -113,3 +113,34 @@ def test_mcp_serve_sse_refuses_without_token(monkeypatch: pytest.MonkeyPatch) ->
     result = runner.invoke(app, ["mcp", "serve", "--transport", "sse"])
     assert result.exit_code == 1
     assert "token" in result.output.lower()
+
+
+# Every registered command group, so the smoke test below fails the moment a new
+# group is added without help that renders.
+_COMMAND_GROUPS = [
+    [],
+    ["research"],
+    ["reddit"],
+    ["reddit", "subreddit"],
+    ["reddit", "auth"],
+    ["arctic"],
+    ["discovery"],
+    ["config"],
+    ["mcp"],
+]
+
+
+@pytest.mark.parametrize("group", _COMMAND_GROUPS)
+def test_help_renders_for_every_command_group(group: list[str]) -> None:
+    result = runner.invoke(app, [*group, "--help"])
+    assert result.exit_code == 0, f"`metalworks {' '.join(group)} --help` failed to render"
+
+
+def test_help_text_points_at_real_post_command_not_a_phantom_subcommand() -> None:
+    """Regression: the discovery help told users to run `reddit post comment`,
+    which is not a command (the real one is `reddit post`). Naming drift across
+    surfaces is exactly what the help should never do."""
+    result = runner.invoke(app, ["discovery", "run", "--help"])
+    assert result.exit_code == 0
+    assert "reddit post comment" not in result.output
+    assert "reddit post" in result.output

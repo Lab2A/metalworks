@@ -11,30 +11,20 @@ out of scope by design.
 """
 
 from metalworks.reddit.compliance import heuristic_check, heuristic_check_post
-from metalworks.reddit.fetcher import RedditMetrics, post_id_from_url
-from metalworks.reddit.inbox import (
-    build_permalink,
-    classify_kind,
-    fetch_inbox,
-    inbox_item_from_child,
-    persist_inbox,
-)
-from metalworks.reddit.oauth import PostResult, RedditOAuth, TokenBundle, parse_scopes
+from metalworks.reddit.fetcher import RedditMetrics
+from metalworks.reddit.inbox import fetch_inbox
+from metalworks.reddit.oauth import PostResult, RedditOAuth, TokenBundle
 from metalworks.reddit.ratelimit import RateLimiter
-from metalworks.reddit.search import (
-    RedditSearch,
-    author_hash,
-    comment_from_node,
-    post_from_submission,
-)
-from metalworks.reddit.subreddit import (
-    Cache,
-    TTLCache,
-    extract_rules_summary,
-    fetch_subreddit_intel,
-    normalize_submission_type,
-)
+from metalworks.reddit.search import RedditSearch
+from metalworks.reddit.subreddit import Cache, TTLCache, fetch_subreddit_intel
 
+# Public surface: the clients you construct (RedditSearch, RedditOAuth,
+# RateLimiter, the injectable Cache/TTLCache), the functions you call
+# (fetch_inbox, fetch_subreddit_intel, heuristic_check[_post]), and the result
+# types you handle (PostResult, TokenBundle, RedditMetrics). The node→model
+# transforms and URL/scope parsers (post_from_submission, build_permalink,
+# parse_scopes, …) are internal plumbing — import them from their submodules
+# (metalworks.reddit.search / .inbox / .oauth / .subreddit) if you need them.
 __all__ = [
     "Cache",
     "PostResult",
@@ -44,19 +34,8 @@ __all__ = [
     "RedditSearch",
     "TTLCache",
     "TokenBundle",
-    "author_hash",
-    "build_permalink",
-    "classify_kind",
-    "comment_from_node",
-    "extract_rules_summary",
     "fetch_inbox",
     "fetch_subreddit_intel",
     "heuristic_check",
     "heuristic_check_post",
-    "inbox_item_from_child",
-    "normalize_submission_type",
-    "parse_scopes",
-    "persist_inbox",
-    "post_from_submission",
-    "post_id_from_url",
 ]

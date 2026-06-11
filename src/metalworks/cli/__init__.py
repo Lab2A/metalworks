@@ -682,7 +682,7 @@ def discovery_run(
     """Search Reddit, draft replies, and gate each through the compliance check.
 
     Produces draft opportunities only. It never posts. Review the drafts, then
-    post a chosen one with `metalworks reddit post comment <url> --text ...`.
+    post a chosen one with `metalworks reddit post <url> --text ...`.
     """
     from metalworks.contract import DiscoveryContext
     from metalworks.discovery import DiscoveryDeps, run_discovery
@@ -710,7 +710,7 @@ def discovery_run(
         console.print(f"  [dim]draft:[/dim] {opp.draft_reply[:240]}")
     console.print(
         f"\n[dim]{len(opportunities)} draft(s). Nothing was posted. "
-        "Post a chosen one with: metalworks reddit post comment <url> --text ...[/dim]"
+        "Post a chosen one with: metalworks reddit post <url> --text ...[/dim]"
     )
 
 

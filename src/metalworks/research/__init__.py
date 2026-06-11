@@ -11,30 +11,16 @@ no provider dependencies (the heavy bits live behind the `[research]` extra).
 
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
 from metalworks.research.pipeline import run_research
-from metalworks.research.types import (
-    ClassifierVerdict,
-    ExplorationItem,
-    HydrationResult,
-    LoadedComment,
-    LoadedPost,
-    MonthRef,
-    SynthesisOutput,
-    TriageBuckets,
-    TriangulationOutput,
-)
 
+# Public surface: the entry point (`run_research`), the dependency bundle
+# (`ResearchDeps`), and the two injection protocols a caller implements to swap
+# the corpus / comment source. The pipeline's intermediate result types
+# (ExplorationItem, LoadedPost, SynthesisOutput, …) are internal — import them
+# from `metalworks.research.types` if you need them; they are not part of the
+# stable surface.
 __all__ = [
-    "ClassifierVerdict",
     "CommentSource",
     "CorpusReader",
-    "ExplorationItem",
-    "HydrationResult",
-    "LoadedComment",
-    "LoadedPost",
-    "MonthRef",
     "ResearchDeps",
-    "SynthesisOutput",
-    "TriageBuckets",
-    "TriangulationOutput",
     "run_research",
 ]

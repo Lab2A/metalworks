@@ -454,9 +454,9 @@ class _DiscoveryNamespace:
     ) -> ReplyGenerationV2 | None:
         """Draft a reply to one thread in your voice (a building block)."""
         from metalworks.contract import DiscoveryContext, Persona
-        from metalworks.discovery import generate_reply
+        from metalworks.discovery import draft_reply
 
-        return generate_reply(
+        return draft_reply(
             self._r.chat(),
             post,
             persona or Persona(),
