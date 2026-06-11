@@ -7,33 +7,37 @@ search, embeddings, storage, data source) is a swappable protocol, so you can
 assemble your own product on top of it.
 
 > **Status: pre-release (0.0.1).** APIs are unstable below 1.0. The stable
-> surface is the `metalworks.contract` Pydantic models and the MCP tool
-> contracts. Everything else may change in any 0.x release. Some surfaces below
-> are marked **planned for 0.1** where they are not wired yet, this README is
-> honest about what runs today.
+> surface is the `Metalworks` facade, the `metalworks.contract` Pydantic models,
+> and the MCP tool contracts. Everything else may change in any 0.x release. Some
+> surfaces below are marked **planned for 0.1** where they are not wired yet;
+> this README is honest about what runs today.
 
 Read the [USAGE_POLICY](USAGE_POLICY.md) before you use the Reddit side. Short
 version: authentic, disclosed engagement only. No fake personas, no vote
 manipulation, no coordinated inauthentic behavior.
 
-## 60-second quickstart (no API key)
+## Quickstart (no API key)
 
-The headline is the offline demo. It runs against committed Reddit sample data,
-touches no network, and needs no keys.
+The headline is the offline demo: fake models on a bundled Reddit corpus, no
+keys, no network.
 
 ```bash
-pip install metalworks
-metalworks quickstart    # planned for 0.1 — offline demo on bundled sample shards
+pip install "metalworks[arctic]"
 ```
 
-`quickstart` builds a small demand report end to end with the in-memory store
-and the bundled fake models, so you can see the shape of the output before you
-decide to plug in your own provider.
+```python
+from metalworks import Metalworks
+
+report = Metalworks.demo().research("Is there demand for a focus supplement?",
+                                    subreddits=["Supplements"])
+print(report.verdict)
+for cluster in report.ranked_clusters:
+    print(cluster.signal, cluster.distinct_author_count, cluster.claim)
+```
 
 ### Then: a real demand report
 
-For a real report you need one LLM provider extra and the matching API key. Pick
-the provider whose key you already have:
+Set one provider key — the provider is inferred from whichever key is present:
 
 ```bash
 pip install "metalworks[google,research]"
@@ -41,48 +45,23 @@ export GOOGLE_API_KEY=...     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
 ```
 
 ```python
-from metalworks.contract import ResearchBrief, TargetSubreddit
-from metalworks.research import ResearchDeps, run_research
-from metalworks.research.arctic.reader import ArcticReader
-from metalworks.stores import MemoryStores
-# from metalworks.llm.adapters.google import GoogleChatModel
-# from metalworks.embeddings.adapters.google import GoogleEmbedding
+from metalworks import Metalworks
 
-brief = ResearchBrief(
-    brief_id="demo-1",
-    question="Is there demand for a focus supplement aimed at developers?",
-    decision_context="Deciding whether to build a nootropic brand.",
-    success_criteria=["Find the top unmet needs", "Gauge willingness to pay"],
-    must_address=["What do people dislike about current options?"],
-    target_subreddits=[TargetSubreddit(name="Nootropics", rationale="core community")],
-    web_research_directions=[],
-    relevance_rubric="Posts discussing focus, energy, or nootropic supplements.",
-)
-
-deps = ResearchDeps(
-    chat=GoogleChatModel("gemini-2.5-pro"),         # bind the model you have a key for
-    embeddings=GoogleEmbedding("gemini-embedding-001"),
-    corpus=MemoryStores(),
-    reader=ArcticReader(),                            # HF Parquet by default
-)
-
-report = run_research(deps, brief=brief)
-print(report.partial, len(report.ranked_clusters))
+mw = Metalworks()             # provider inferred; or Metalworks(model="anthropic/claude-opus-4-6")
+report = mw.research("Is there demand for a focus supplement aimed at developers?",
+                     subreddits=["Nootropics", "Supplements"])
 ```
 
 Every quote in `report.ranked_clusters` is exact-matched to a stored Reddit
 comment, and every web finding carries its source URL from the grounding tool's
 citation metadata, not from model prose. See
-[docs/explanation-open-core.md](docs/explanation-open-core.md) for why.
+[docs/explanation-provenance.md](docs/explanation-provenance.md) for why.
 
-Notes on the real run:
-
-- Submissions come from the Hugging Face `open-index/arctic` Parquet mirror by
-  default. Comments come from the live Arctic Shift API (the bulk mirror's
-  comment tree lags by years). Point `ArcticReader(data_root=...)` at a local
-  directory of `.parquet` files to read offline.
-- Unauthenticated Hugging Face access is rate-limited. Scope the first real pull
-  to a 1 to 3 month window; set `HF_TOKEN` for longer windows.
+The `Metalworks` facade is the easy path over `run_research` / `run_discovery`
+and the protocols — drop down to those whenever you want more control. Submissions
+come from the Hugging Face `open-index/arctic` Parquet mirror; comments from the
+live Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months, or
+[bring your own corpus](docs/how-to-custom-corpus.md) to skip Arctic Shift.
 
 ## Extras
 
@@ -143,14 +122,14 @@ Two verticals sit on top of those protocols:
 
 Four form factors share that contract:
 
-1. **Library** — import and call (works today for the pieces above).
-2. **CLI** — `metalworks ...` (the `version` and `doctor` commands exist;
-   `research`, `reddit`, `arctic`, `discovery`, and `mcp serve` are **planned
-   for 0.1**).
-3. **MCP server** — zero-key data tools plus key-gated pipeline tools (**planned
-   for 0.1**).
+1. **Library** — `from metalworks import Metalworks`, or the functions and
+   protocols underneath.
+2. **CLI** — `metalworks research|reddit|arctic|discovery run`, `metalworks
+   quickstart`, `metalworks doctor`, `metalworks mcp serve`.
+3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
+   or SSE.
 4. **Claude Code plugin** — `/demand-report` and friends, zero keys on the demo
-   path (**planned for 0.1**).
+   path (`/plugin marketplace add Lab2A/metalworks`).
 
 ## Testing your own adapters and backends
 
@@ -164,16 +143,19 @@ def test_my_backend():
 ```
 
 See [docs/how-to-custom-chatmodel.md](docs/how-to-custom-chatmodel.md) and
-[docs/how-to-supabase-store.md](docs/how-to-supabase-store.md).
+[docs/how-to-custom-store.md](docs/how-to-custom-store.md).
 
 ## Docs
 
-- [Tutorial: your first demand report](docs/tutorial-first-demand-report.md)
-- [How-to: implement a custom ChatModel](docs/how-to-custom-chatmodel.md)
-- [How-to: bind a Supabase store](docs/how-to-supabase-store.md)
+- [Quickstart](docs/quickstart.md) and [Core concepts](docs/concepts.md)
+- [Guide: demand research](docs/guide-demand-research.md)
+- [Guide: Reddit engagement](docs/guide-reddit-engagement.md)
+- [Guide: build your own](docs/build-your-own.md)
+- [Model configuration](docs/model-configuration.md) (provider/model refs, OpenAI-compatible endpoints)
+- [Building blocks](docs/building-blocks.md) and the [Metalworks client](docs/reference-client.md)
 - [Reference: protocols](docs/reference-protocols.md)
-- [Explanation: open-core and structural provenance](docs/explanation-open-core.md)
-- Agents: see [llms.txt](llms.txt) for a machine-readable index.
+- [Explanation: structural provenance](docs/explanation-provenance.md)
+- Agents: [for coding agents](docs/for-coding-agents.md) and [llms.txt](llms.txt).
 
 ## Project
 

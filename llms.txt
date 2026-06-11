@@ -14,19 +14,31 @@ provider modules. Install only what matches the API key you have:
 
 ## Entry points
 
+- `from metalworks import Metalworks` — the high-level facade and the one entry
+  point most users need. `Metalworks()` resolves a provider from your env keys
+  (or pass `model="provider/model"`). `Metalworks.demo()` runs the whole research
+  pipeline offline with zero keys and zero network (needs `[arctic]`).
+  - `.research(question, subreddits=[...])` -> `DemandReport`.
+  - `.plan(prompt)` -> `ResearchBrief` (walks the D1-D8 planner).
+  - `.reddit.{search,subreddit,comments,rules,inbox,post}` — Reddit surfaces
+    (reads are zero-key; `.post` is gated by the compliance check and audited).
+  - `.discovery.{run,filter,generate}` — the discovery loop and its building blocks.
 - `metalworks.research.run_research(deps, *, brief)` -> `DemandReport`. The
-  research vertical: a `ResearchBrief` becomes a clustered demand report whose
-  quotes are exact-matched to stored Reddit comments and whose web findings
-  carry source URLs from grounding metadata (never model prose). `deps` is a
-  `ResearchDeps` carrying a `ChatModel`, an `EmbeddingProvider`, a corpus repo,
-  and an Arctic Shift reader.
-- `metalworks.reddit`: `RedditSearch`, `RedditOAuth` (httpx, typed errors,
-  encrypted tokens via `TokenCipher`), `RedditMetrics`, `fetch_subreddit_intel`,
-  `RateLimiter`, and `heuristic_check` / `heuristic_check_post` (a deterministic,
-  zero-key compliance gate over reply and post text).
+  research vertical underneath the facade. Quotes are exact-matched to stored
+  Reddit comments; web findings carry source URLs from grounding metadata, never
+  model prose.
+- `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
+  `generate_reply` building blocks.
+- `metalworks.reddit`: `RedditSearch`, `RedditOAuth`, `RedditMetrics`,
+  `fetch_subreddit_intel`, `RateLimiter`, and `heuristic_check` /
+  `heuristic_check_post` (a deterministic, zero-key compliance gate).
 - `metalworks.contract`: the stable Pydantic wire models.
 - `metalworks.testing`: public conformance suites for third-party adapters and
   repo backends.
+
+Model refs: `provider:id` or `provider/model`. Point at any OpenAI-compatible
+endpoint (OpenRouter, vLLM, LM Studio, local) with `OpenAIChatModel(base_url=...,
+api_key_env=...)`. Set a cheap triage model with `Metalworks(model=..., fast_model=...)`.
 
 ## Protocols (the seam everything speaks through)
 
@@ -40,6 +52,6 @@ provider modules. Install only what matches the API key you have:
 ## Usage policy
 
 For authentic, disclosed engagement only. No fake personas, no invented account
-backstories, no vote manipulation, no coordinated inauthentic behavior. The
-account-backstory tooling from the source pipeline was deliberately not
-open-sourced. See USAGE_POLICY.md.
+backstories, no vote manipulation, no coordinated inauthentic behavior. Tooling
+that fabricates account backstories is deliberately not part of metalworks. See
+USAGE_POLICY.md.

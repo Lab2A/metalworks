@@ -1,0 +1,61 @@
+---
+title: "For coding agents"
+description: "A dense map of metalworks for an LLM or coding agent integrating it — entry points, tiers, and the rules that matter."
+---
+
+If you are an agent integrating metalworks, read this page and `llms.txt`, then go.
+
+## The one entry point
+
+```python
+from metalworks import Metalworks
+mw = Metalworks()                       # provider inferred from env keys
+```
+
+- `mw.research(question, subreddits=[...]) -> DemandReport` — demand research.
+- `mw.reddit.search / subreddit / comments / rules / inbox / post` — Reddit surfaces.
+- `mw.discovery.run / filter / generate` — discovery loop + building blocks.
+- `Metalworks.demo()` — offline, zero-key, for a smoke test (needs `[arctic]`).
+
+Construction never raises; a `MissingKeyError` (with a `fix` string) surfaces only
+when a call needs a key. Every error carries `error_code`, `message`, `fix`, and
+`docs_url` — relay the `fix` verbatim.
+
+## MCP tools (the language-agnostic surface)
+
+Run `metalworks mcp serve` (stdio). Tools are tiered:
+
+- **Tier 1 (zero-key):** `compliance_lint`, `reddit_search_posts`,
+  `reddit_get_post_comments`, `reddit_subreddit_info`, `reddit_subreddit_rules`.
+- **Tier 2 (keys):** `arctic_*`, `corpus_stats`, `research_plan_brief`,
+  `research_start` / `research_status` / `research_result`, `generate_reply`,
+  `discovery_run`.
+- **Posting (the security boundary):** `reddit_post_comment` requires a
+  `confirm_token` emitted by a `compliance_lint` pass over that exact text **and**
+  `METALWORKS_ALLOW_POSTING=1`. There is no override.
+
+## The async job pattern
+
+Research and discovery take minutes. Do not call a blocking tool and wait — use
+`research_start` → `research_status` → `research_result`. The synchronous Python
+`mw.research(...)` is for scripts, not for tool-call timeouts.
+
+## Rules that matter
+
+1. **Posting is gated and irreversible.** A blocked draft is refused before it
+   reaches Reddit; every attempt is logged to `~/.metalworks/post-log.jsonl`.
+   Never try to route around the compliance gate.
+2. **Authentic engagement only.** No fabricated personas or backstories. The
+   `Persona.background` field must be real.
+3. **Provenance is enforced.** Quotes are exact-matched; web URLs come from
+   citation metadata. Don't present model-authored text as a sourced quote.
+4. **Pick models by ref.** `Metalworks(model="provider/model")`; point at any
+   OpenAI-compatible endpoint with `base_url`. See
+   [Model configuration](/docs/model-configuration).
+
+## Where to look
+
+- [Metalworks client](/docs/reference-client) — the facade surface.
+- [Building blocks](/docs/building-blocks) — the swappable protocols + functions.
+- [Protocols](/docs/reference-protocols) — exact protocol shapes.
+- `llms.txt` — the machine-readable index.
