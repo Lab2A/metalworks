@@ -123,6 +123,13 @@ class MemoryStores:
             )
         return cosine_topk(query, self._embeddings, k)
 
+    def get_embeddings(
+        self, ids: Sequence[str], *, identity: IndexIdentity
+    ) -> dict[str, list[float]]:
+        if self._embedding_identity != identity:
+            return {}  # index built with a different model → all misses
+        return {cid: list(self._embeddings[cid]) for cid in ids if cid in self._embeddings}
+
     # ── AccountRepo ──
 
     def save_account(self, account: StoredRedditAccount) -> None:

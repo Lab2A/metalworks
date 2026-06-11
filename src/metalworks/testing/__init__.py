@@ -133,6 +133,16 @@ def _check_corpus_embeddings(repo: CorpusRepo) -> None:
         {"mwtest-c0": [1.0, 0.0, 0.0, 0.0], "mwtest-c1": [0.0, 1.0, 0.0, 0.0]},
         identity=identity,
     )
+
+    # get_embeddings (the cache-read path) — numpy-free, always exercised.
+    fetched = repo.get_embeddings(["mwtest-c0", "mwtest-absent"], identity=identity)
+    assert set(fetched) == {"mwtest-c0"}, "get_embeddings must return only stored ids"
+    assert fetched["mwtest-c0"][0] == 1.0
+    wrong_model = IndexIdentity(embedding_model_id="mwtest-other", dim=4)
+    assert repo.get_embeddings(["mwtest-c0"], identity=wrong_model) == {}, (
+        "get_embeddings must miss when the index was built with a different model"
+    )
+
     if importlib.util.find_spec("numpy") is None:
         return  # search needs the [research] extra; the write path is already proven
 

@@ -142,6 +142,16 @@ class CorpusRepo(Protocol):
         ``[research]`` extra (numpy) for the cosine math."""
         ...
 
+    def get_embeddings(
+        self, ids: Sequence[str], *, identity: IndexIdentity
+    ) -> dict[str, list[float]]:
+        """Return the stored vectors for ``ids`` that were embedded under
+        ``identity``, as ``{id: vector}``. Ids with no stored vector — or any when
+        the index was built with a different model — are omitted, so the caller
+        re-embeds the misses. This is the embedding-cache read path; no numpy
+        needed (a plain lookup, not cosine)."""
+        ...
+
 
 @runtime_checkable
 class AccountRepo(Protocol):

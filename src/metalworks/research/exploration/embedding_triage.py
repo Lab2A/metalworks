@@ -40,6 +40,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from metalworks.errors import MissingExtraError
+from metalworks.research.embedding_cache import cached_embed
 from metalworks.research.types import ExplorationItem, TriageBuckets
 
 if TYPE_CHECKING:
@@ -146,10 +147,11 @@ def triage_by_embedding(
     if not q_vec:
         raise RuntimeError("embedding_triage: question embedding failed; cannot triage corpus")
 
-    # Step 2: BATCH-embed every item (PORT CHANGE — one call, not a fan-out)
-    # plus BM25 in-process. The adapter raises on failure, so there is no
-    # per-item None to tolerate.
-    item_vecs = deps.embeddings.embed([it.to_text() for it in items], task="document")
+    # Step 2: embed every item (reusing any persisted corpus vectors, keyed on
+    # post_id, embedding only the misses in one batch) plus BM25 in-process. The
+    # adapter raises on failure, so there is no per-item None to tolerate.
+    cache = cached_embed(deps, [(it.post_id, it.to_text()) for it in items], task="document")
+    item_vecs = [cache[it.post_id] for it in items]
     bm25_raw = _bm25_scores(question, items)
 
     # Step 3: cosine each item against the question.

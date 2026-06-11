@@ -258,6 +258,25 @@ class SqliteStores:
         vectors = {corpus_id: blob_to_vector(blob) for corpus_id, blob in rows}
         return cosine_topk(query, vectors, k)
 
+    def get_embeddings(
+        self, ids: Sequence[str], *, identity: IndexIdentity
+    ) -> dict[str, list[float]]:
+        out: dict[str, list[float]] = {}
+        with self._lock:
+            meta = self._con.execute(
+                "SELECT model_id, dim FROM embedding_meta WHERE id = 1"
+            ).fetchone()
+            if meta is None or meta[0] != identity.embedding_model_id or meta[1] != identity.dim:
+                return {}  # no index, or built with a different model → all misses
+            for chunk in _chunks(ids):
+                marks = ",".join("?" * len(chunk))
+                rows = self._con.execute(
+                    f"SELECT corpus_id, vector FROM embeddings WHERE corpus_id IN ({marks})",
+                    tuple(chunk),
+                ).fetchall()
+                out.update({corpus_id: blob_to_vector(blob) for corpus_id, blob in rows})
+        return out
+
     # ── AccountRepo ──
 
     def save_account(self, account: StoredRedditAccount) -> None:
