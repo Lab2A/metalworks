@@ -23,7 +23,8 @@ typing means `MemoryStores()` satisfies every repo parameter.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -39,6 +40,8 @@ from metalworks.contract import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+_M = TypeVar("_M", bound=BaseModel)
 
 PROTOCOL_VERSION = "1.0"
 
@@ -155,3 +158,50 @@ class InboxRepo(Protocol):
     ) -> list[InboxItem]: ...
 
     def mark_inbox_read(self, message_id: str) -> None: ...
+
+
+class StoredArtifact(BaseModel):
+    """A persisted Tier-2 pillar output + its provenance stamp.
+
+    The artifact itself is any contract model (PositioningBrief, MarketingSite,
+    ContentPlan, …) serialized into ``payload_json``. The stamp — ``report_id`` +
+    ``generated_at`` — is what makes staleness detectable: when research re-runs
+    and mints a new ``report_id``, a snapshot whose ``report_id`` no longer matches
+    the project's latest run is flagged stale (per Decision §9.1). ``parse`` rebuilds
+    the typed artifact.
+    """
+
+    project_id: str
+    report_id: str
+    stage: str = Field(description="Arc stage: 'design' | 'launch' | 'growth' | ….")
+    kind: str = Field(description="Artifact kind, e.g. 'positioning' | 'site' | 'content_plan'.")
+    generated_at: datetime
+    payload_json: str = Field(description="The pillar artifact, serialized as JSON.")
+
+    def parse(self, model: type[_M]) -> _M:
+        """Rebuild the typed artifact from ``payload_json``."""
+        return model.model_validate_json(self.payload_json)
+
+
+@runtime_checkable
+class ArtifactStore(Protocol):
+    """Tier-2 derived-artifact persistence, keyed ``(project_id, report_id, stage,
+    kind)``. One small protocol that lets every downstream stage persist without a
+    shared container type — pillars stay pure functions.
+
+    Persist-only-latest: ``get_latest`` returns the most recent artifact of a kind;
+    history is the file/git layer, not this API. The default backend is a
+    :class:`~metalworks.stores.FileStore` (markdown+json on disk); hosted backends
+    bind to the same protocol downstream.
+    """
+
+    def save_artifact(
+        self, project_id: str, report_id: str, stage: str, kind: str, obj: BaseModel
+    ) -> StoredArtifact:
+        """Persist ``obj`` as the latest artifact of ``kind`` (overwriting any prior
+        latest) and return the stored envelope."""
+        ...
+
+    def get_latest(self, project_id: str, kind: str) -> StoredArtifact | None: ...
+
+    def list_artifacts(self, project_id: str) -> list[StoredArtifact]: ...
