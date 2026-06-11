@@ -35,12 +35,33 @@ about tenants.
 
 from __future__ import annotations
 
+import hashlib
 import math
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+from metalworks.contract.evidence import EvidenceRecord
+
+# ──────────────────────────────────────────────────────────────────────────
+# Evidence ids
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _evidence_id(prefix: str, *parts: str) -> str:
+    """Deterministic, content-addressed evidence id, e.g. ``q:1a2b3c4d5e6f``.
+
+    Stable across (de)serialization because it is a pure function of the
+    evidence content. Scoped by resolution-within-report (see
+    ``metalworks.contract.evidence``): unique + stable within one report is
+    enough, so we do not embed ``report_id``. The ``\\x1f`` unit separator
+    keeps ``("ab", "c")`` distinct from ``("a", "bc")``.
+    """
+    digest = hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}:{digest}"
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # Enums
@@ -92,6 +113,12 @@ class QuoteCitation(BaseModel):
         "counting, never the raw username. Pseudonymization, not anonymization."
     )
     upvotes: int = Field(default=0, description="Upvotes on the source comment, for context.")
+
+    @computed_field
+    @property
+    def id(self) -> str:
+        """Stable content-addressed evidence id (``q:<hash of permalink|text>``)."""
+        return _evidence_id("q", self.permalink, self.text)
 
 
 class InsightCluster(BaseModel):
@@ -188,6 +215,12 @@ class PriceEvidence(BaseModel):
     kind: str
     amount: float | None = None
     permalink: str | None = None
+
+    @computed_field
+    @property
+    def id(self) -> str:
+        """Stable content-addressed evidence id (``p:<hash of permalink|text>``)."""
+        return _evidence_id("p", self.permalink or "", self.text)
 
 
 class PriceFinding(BaseModel):
@@ -350,6 +383,12 @@ class WebFinding(BaseModel):
     )
     confidence: SignalStrength = Field(description="Service-assigned, not LLM-assigned.")
 
+    @computed_field
+    @property
+    def id(self) -> str:
+        """Stable content-addressed evidence id (``w:<hash of source_url|claim>``)."""
+        return _evidence_id("w", self.source_url, self.claim)
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # Corpus-level statistics + exploration report
@@ -491,6 +530,46 @@ class DemandReport(BaseModel):
         default_factory=dict,
         description="must_address item → 'cluster:N' | 'web:N' | 'unaddressable: <reason>'.",
     )
+
+    @property
+    def evidence(self) -> list[EvidenceRecord]:
+        """Flat, de-duplicated evidence backing this report.
+
+        This is what downstream pillars' ``EvidenceRef``s resolve against
+        (by ``EvidenceRecord.id``). Derived on access — never stored or
+        serialized, so it is always consistent with the report's own fields
+        after a round-trip through the FileStore. De-dups by id (the same
+        quote can back more than one cluster).
+        """
+        records: dict[str, EvidenceRecord] = {}
+        for cluster in self.ranked_clusters:
+            for q in cluster.quotes:
+                records.setdefault(
+                    q.id,
+                    EvidenceRecord(
+                        id=q.id, kind="quote", text=q.text, url=q.permalink, provenance="verbatim"
+                    ),
+                )
+        for w in self.web_findings:
+            records.setdefault(
+                w.id,
+                EvidenceRecord(
+                    id=w.id, kind="web", text=w.claim, url=w.source_url, provenance="grounded-web"
+                ),
+            )
+        if self.price_finding is not None:
+            for p in self.price_finding.evidence:
+                records.setdefault(
+                    p.id,
+                    EvidenceRecord(
+                        id=p.id,
+                        kind="price",
+                        text=p.text,
+                        url=p.permalink or "",
+                        provenance="verbatim" if p.permalink else "derived",
+                    ),
+                )
+        return list(records.values())
 
 
 # ──────────────────────────────────────────────────────────────────────────

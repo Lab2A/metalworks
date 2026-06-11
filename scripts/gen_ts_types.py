@@ -42,6 +42,8 @@ from metalworks.contract import (  # noqa: E402
     CrossReference,
     DemandReport,
     DiscoveryContext,
+    EvidenceRecord,
+    EvidenceRef,
     ExplorationReport,
     Fork,
     InboxItem,
@@ -77,6 +79,8 @@ ENUMS: list[type[enum.Enum]] = [
 # Models to emit, in dependency order (leaves first).
 MODELS: list[type[BaseModel]] = [
     # research
+    EvidenceRef,
+    EvidenceRecord,
     QuoteCitation,
     InsightCluster,
     SlotPlan,
@@ -186,6 +190,19 @@ def _emit_interface(model: type[BaseModel]) -> str:
         if doc:
             lines.append(f"  /** {doc} */")
         lines.append(f"  {wire_name}{optional}: {ts}{suffix};")
+    # Computed fields (e.g. content-addressed evidence ids) are absent from
+    # model_fields but ARE present in the serialized payload (model_dump). The TS
+    # twin describes that serialized shape, so emit them. (The JSON-schema
+    # snapshots stay validation-mode and omit computed fields — they describe
+    # valid *input*, where a computed id is ignored — so the two views differ by
+    # design: TS = output shape, schema = input shape.)
+    for name, cfield in model.model_computed_fields.items():
+        ts, nullable = _ts_type(cfield.return_type)
+        suffix = " | null" if nullable else ""
+        doc = (cfield.description or "").replace("\n", " ").strip()
+        if doc:
+            lines.append(f"  /** {doc} */")
+        lines.append(f"  {name}: {ts}{suffix};")
     lines.append("}")
     return "\n".join(lines)
 
