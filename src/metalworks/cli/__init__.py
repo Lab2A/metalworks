@@ -304,26 +304,35 @@ def research_plan(
 
 @research_app.command("run")
 def research_run(
-    brief: Annotated[Path, typer.Option("--brief", help="Path to a brief.json.")],
+    question: Annotated[
+        str | None,
+        typer.Option("--question", "-q", help="Research question; skips the brief.json step."),
+    ] = None,
+    brief: Annotated[
+        Path | None,
+        typer.Option("--brief", help="Path to a brief.json (alternative to --question)."),
+    ] = None,
+    subreddit: Annotated[
+        list[str] | None,
+        typer.Option("--subreddit", help="Subreddit to cover, repeatable; else auto."),
+    ] = None,
     months: Annotated[
-        int | None, typer.Option("--months", help="Override the time window.")
+        int | None, typer.Option("--months", help="Corpus time window in months (default 12).")
     ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
     ] = None,
 ) -> None:
-    """Run the research pipeline against a brief.json and print/save the report."""
+    """Run the research pipeline from a --question (no brief.json needed) or a --brief file."""
     from metalworks.contract import ResearchBrief
     from metalworks.research import run_research
     from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
+    from metalworks.research.planner import brief_from_question
 
-    if not brief.is_file():
-        err_console.print(f"[red]No such brief file: {brief}[/red]")
-        raise typer.Exit(code=1)
-    research_brief = ResearchBrief.model_validate_json(brief.read_text(encoding="utf-8"))
-    if months is not None:
-        research_brief = research_brief.model_copy(update={"time_window_months": months})
+    if (question is None) == (brief is None):
+        err_console.print("[red]Pass exactly one of --question or --brief.[/red]")
+        raise typer.Exit(code=2)
 
     chat = _resolve_chat_or_exit()
     embeddings = config.resolve_embeddings()
@@ -337,6 +346,20 @@ def research_run(
         search=config.resolve_search(),
         comments=ArcticShiftApiClient(),
     )
+
+    if brief is not None:
+        if not brief.is_file():
+            err_console.print(f"[red]No such brief file: {brief}[/red]")
+            raise typer.Exit(code=1)
+        research_brief = ResearchBrief.model_validate_json(brief.read_text(encoding="utf-8"))
+        if months is not None:
+            research_brief = research_brief.model_copy(update={"time_window_months": months})
+    else:
+        assert question is not None  # guaranteed by the exactly-one check above
+        research_brief = brief_from_question(
+            deps, question, subreddits=subreddit, time_window_months=months or 12
+        )
+
     console.print(f"[bold]Running research[/bold] for: {research_brief.question}")
     try:
         report = run_research(deps, brief=research_brief)

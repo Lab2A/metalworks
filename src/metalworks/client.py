@@ -16,7 +16,6 @@ top level — every such symbol is imported inside the method that needs it, so
 
 from __future__ import annotations
 
-import uuid
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,10 +40,6 @@ if TYPE_CHECKING:
     from metalworks.stores import MemoryStores, SqliteStores
 
     Store = MemoryStores | SqliteStores
-
-
-def _new_id() -> str:
-    return str(uuid.uuid4())
 
 
 class _Resolver:
@@ -272,8 +267,9 @@ class Metalworks:
         compatibility, and the front door's return shape never breaks as the
         stage grows.
         """
-        from metalworks.contract import Research, ResearchBrief, TargetSubreddit
+        from metalworks.contract import Research, ResearchBrief
         from metalworks.research import run_research
+        from metalworks.research.planner import brief_from_question
 
         deps = self._r.research_deps()
         if isinstance(question, ResearchBrief):
@@ -284,26 +280,9 @@ class Metalworks:
                 if time_window_months is not None
                 else (1 if self._r.offline else 12)
             )
-            targets = [
-                TargetSubreddit(name=s, rationale="caller-specified") for s in (subreddits or [])
-            ]
-            brief = ResearchBrief(
-                brief_id=_new_id(),
-                question=question,
-                decision_context="Assess the Reddit demand signal behind this question.",
-                success_criteria=["Surface the top unmet needs and the demand signal."],
-                must_address=[],
-                target_subreddits=targets,
-                web_research_directions=[],
-                relevance_rubric=f"Posts and comments relevant to: {question}",
-                time_window_months=window,
+            brief = brief_from_question(
+                deps, question, subreddits=subreddits, time_window_months=window
             )
-            if not targets:
-                from metalworks.research.planner import pick_target_subreddits
-
-                brief = brief.model_copy(
-                    update={"target_subreddits": pick_target_subreddits(deps, brief=brief)}
-                )
         report = run_research(
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )

@@ -158,3 +158,16 @@ def test_help_text_points_at_real_post_command_not_a_phantom_subcommand() -> Non
     assert result.exit_code == 0
     assert "reddit post comment" not in result.output
     assert "reddit post" in result.output
+
+
+def test_research_run_requires_a_question_or_brief() -> None:
+    result = runner.invoke(app, ["research", "run"])
+    assert result.exit_code == 2
+    assert "exactly one" in result.output.lower()
+
+
+def test_research_run_rejects_both_question_and_brief(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["research", "run", "--question", "q", "--brief", str(tmp_path / "b.json")]
+    )
+    assert result.exit_code == 2
