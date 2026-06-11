@@ -307,7 +307,18 @@ class Metalworks:
         report = run_research(
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )
-        return Research(demand=report)
+        result = Research(demand=report)
+        # Persist as committed files inside a project (real runs only — demo()
+        # is offline and stays footprint-free).
+        if not self._r.offline:
+            from metalworks.project import Project
+
+            project = Project.find()
+            if project is not None:
+                from metalworks.runs import write_run
+
+                write_run(project, result, question=brief.question)
+        return result
 
     def plan(self, prompt: str) -> ResearchBrief:
         """Walk the D1-D8 planner (recommended answers) → a ``ResearchBrief``."""
