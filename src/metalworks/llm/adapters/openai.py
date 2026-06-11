@@ -82,25 +82,44 @@ class OpenAIChatModel:
         model_id: str = "gpt-5",
         *,
         api_key: str | None = None,
+        api_key_env: str | None = None,
+        base_url: str | None = None,
+        native_structured: bool = True,
         on_generation: GenerationHook | None = None,
     ) -> None:
+        """ChatModel over any OpenAI chat.completions-compatible endpoint.
+
+        Point at a non-OpenAI gateway (OpenRouter, vLLM, LM Studio, Together,
+        Groq, a local server) by passing ``base_url`` plus the env var holding
+        its key via ``api_key_env``. ``base_url`` also falls back to the
+        ``OPENAI_BASE_URL`` env var. Compatible endpoints vary in JSON-schema
+        support, so set ``native_structured=False`` to route structured calls
+        straight to the schema-in-prompt ladder tier; the default keeps the
+        native ``response_format`` path with a tier-3 fallback on rejection.
+        Reasoning-effort tuning is suppressed on non-default endpoints.
+        """
         try:
             openai = importlib.import_module("openai")
         except ImportError as exc:
             raise MissingExtraError("openai") from exc
-        key = api_key or os.environ.get("OPENAI_API_KEY")
+        env_var = api_key_env or "OPENAI_API_KEY"
+        key = api_key or os.environ.get(env_var)
         if not key:
-            raise MissingKeyError("OPENAI_API_KEY", provider="OpenAI")
+            raise MissingKeyError(env_var, provider="OpenAI-compatible")
+        resolved_base_url = base_url or os.environ.get("OPENAI_BASE_URL")
         self.model_id = model_id
+        self._is_compat = resolved_base_url is not None
         self.capabilities = ChatCapabilities(
-            native_structured=True,
+            native_structured=native_structured,
             tool_calls=True,
             native_grounding=False,
-            thinking=True,
+            # reasoning_effort is OpenAI-specific; don't advertise thinking on
+            # an arbitrary compatible endpoint.
+            thinking=not self._is_compat,
         )
         self._on_generation = on_generation
         self._bad_request_error: type[Exception] = openai.BadRequestError
-        self._client: Any = openai.OpenAI(api_key=key)
+        self._client: Any = openai.OpenAI(api_key=key, base_url=resolved_base_url)
 
     # ── ChatModel ──
 
@@ -142,6 +161,25 @@ class OpenAIChatModel:
         thinking_budget: int = 0,
         timeout_s: float = 120.0,
     ) -> T:
+        def _text(ask: str) -> str:
+            return self.complete_text(
+                system=system,
+                user=ask,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                thinking_budget=thinking_budget,
+                timeout_s=timeout_s,
+            ).text
+
+        if not self.capabilities.native_structured:
+            # Compatible endpoint without reliable json_schema support: go
+            # straight to ladder tier 3 (schema-in-prompt + one retry).
+            return prompt_embedded_structured(
+                model_id=self.model_id,
+                output_model=output_model,
+                complete_text=_text,
+                user=user,
+            )
         response_format = {
             "type": "json_schema",
             "json_schema": {
@@ -167,16 +205,6 @@ class OpenAIChatModel:
             )
         except self._bad_request_error:
             # Schema rejected by the API — fall through to ladder tier 3.
-            def _text(ask: str) -> str:
-                return self.complete_text(
-                    system=system,
-                    user=ask,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    thinking_budget=thinking_budget,
-                    timeout_s=timeout_s,
-                ).text
-
             return prompt_embedded_structured(
                 model_id=self.model_id,
                 output_model=output_model,
@@ -207,6 +235,10 @@ class OpenAIChatModel:
 
     def _tuning_kwargs(self, temperature: float, thinking_budget: int) -> dict[str, Any]:
         """Per-model temperature / reasoning_effort handling (see module docstring)."""
+        # reasoning_effort is OpenAI-proper; a compatible endpoint may reject it
+        # even when the model id pattern-matches (e.g. openai/gpt-5 via OpenRouter).
+        if self._is_compat:
+            return {"temperature": temperature}
         if _supports_reasoning(self.model_id):
             effort = _reasoning_effort(thinking_budget)
             return {"reasoning_effort": effort} if effort is not None else {}

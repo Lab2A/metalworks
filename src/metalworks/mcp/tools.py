@@ -293,7 +293,7 @@ def research_plan_brief(prompt: str, store_path: str | None = None) -> ToolResul
     from metalworks import config
     from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
-    from metalworks.research.planner import QUESTIONS, BriefState, assemble_brief, provide_content
+    from metalworks.research.planner import plan_brief
 
     chat = config.resolve_chat()
     store = config.default_store(store_path)
@@ -301,21 +301,7 @@ def research_plan_brief(prompt: str, store_path: str | None = None) -> ToolResul
     deps = ResearchDeps(
         chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
     )
-    state = BriefState(brief_id=str(uuid.uuid4()), prompt=prompt)
-    for spec in QUESTIONS:
-        brief = provide_content(
-            deps, question_spec=spec, prompt=prompt, prior_answers=dict(state.answers)
-        )
-        recommended = next(
-            (i for i, o in enumerate(brief.options) if o.is_recommended), 0 if brief.options else -1
-        )
-        labels = [brief.options[recommended].label] if recommended >= 0 else []
-        state.answers[spec.decision_id] = {
-            "option_indices": [recommended] if recommended >= 0 else [],
-            "custom_text": "",
-            "selected_labels": labels,
-        }
-    research_brief = assemble_brief(deps, state=state)
+    research_brief = plan_brief(deps, prompt)
     return {"brief": research_brief.model_dump(mode="json")}
 
 
@@ -381,6 +367,8 @@ def generate_reply(thread_url: str, *, voice: str | None = None) -> ToolResult:
     the deterministic compliance gate. Returns the draft, the verdict, and — when
     it passes — a ``confirm_token`` usable with ``reddit_post_comment``."""
     from metalworks import config
+    from metalworks.contract import DiscoveryContext, Persona
+    from metalworks.discovery import generate_reply as draft_reply
     from metalworks.reddit import RedditSearch, heuristic_check
 
     chat = config.resolve_chat()
@@ -394,13 +382,20 @@ def generate_reply(thread_url: str, *, voice: str | None = None) -> ToolResult:
                 "docs_url": _DOCS_BASE,
             }
         }
-    system = (
-        "You write authentic, disclosed, genuinely-helpful Reddit replies. No marketing voice, "
-        "no AI tells, no em-dashes, no calls to action. Be specific and human."
-        + (f" Voice: {voice}." if voice else "")
-    )
-    user = f"Thread title: {post.title}\n\nThread body:\n{post.selftext}\n\nWrite a helpful reply."
-    draft = chat.complete_text(system=system, user=user).text
+    # Delegate to the real discovery reply seam (persona/voice-aware, with the
+    # pro→flash degradation retry) rather than a bespoke prompt.
+    context = DiscoveryContext(voice_guidelines=[voice] if voice else [])
+    reply = draft_reply(chat, post, Persona(), "expert", context, subreddit_rules=[])
+    if reply is None or not reply.reply_text.strip():
+        return {
+            "error": {
+                "error_code": "generation_failed",
+                "message": "The model did not return a usable reply draft.",
+                "fix": "Retry, or try a different thread or chat model.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    draft = reply.reply_text
     verdict = heuristic_check(draft)
     payload: ToolResult = {
         "draft": draft,

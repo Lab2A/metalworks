@@ -328,3 +328,62 @@ def test_query_performance_orders_queries() -> None:
     run_discovery(deps, queries=["low", "high"])
 
     assert search.queries == ["high", "low"]
+
+
+# ── Standalone seam tests (WS3: filter_post / generate_reply are public) ─────
+
+
+def test_filter_post_standalone_building_block() -> None:
+    from metalworks.discovery import FilterDecision, filter_post
+
+    chat = FakeChatModel()
+    chat.script(FilterDecision, _keep())
+    decision = filter_post(chat, _post(), DiscoveryContext())
+    assert decision is not None
+    assert decision.keep is True
+
+
+def test_filter_post_reports_errors_via_callback() -> None:
+    from metalworks.discovery import filter_post
+
+    class _BoomChat(FakeChatModel):
+        def complete_structured(self, **kwargs: object) -> object:  # type: ignore[override]
+            raise RuntimeError("boom")
+
+    errors: list[str] = []
+    decision = filter_post(_BoomChat(), _post(), DiscoveryContext(), on_error=errors.append)
+    assert decision is None
+    assert errors and errors[0].startswith("filter-error:")
+
+
+def test_generate_reply_standalone_building_block() -> None:
+    from metalworks.discovery import ReplyGenerationV2, generate_reply
+
+    chat = FakeChatModel()
+    chat.script(ReplyGenerationV2, _reply())
+    reply = generate_reply(chat, _post(), Persona(), "expert", DiscoveryContext())
+    assert reply is not None
+    assert reply.reply_text.strip()
+
+
+def test_generate_reply_retries_on_fast_chat_when_capable_returns_empty() -> None:
+    from metalworks.discovery import ReplyGenerationV2, generate_reply
+
+    capable = FakeChatModel()
+    capable.script(ReplyGenerationV2, _reply(text="   "))  # empty → triggers pro→flash retry
+    fast = FakeChatModel()
+    fast.script(ReplyGenerationV2, _reply(text="recovered budget log aggregation reply text"))
+
+    events: list[str] = []
+    reply = generate_reply(
+        capable,
+        _post(),
+        Persona(),
+        "expert",
+        DiscoveryContext(),
+        fast_chat=fast,
+        on_event=events.append,
+    )
+    assert reply is not None
+    assert reply.reply_text == "recovered budget log aggregation reply text"
+    assert any(e.startswith("generate-retry:") for e in events)

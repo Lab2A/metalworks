@@ -20,7 +20,7 @@ from metalworks.discovery.prompts import (
     build_filter_prompt,
     build_generate_prompt,
 )
-from metalworks.discovery.service import run_discovery
+from metalworks.discovery.service import filter_post, generate_reply, run_discovery
 
 __all__ = [
     "DiscoveryDeps",
@@ -29,6 +29,8 @@ __all__ = [
     "build_filter_prompt",
     "build_generate_prompt",
     "build_llm_judge_prompt",
+    "filter_post",
+    "generate_reply",
     "llm_judge",
     "run_discovery",
 ]

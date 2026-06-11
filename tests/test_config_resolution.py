@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from metalworks import config
+from metalworks.config import _resolve_chat_provider as resolve_provider
 from metalworks.errors import MissingKeyError
 
 _CHAT_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY")
@@ -134,3 +135,53 @@ def test_default_store_sqlite_path(tmp_path: Path) -> None:
     store = config.default_store(str(tmp_path / "s.db"))
     assert type(store).__name__ == "SqliteStores"
     assert (tmp_path / "s.db").exists()
+
+
+# ── provider/model slash refs (A1 routing) + resolve_models ──────────────────
+
+
+def test_slash_ref_known_provider_routes_native() -> None:
+    # A bare known-provider slash stays native (never mis-routes to OpenRouter).
+    assert resolve_provider("anthropic/claude-opus") == ("anthropic", "claude-opus")
+    assert resolve_provider("google/gemini-3-pro") == ("google", "gemini-3-pro")
+
+
+def test_slash_ref_explicit_compat_prefix() -> None:
+    assert resolve_provider("openrouter/x/y") == ("openrouter", "x/y")
+    assert resolve_provider("openai-compatible/local") == (
+        "openai-compatible",
+        "local",
+    )
+
+
+def test_slash_ref_unknown_vendor_routes_to_openrouter() -> None:
+    # Unknown head (a vendor namespace) → OpenRouter, full ref as the id.
+    assert resolve_provider("meta-llama/llama-3-70b") == (
+        "openrouter",
+        "meta-llama/llama-3-70b",
+    )
+
+
+def test_colon_ref_still_works() -> None:
+    assert resolve_provider("anthropic:claude-x") == ("anthropic", "claude-x")
+
+
+def test_resolve_chat_openrouter_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pytest.importorskip("openai")  # compat adapter wraps the openai SDK
+    monkeypatch.chdir(tmp_path)
+    _clear_chat_keys(monkeypatch)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    model = config.resolve_chat("openrouter/meta-llama/llama-3-70b")
+    assert type(model).__name__ == "OpenAIChatModel"
+    assert model.capabilities.native_structured is False
+
+
+def test_resolve_models_fast_falls_back_to_main(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("anthropic")
+    monkeypatch.chdir(tmp_path)
+    _clear_chat_keys(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    main, fast = config.resolve_models()
+    assert main is fast  # no fast_model given → fast slot is the main model
