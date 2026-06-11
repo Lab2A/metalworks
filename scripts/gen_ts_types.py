@@ -60,6 +60,7 @@ from metalworks.contract import (  # noqa: E402
     RedditComment,
     RedditPost,
     ReportSummary,
+    Research,
     ResearchBrief,
     RunSummary,
     SignalStrength,
@@ -99,6 +100,7 @@ MODELS: list[type[BaseModel]] = [
     CorpusStats,
     CrossReference,
     DemandReport,
+    Research,
     ReportSummary,
     RunSummary,
     # reddit

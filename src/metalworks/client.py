@@ -27,10 +27,10 @@ if TYPE_CHECKING:
         Persona,
         RedditComment,
         RedditPost,
+        Research,
         ResearchBrief,
         SubredditIntel,
     )
-    from metalworks.contract.research import DemandReport
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
@@ -211,9 +211,10 @@ class Metalworks:
         """A fully offline facade — fake models + a bundled local corpus.
 
         ``Metalworks.demo().research("...", subreddits=["Supplements"])`` runs the
-        whole pipeline with **zero API keys and zero network** and renders a
-        small :class:`~metalworks.contract.research.DemandReport`, so you can see
-        the output shape before plugging in a provider. Requires the ``[arctic]``
+        whole pipeline with **zero API keys and zero network** and returns a
+        small :class:`~metalworks.contract.Research` bundle (its ``.demand`` is a
+        :class:`~metalworks.contract.research.DemandReport`), so you can see the
+        output shape before plugging in a provider. Requires the ``[arctic]``
         extra (duckdb) for the local corpus.
         """
         import tempfile
@@ -253,16 +254,23 @@ class Metalworks:
         time_window_months: int | None = None,
         per_sub_limit: int | None = None,
         max_findings: int = 10,
-    ) -> DemandReport:
-        """Run the demand-research pipeline → a :class:`DemandReport`.
+    ) -> Research:
+        """Run stage 1 ("Research") → a frozen :class:`~metalworks.contract.Research` bundle.
 
         Pass a plain ``question`` (and optionally the ``subreddits`` to cover; if
         omitted, the planner picks them) or a fully-formed
         :class:`~metalworks.contract.ResearchBrief` for full control. The corpus
         window defaults to 12 months (1 month in ``demo()`` mode, where the
         bundled corpus is a single month).
+
+        The demand report is on ``.demand``; ``.evidence`` surfaces its grounded
+        evidence on the bundle. ``.competitors`` / ``.positioning`` are reserved
+        for the landscape and positioning pillars and are ``None`` until they
+        ship — so today this returns one demand report wrapped for forward
+        compatibility, and the front door's return shape never breaks as the
+        stage grows.
         """
-        from metalworks.contract import ResearchBrief, TargetSubreddit
+        from metalworks.contract import Research, ResearchBrief, TargetSubreddit
         from metalworks.research import run_research
 
         deps = self._r.research_deps()
@@ -294,9 +302,10 @@ class Metalworks:
                 brief = brief.model_copy(
                     update={"target_subreddits": pick_target_subreddits(deps, brief=brief)}
                 )
-        return run_research(
+        report = run_research(
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )
+        return Research(demand=report)
 
     def plan(self, prompt: str) -> ResearchBrief:
         """Walk the D1-D8 planner (recommended answers) → a ``ResearchBrief``."""

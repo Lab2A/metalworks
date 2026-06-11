@@ -4,7 +4,8 @@ The high-level entry point is :class:`~metalworks.client.Metalworks`::
 
     from metalworks import Metalworks
 
-    report = Metalworks.demo().research("demand for a focus supplement?")
+    research = Metalworks.demo().research("demand for a focus supplement?")
+    print(research.demand.verdict, len(research.evidence))
 
 Every layer underneath is composable and swappable: the LLM / search /
 embedding / storage protocols, the ``run_research`` / ``run_discovery``

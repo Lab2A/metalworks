@@ -257,6 +257,10 @@ export interface DemandReport {
   must_address_resolution?: Record<string, string>;
 }
 
+export interface Research {
+  demand: DemandReport;
+}
+
 export interface ReportSummary {
   report_id: string;
   query: string;
