@@ -20,7 +20,7 @@ EVERY member of that batch to `relevant=False, reason="other"` — we err on the
 side of REJECT when the classifier breaks, so a silent LLM outage shrinks the
 surviving corpus visibly rather than pretending everything was relevant.
 
-PORT CHANGE (from clique-research-api): the source fanned batches out across a
+DESIGN NOTE: an earlier internal version fanned batches out across a
 ThreadPoolExecutor with a module-level `complete_structured`. Here the injected
 `deps.filter_model` is called sequentially per batch — the model is bound once
 on the adapter and the cheap-vs-capable split is `deps.filter_model` vs

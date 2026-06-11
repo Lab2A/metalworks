@@ -1,8 +1,7 @@
 """End-to-end research pipeline orchestrator.
 
-Ported from clique-research-api's research_pipeline.run_research, with the
-module-level singletons replaced by an injected `ResearchDeps`. The stage
-sequence is unchanged:
+The single research entry point. Every stage takes an injected `ResearchDeps`
+rather than reaching for module-level singletons. The stage sequence:
 
     brief
       → pick effective subreddits (LLM, append-only)

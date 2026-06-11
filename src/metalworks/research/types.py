@@ -2,7 +2,7 @@
 
 These are the dataclasses passed stage-to-stage inside the pipeline — distinct
 from `metalworks.contract`, which is the public wire shape. Ported with field
-names preserved from the source so the Clique migration is mechanical.
+names are kept stable as part of the public contract.
 """
 
 from __future__ import annotations

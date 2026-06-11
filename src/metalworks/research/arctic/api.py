@@ -1,6 +1,6 @@
 """Rate-limited HTTP client for the public Arctic Shift API.
 
-Ported from clique-research-api's ``arctic_shift_api.py``. The endpoint at
+The live Arctic Shift comment API client. The endpoint at
 ``arctic-shift.photon-reddit.com`` serves CURRENT comments — including the
 present month — which the ``open-index/arctic`` HF mirror does not (its comment
 tree stops at 2021-04). Submissions come from the Parquet mirror via

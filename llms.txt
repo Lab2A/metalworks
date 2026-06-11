@@ -2,8 +2,8 @@
 
 > Open-source Python library for marketing research and Reddit engagement.
 > Produces demand reports from real Reddit conversations and provides the
-> OAuth / search / compliance primitives to act on them. MIT licensed, built by
-> the team behind Clique. Pre-release (0.0.1): APIs below 1.0 are unstable
+> OAuth / search / compliance primitives to act on them. MIT licensed and
+> fully composable. Pre-release (0.0.1): APIs below 1.0 are unstable
 > except `metalworks.contract` models and the MCP tool contracts.
 
 Core is dependency-light (pydantic, httpx, typer, rich). Provider SDKs live

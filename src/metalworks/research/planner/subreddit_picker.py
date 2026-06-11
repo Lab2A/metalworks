@@ -1,6 +1,6 @@
 """LLM-driven subreddit picker.
 
-Ported from clique-research-api's ``subreddit_picker.py``. Runs an LLM-backed
+Runs an LLM-backed
 picker that APPENDS new subreddits to the user's D5 selection. Design
 constraints (preserved from the source):
 

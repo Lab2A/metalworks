@@ -1,6 +1,6 @@
 """Content provider for DecisionBriefs.
 
-Ported from clique-research-api's ``llm_planner.py``. :func:`provide_content`
+:func:`provide_content`
 produces the next :class:`DecisionBrief` for a planner turn.
 
 Port change: the source's ``PLANNER_MODE`` env switch (stub vs vertex) is

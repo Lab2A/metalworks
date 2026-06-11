@@ -1,6 +1,6 @@
 """run_discovery — the filter → generate → gate engagement pipeline.
 
-Ported from Clique's `services/discovery_service.py`, with the 7 review-mandated
+The discovery service, with the 7 review-mandated
 decoupling seams (see the discovery package docstring / plan). The pipeline per
 post is:
 

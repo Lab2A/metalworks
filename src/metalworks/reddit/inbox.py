@@ -1,6 +1,6 @@
 """Reddit inbox: classify /message/inbox entries into typed `InboxItem`s.
 
-Ported from Clique's `services/reddit_inbox.py`, keeping only the PURE
+Inbox classification, keeping only the PURE
 dict→model transforms — the Supabase reads/writes, PostHog emission, the cron
 fan-out, triage, and retention cleanup are all left behind (they belong to the
 host application, not this library).

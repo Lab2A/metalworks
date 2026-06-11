@@ -2,8 +2,9 @@
 
 Marketing research and Reddit engagement as a Python library: demand reports
 from real Reddit conversations, plus the OAuth / search / compliance primitives
-to act on them. Built by the team behind [Clique](https://clique.so) and
-extracted from the production pipeline that runs it.
+to act on them. MIT licensed, and built to be embedded — every layer (LLM,
+search, embeddings, storage, data source) is a swappable protocol, so you can
+assemble your own product on top of it.
 
 > **Status: pre-release (0.0.1).** APIs are unstable below 1.0. The stable
 > surface is the `metalworks.contract` Pydantic models and the MCP tool
@@ -181,4 +182,4 @@ See [docs/how-to-custom-chatmodel.md](docs/how-to-custom-chatmodel.md) and
 - Security: [SECURITY.md](SECURITY.md).
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 - Changes: [CHANGELOG.md](CHANGELOG.md).
-- Org: [Lab2A](https://github.com/Lab2A). Built by the Clique team.
+- Org: [Lab2A](https://github.com/Lab2A).

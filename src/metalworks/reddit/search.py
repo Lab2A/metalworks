@@ -1,6 +1,6 @@
 """Reddit search via redditwarp — posts, subreddits, comments, rules.
 
-Ported from Clique's `services/reddit_search.py`, which constructed a fresh
+A redditwarp search wrapper. An earlier version constructed a fresh
 `redditwarp.SYNC.Client()` per call and returned stringly/dict payloads. Two
 structural changes:
 

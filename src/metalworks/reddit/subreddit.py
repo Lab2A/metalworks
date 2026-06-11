@@ -1,6 +1,6 @@
 """Per-subreddit intel — description, top-post titles, top comments, rules.
 
-Merges Clique's `subreddit_context.py` (description + top comments) and
+Merges subreddit context (description + top comments) and
 `subreddit_submission_rules.py` (the /about-driven rules normalization) into one
 `fetch_subreddit_intel` returning the contract `SubredditIntel` model.
 

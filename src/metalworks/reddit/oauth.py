@@ -1,6 +1,6 @@
 """Reddit OAuth + posting — rewritten on httpx with typed errors.
 
-This is a deliberate rewrite of Clique's `reddit_oauth.py`, not a port. The
+A deliberate, hardened OAuth implementation. The
 source had four problems this fixes (per the plan review):
 
 1. No HTTP timeouts anywhere → a stalled Reddit endpoint hung the caller

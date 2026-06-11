@@ -1,15 +1,15 @@
 """Reddit-side data contract: posts, comments, subreddit intel, inbox,
 opportunities, compliance verdicts, and the discovery-context seam.
 
-Compliance models are ported from the production deterministic gate
-(clique-api prompts/judge.py); the entity models formalize the dict shapes
-that flowed through the production discovery/inbox services.
+Compliance models formalize the deterministic gate's output; the entity
+models formalize the dict shapes that flow through the discovery/inbox
+services.
 
 `DiscoveryContext` (incl. `PersonaSet`) is a PUBLIC contract: it is the seam
-a caller — including Clique's memory system after migration — renders its
-knowledge into. Personas carry a `background` field that MUST be authentic;
-fabricated personas/backstories are prohibited by the usage policy and the
-tooling that generated them upstream was deliberately not open-sourced.
+a caller (for example, a memory system) renders its knowledge into. Personas
+carry a `background` field that MUST be authentic; fabricated
+personas/backstories are prohibited by the usage policy, and tooling that
+fabricates them is deliberately not part of metalworks.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 The deterministic gate (`metalworks.reddit.heuristic_check`) returns a verdict
 plus a confidence; a confidence < 0.7 is the signal that the cheap heuristic
 can't call it. This module ports the source's `build_llm_judge_prompt`
-(clique-api `prompts/judge.py`) and runs it on the cheap `filter_model`
+and runs it on the cheap `filter_model`
 (Haiku judging Sonnet output, or vice versa).
 
 The judge is STRICT by design: rejecting a good reply (false positive) costs

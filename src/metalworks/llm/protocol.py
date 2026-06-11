@@ -99,8 +99,8 @@ class GroundedResult:
 
 
 # Observability hook: adapters call this after every completion when set.
-# Clique re-attaches PostHog here at migration; library users can attach
-# cost meters. Signature: (event: dict) -> None. Never raises into the call.
+# Attach your own observability here (PostHog, a cost meter, structured
+# logging). Signature: (event: dict) -> None. Never raises into the call.
 GenerationHook = Callable[[dict[str, Any]], None]
 
 

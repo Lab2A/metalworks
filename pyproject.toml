@@ -9,7 +9,7 @@ description = "Open-source marketing research and Reddit engagement library — 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "Lab2A (built by the Clique team)" }]
+authors = [{ name = "Lab2A" }]
 keywords = ["reddit", "marketing", "research", "demand", "mcp", "agents", "claude"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
