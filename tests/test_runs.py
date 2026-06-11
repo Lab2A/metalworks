@@ -12,6 +12,7 @@ from metalworks.contract import (
     QuoteCitation,
     Research,
     SignalStrength,
+    WebFinding,
 )
 from metalworks.project import Project
 from metalworks.runs import render_run_markdown, write_run
@@ -80,3 +81,38 @@ def test_markdown_links_claims_to_real_permalinks() -> None:
     # the representative quote links back to its source thread
     assert "https://reddit.com/r/Supplements/comments/x/c/" in md
     assert "rep-123" in md
+
+
+def test_markdown_renders_web_findings_and_partial_caveat() -> None:
+    now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+    report = DemandReport(
+        report_id="rep-9",
+        query="demand?",
+        fork=Fork.PRODUCT_PINNED,
+        pinned_axis="product",
+        optimized_axis="audience",
+        date_range_start=now,
+        date_range_end=now,
+        total_threads=4,
+        total_distinct_authors=2,
+        ranked_clusters=[],  # no clusters → the clusters block is skipped
+        generated_at=now,
+        partial=True,
+        caveat="thin corpus",
+        web_findings=[
+            WebFinding(
+                finding_index=1,
+                claim="market is growing 12% YoY",
+                specifics="12% YoY",
+                source_url="https://example.com/report",
+                source_title="Market Report 2026",
+                confidence=SignalStrength.MEDIUM,
+            )
+        ],
+    )
+    md = render_run_markdown(Research(demand=report))
+    assert "⚠️ Partial result: thin corpus" in md
+    assert "## Web findings" in md
+    assert "market is growing 12% YoY" in md
+    assert "[Market Report 2026](https://example.com/report)" in md
+    assert "## Top demand clusters" not in md  # empty clusters → block omitted
