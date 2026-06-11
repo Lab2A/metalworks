@@ -39,12 +39,26 @@ def test_doctor_runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert "store" in result.output.lower()
 
 
-def test_init_scaffolds_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_init_scaffolds_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["init"])
+    result = runner.invoke(app, ["init", "--idea", "focus supplement for devs"])
     assert result.exit_code == 0
-    assert (tmp_path / "metalworks.toml").is_file()
+    assert (tmp_path / ".metalworks" / "project.json").is_file()
+    assert (tmp_path / ".metalworks" / "config.toml").is_file()
+    assert (tmp_path / ".metalworks" / ".gitignore").is_file()
     assert (tmp_path / ".env.example").is_file()
+
+
+def test_init_is_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    first = runner.invoke(app, ["init", "--idea", "first"])
+    assert first.exit_code == 0
+    manifest = (tmp_path / ".metalworks" / "project.json").read_text()
+    second = runner.invoke(app, ["init", "--idea", "second"])
+    assert second.exit_code == 0
+    assert "already exists" in second.output
+    # Re-init never clobbers the original manifest (slug/id stay put).
+    assert (tmp_path / ".metalworks" / "project.json").read_text() == manifest
 
 
 def test_config_set_get_list(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -8,9 +8,11 @@ Two responsibilities:
    are lazy-imported so importing this module costs nothing and works on a
    bare install with no extras.
 
-2. **Non-secret config** — a small ``metalworks.toml`` (provider id, model id,
-   store path) discovered in the cwd, then ``~/.config/metalworks/``. Precedence
-   for any setting is: **explicit argument > environment variable > config.toml**.
+2. **Non-secret config** — a small TOML (provider id, model id, store path).
+   Discovered, highest precedence first, in the active project's
+   ``.metalworks/config.toml``, then a legacy cwd ``metalworks.toml``, then
+   ``~/.config/metalworks/``. Precedence for any setting is: **explicit
+   argument > environment variable > config file**.
 
 Nothing here imports a provider SDK, ``duckdb``, or ``mcp`` at module top.
 """
@@ -23,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from metalworks.errors import MissingKeyError
+from metalworks.project import Project
 
 if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
@@ -58,12 +61,16 @@ _DEFAULT_STORE_PATH = Path.home() / ".metalworks" / "store.db"
 
 
 def config_search_paths() -> list[Path]:
-    """Where ``load_config`` looks, highest precedence first: cwd, then
-    ``~/.config/metalworks/``."""
-    return [
-        Path.cwd() / _CONFIG_FILENAME,
-        Path.home() / ".config" / "metalworks" / _CONFIG_FILENAME,
-    ]
+    """Where ``load_config`` looks, highest precedence first: the active
+    project's ``.metalworks/config.toml``, then a legacy cwd ``metalworks.toml``,
+    then ``~/.config/metalworks/``."""
+    paths: list[Path] = []
+    project = Project.find()
+    if project is not None:
+        paths.append(project.config_path)
+    paths.append(Path.cwd() / _CONFIG_FILENAME)
+    paths.append(Path.home() / ".config" / "metalworks" / _CONFIG_FILENAME)
+    return paths
 
 
 def load_config() -> dict[str, Any]:
@@ -84,8 +91,11 @@ def load_config() -> dict[str, Any]:
 
 
 def default_config_path() -> Path:
-    """The path ``save_config`` / ``init`` write to (the cwd file)."""
-    return Path.cwd() / _CONFIG_FILENAME
+    """The path ``save_config`` / ``init`` write to: the active project's
+    ``.metalworks/config.toml`` if a project exists, else a cwd ``metalworks.toml``
+    (legacy / non-project use)."""
+    project = Project.find()
+    return project.config_path if project is not None else Path.cwd() / _CONFIG_FILENAME
 
 
 def _toml_scalar(value: Any) -> str:

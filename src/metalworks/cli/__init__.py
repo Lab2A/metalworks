@@ -109,14 +109,34 @@ def doctor() -> None:
 
 
 @app.command()
-def init() -> None:
-    """Scaffold a metalworks.toml and a .env.example in the current directory."""
-    cfg_path = config.default_config_path()
-    if cfg_path.exists():
-        console.print(f"[yellow]{cfg_path.name} already exists; leaving it untouched.[/yellow]")
+def init(
+    idea: Annotated[
+        str | None,
+        typer.Option("--idea", help="One line on what you're building (seeds the project slug)."),
+    ] = None,
+) -> None:
+    """Create a ``.metalworks/`` project in the current directory, like ``git init``.
+
+    Writes ``.metalworks/`` (a ``project.json`` manifest, a ``config.toml`` for
+    non-secret settings, and a gitignored ``corpus.db`` cache) plus a
+    ``.env.example``. Idempotent — an existing project is left untouched.
+    """
+    from metalworks.project import DIRNAME, Project
+
+    existed = (Path.cwd() / DIRNAME / "project.json").is_file()
+    project = Project.init(Path.cwd(), idea=idea)
+    if existed:
+        console.print(f"[yellow]{DIRNAME}/ already exists; leaving it untouched.[/yellow]")
     else:
-        config.save_config({"provider": "anthropic", "store": "~/.metalworks/store.db"})
-        console.print(f"[green]Wrote[/green] {cfg_path}")
+        console.print(f"[green]Created[/green] {DIRNAME}/ (project '{project.slug}')")
+
+    if project.config_path.exists():
+        console.print(
+            f"[yellow]{project.config_path.name} already exists; leaving it untouched.[/yellow]"
+        )
+    else:
+        config.save_config({"provider": "anthropic"}, path=project.config_path)
+        console.print(f"[green]Wrote[/green] {project.config_path}")
 
     env_path = Path.cwd() / ".env.example"
     if env_path.exists():
