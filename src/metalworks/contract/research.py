@@ -1,8 +1,6 @@
 """Research data contract — single source of truth.
 
-Ported from Clique's production research pipeline (clique-research-api
-services/research_contract.py) with field names preserved so downstream
-consumers can migrate by swapping imports.
+Field names are stable so downstream consumers can depend on them directly.
 
 Every surface imports its shape from here:
 

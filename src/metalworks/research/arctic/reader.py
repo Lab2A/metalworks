@@ -1,6 +1,6 @@
 """DuckDB-over-Parquet reader for Arctic Shift submission shards.
 
-Ported from clique-research-api's ``duckdb_reader.py``. The default source is
+The submissions corpus reader (DuckDB over Parquet). The default source is
 the Hugging Face ``open-index/arctic`` Parquet mirror, read directly over
 httpfs:
 

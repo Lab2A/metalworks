@@ -1,7 +1,7 @@
 """Typed repository protocols — the storage seam.
 
 Design decision (from plan review, do not regress): the typed repos ARE the
-protocol. There is no public generic doc-store — Clique's production tables
+protocol. There is no public generic doc-store — real production tables
 are columnar, and a generic put/get cannot bind to them. Each backend
 (memory, sqlite, supabase) implements these protocols directly; the Supabase
 backend additionally takes a table_map + column codecs so it can bind to

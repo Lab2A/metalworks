@@ -26,7 +26,7 @@ research side reads public archives and does not post.
   concert, no sockpuppets, no manufactured consensus.
 - **Fake personas and invented account backstories.** Do not fabricate a
   history, identity, or lived experience for an account. The backstory-generation
-  tooling from Clique's internal codebase was deliberately **not**
+  such tooling was deliberately **not**
   open-sourced for exactly this reason. The remaining persona field in the
   discovery loop is named `background` and is meant to carry a real account's
   real context, never a fabricated one.

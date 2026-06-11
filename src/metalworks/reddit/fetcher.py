@@ -1,7 +1,6 @@
 """Live Reddit metrics via the OAuth-authenticated API (oauth.reddit.com).
 
-Ported from Clique's `services/reddit_fetcher.py`. Two deliberate changes from
-the source:
+Two deliberate design choices:
 
 1. **Tokens are injected, never resolved.** The source reached into Supabase to
    look up an account's OAuth token per call (`_resolve_access_token`). Here the
@@ -154,7 +153,7 @@ class RedditMetrics:
         replies_obj = comment.get("replies")
         comment_replies = len(_children(replies_obj)) if isinstance(replies_obj, dict) else 0
 
-        # Reddit: depth 0 = top-level. Clique's schema: 1 = top-level. +1 aligns.
+        # Reddit: depth 0 = top-level. Our schema: 1 = top-level. +1 aligns.
         depth = comment.get("depth")
         comment_position = (depth + 1) if isinstance(depth, int) else 1
 

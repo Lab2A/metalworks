@@ -1,6 +1,6 @@
 """run_discovery — the filter → generate → gate engagement pipeline.
 
-Ported from Clique's `services/discovery_service.py`, with the 7 review-mandated
+The discovery service, with the 7 review-mandated
 decoupling seams (see the discovery package docstring / plan). The pipeline per
 post is:
 
@@ -19,7 +19,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from metalworks.contract import ComplianceVerdict, Opportunity, RedditPost
+from metalworks.contract import ComplianceVerdict, Opportunity, Persona, RedditPost
 from metalworks.discovery.judge import llm_judge
 from metalworks.discovery.prompts import (
     FilterDecision,
@@ -30,7 +30,11 @@ from metalworks.discovery.prompts import (
 from metalworks.reddit import heuristic_check
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from metalworks.contract import DiscoveryContext
     from metalworks.discovery.deps import DiscoveryDeps
+    from metalworks.llm import ChatModel
 
 # Confidence below which the deterministic heuristic defers to the LLM judge.
 _ESCALATE_BELOW = 0.7
@@ -127,8 +131,8 @@ def _process_single_post(deps: DiscoveryDeps, post: RedditPost) -> Opportunity |
     if len(post.title.strip()) + len(post.selftext.strip()) < 30:
         return None
 
-    # Stage 1: filter (cheap model).
-    decision = _filter(deps, post)
+    # Stage 1: filter (cheap model) — the public filter_post seam.
+    decision = filter_post(deps.filter_model, post, deps.context, on_error=deps.emit)
     if decision is None or not decision.keep:
         return None
 
@@ -136,13 +140,21 @@ def _process_single_post(deps: DiscoveryDeps, post: RedditPost) -> Opportunity |
     account_type = (decision.account_type or "expert").strip().lower()
     if account_type not in _VALID_ACCOUNT_TYPES:
         account_type = "expert"
-    persona = deps.context.personas.get(account_type)
+    persona = deps.context.personas.get(account_type) or Persona()
 
     subreddit_rules = _subreddit_rules(deps, post.subreddit)
 
-    # Stage 2: generate (capable model, with pro→flash degradation retry).
-    reply = _generate(
-        deps, post=post, persona=persona, account_type=account_type, subreddit_rules=subreddit_rules
+    # Stage 2: generate (capable model, with pro→flash degradation retry) — the
+    # public generate_reply seam.
+    reply = generate_reply(
+        deps.chat,
+        post,
+        persona,
+        account_type,
+        deps.context,
+        subreddit_rules=subreddit_rules,
+        fast_chat=deps.fast_chat,
+        on_event=deps.emit,
     )
     if reply is None:
         return None
@@ -160,11 +172,23 @@ def _process_single_post(deps: DiscoveryDeps, post: RedditPost) -> Opportunity |
     return _build_opportunity(deps, post=post, decision=decision, reply=reply, verdict=verdict)
 
 
-def _filter(deps: DiscoveryDeps, post: RedditPost) -> FilterDecision | None:
-    """Run the relevance filter on the cheap model. None on failure."""
-    system, user = build_filter_prompt(post=post, context=deps.context)
+def filter_post(
+    model: ChatModel,
+    post: RedditPost,
+    context: DiscoveryContext,
+    *,
+    on_error: Callable[[str], None] | None = None,
+) -> FilterDecision | None:
+    """Relevance-filter one post on ``model`` (a cheap model is enough). None on failure.
+
+    A standalone building block: hand it any :class:`~metalworks.llm.ChatModel`
+    and your :class:`~metalworks.contract.DiscoveryContext` to decide whether a
+    thread is worth engaging, without running the whole loop. ``on_error`` (if
+    given) receives a ``"filter-error:<url>:<exc>"`` string on failure.
+    """
+    system, user = build_filter_prompt(post=post, context=context)
     try:
-        return deps.filter_model.complete_structured(
+        return model.complete_structured(
             system=system,
             user=user,
             output_model=FilterDecision,
@@ -172,41 +196,49 @@ def _filter(deps: DiscoveryDeps, post: RedditPost) -> FilterDecision | None:
             temperature=0.3,
         )
     except Exception as exc:
-        deps.emit(f"filter-error:{post.url}:{exc}")
+        if on_error is not None:
+            on_error(f"filter-error:{post.url}:{exc}")
         return None
 
 
-def _generate(
-    deps: DiscoveryDeps,
-    *,
+def generate_reply(
+    chat: ChatModel,
     post: RedditPost,
-    persona: object,
+    persona: Persona,
     account_type: str,
-    subreddit_rules: list[str],
+    context: DiscoveryContext,
+    *,
+    subreddit_rules: list[str] | None = None,
+    fast_chat: ChatModel | None = None,
+    on_event: Callable[[str], None] | None = None,
 ) -> ReplyGenerationV2 | None:
-    """Generate a reply on the capable model; on failure/empty retry on the cheap model.
+    """Draft a reply to ``post`` in a given voice. None when generation fails.
 
-    PRO→FLASH DEGRADATION is load-bearing: the source observed the pro model
-    truncating structured output mid-string, dropping ~50% of valid candidates.
-    Retrying the SAME prompt on the cheaper model recovers them.
+    The standalone reply seam — "draft a reply to THIS thread in MY voice with
+    MY persona/context." Tries ``chat``, then retries the same prompt on
+    ``fast_chat`` (falling back to ``chat`` when no fast model is given). This
+    pro→flash degradation is load-bearing: the capable model can truncate
+    structured output mid-string, dropping ~50% of valid candidates, which the
+    cheaper retry recovers. Compliance is the caller's job — run
+    :func:`~metalworks.reddit.heuristic_check` / :func:`~metalworks.discovery.llm_judge`
+    on the returned ``reply_text``.
     """
-    from metalworks.contract import Persona
-
-    persona_obj = persona if isinstance(persona, Persona) else Persona()
     system, user = build_generate_prompt(
         post=post,
-        persona=persona_obj,
+        persona=persona,
         account_type=account_type,
-        context=deps.context,
-        subreddit_rules=subreddit_rules,
+        context=context,
+        subreddit_rules=list(subreddit_rules or []),
     )
 
-    reply = _try_generate(deps.chat, system, user)
+    reply = _try_generate(chat, system, user)
     if reply is not None and reply.reply_text.strip():
         return reply
 
-    deps.emit(f"generate-retry:{post.url}")
-    fallback = _try_generate(deps.filter_model, system, user)
+    if on_event is not None:
+        on_event(f"generate-retry:{post.url}")
+    fallback_model = fast_chat if fast_chat is not None else chat
+    fallback = _try_generate(fallback_model, system, user)
     if fallback is not None and fallback.reply_text.strip():
         return fallback
     return None

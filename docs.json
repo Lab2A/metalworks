@@ -19,23 +19,36 @@
     "groups": [
       {
         "group": "Get started",
-        "pages": ["docs/index", "docs/quickstart"]
+        "pages": ["docs/index", "docs/quickstart", "docs/concepts"]
       },
       {
-        "group": "Tutorials",
-        "pages": ["docs/tutorial-first-demand-report"]
+        "group": "Guides",
+        "pages": [
+          "docs/guide-demand-research",
+          "docs/guide-reddit-engagement",
+          "docs/build-your-own"
+        ]
       },
       {
         "group": "How-to guides",
-        "pages": ["docs/how-to-custom-chatmodel", "docs/how-to-supabase-store"]
+        "pages": [
+          "docs/model-configuration",
+          "docs/how-to-custom-chatmodel",
+          "docs/how-to-custom-corpus",
+          "docs/how-to-custom-store"
+        ]
       },
       {
         "group": "Reference",
-        "pages": ["docs/reference-protocols"]
+        "pages": [
+          "docs/building-blocks",
+          "docs/reference-client",
+          "docs/reference-protocols"
+        ]
       },
       {
         "group": "Explanation",
-        "pages": ["docs/explanation-open-core"]
+        "pages": ["docs/explanation-provenance", "docs/for-coding-agents"]
       }
     ]
   },

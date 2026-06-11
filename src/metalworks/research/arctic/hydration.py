@@ -1,6 +1,6 @@
 """Post-triage hydration: persist the small relevant Reddit subset.
 
-Ported from clique-research-api's ``hydration.py``. The pipeline triages
+Corpus hydration. The pipeline triages
 millions of Parquet rows against the brief (~thousands relevant) and only that
 subset is hydrated; the raw corpus stays in object storage.
 

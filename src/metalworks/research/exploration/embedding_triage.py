@@ -24,7 +24,7 @@ BM25, near-zero cosine) is usually a false positive (rare-word collisions).
 Promotion / demotion to MIDDLE on these overrides is recorded as
 band_percentile_disagreement.
 
-PORT CHANGE (from clique-research-api): the source embedded each item in its
+DESIGN NOTE: an earlier internal version embedded each item in its
 own ThreadPoolExecutor task with a None-tolerant adapter. Here we BATCH-embed
 through `deps.embeddings.embed(...)` — one call for all documents, one for the
 query. The metalworks embedding adapters never return None (they raise on

@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Install metalworks, run the zero-key offline demo, then plug in a provider key for a real report."
+description: "Run the zero-key offline demo, then a real report with a provider key, then the same thing from the CLI or MCP server."
 ---
 
 ## Install
@@ -10,58 +10,77 @@ pip install metalworks
 ```
 
 Core stays lean (pydantic, httpx, typer, rich). Everything that pulls a provider
-SDK lives behind an extra, so you install only what matches the key you have.
+SDK or duckdb lives behind an extra, so you install only what you use.
 
-## The offline demo (no keys, no network)
-
-```bash
-metalworks quickstart    # planned for 0.1
-```
-
-This runs the full research pipeline against bundled Reddit sample data using
-the in-memory store and bundled fake models. It prints a small report so you can
-see the output shape before plugging in a provider.
-
-## A real report
-
-You need one LLM provider extra and the matching API key:
+## 1. The offline demo (no keys, no network)
 
 ```bash
-pip install "metalworks[google,research]"
-export GOOGLE_API_KEY=...     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+pip install "metalworks[arctic]"      # duckdb, for the bundled local corpus
 ```
 
 ```python
-from metalworks.contract import ResearchBrief, TargetSubreddit
-from metalworks.research import ResearchDeps, run_research
-from metalworks.research.arctic.reader import ArcticReader
-from metalworks.stores import MemoryStores
-from metalworks.llm.adapters.google import GoogleChatModel
-from metalworks.embeddings.adapters.google import GoogleEmbedding
+from metalworks import Metalworks
 
-brief = ResearchBrief(
-    brief_id="demo-1",
-    question="Is there demand for a focus supplement aimed at developers?",
-    decision_context="Deciding whether to build a nootropic brand.",
-    success_criteria=["Find the top unmet needs"],
-    must_address=["What do people dislike about current options?"],
-    target_subreddits=[TargetSubreddit(name="Nootropics", rationale="core community")],
-    web_research_directions=[],
-    relevance_rubric="Posts discussing focus, energy, or nootropic supplements.",
+report = Metalworks.demo().research(
+    "Is there demand for a focus supplement?",
+    subreddits=["Supplements"],
 )
-
-deps = ResearchDeps(
-    chat=GoogleChatModel("gemini-2.5-pro"),
-    embeddings=GoogleEmbedding("gemini-embedding-001"),
-    corpus=MemoryStores(),
-    reader=ArcticReader(),
-)
-
-report = run_research(deps, brief=brief)
-print(report.partial, len(report.ranked_clusters))
+print(report.verdict)      # the synthesized go / no-go summary (or None)
+for cluster in report.ranked_clusters:
+    print(cluster.signal, cluster.distinct_author_count, cluster.claim)
 ```
 
-## The Claude Code plugin
+`Metalworks.demo()` wires fake models and a small bundled Reddit corpus, so the
+whole pipeline runs in seconds with **zero API keys and zero network**. It shows
+you the output shape before you plug in a provider.
+
+## 2. A real report
+
+Set one provider key — metalworks infers the provider from whichever key is
+present:
+
+```bash
+pip install "metalworks[google,research]"
+export GOOGLE_API_KEY=...      # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+```
+
+```python
+from metalworks import Metalworks
+
+mw = Metalworks()                       # provider inferred from the env key
+report = mw.research(
+    "Is there demand for a focus supplement aimed at developers?",
+    subreddits=["Nootropics", "Supplements"],
+)
+for cluster in report.ranked_clusters:
+    print(cluster.claim, "—", cluster.distinct_author_count, "distinct authors")
+    for quote in cluster.quotes:
+        print("  ", quote.permalink, "→", quote.text[:80])
+```
+
+Submissions come from the Hugging Face Arctic mirror; comments come from the live
+Arctic Shift API. Set `HF_TOKEN` for windows longer than a few months. See
+[Use your own corpus](/docs/how-to-custom-corpus) to run without Arctic Shift.
+
+## 3. The same thing, language-agnostic
+
+Not in Python? Every surface is also a CLI command and an MCP tool.
+
+**CLI:**
+
+```bash
+metalworks quickstart                       # the offline demo
+metalworks reddit search "focus supplement" --subreddit Supplements
+metalworks research run brief.json
+```
+
+**MCP server** (for Claude Code, Cursor, or any MCP host):
+
+```bash
+metalworks mcp serve                        # stdio; zero-key tools need no keys
+```
+
+Or install the Claude Code plugin and just ask:
 
 ```
 /plugin marketplace add Lab2A/metalworks
@@ -75,6 +94,8 @@ pipeline tools use whatever provider key is in your environment. Requires
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="Your first demand report" href="/docs/tutorial-first-demand-report" />
-  <Card title="Custom ChatModel" href="/docs/how-to-custom-chatmodel" />
+  <Card title="Core concepts" href="/docs/concepts" />
+  <Card title="Building blocks" href="/docs/building-blocks" />
+  <Card title="Demand Research guide" href="/docs/guide-demand-research" />
+  <Card title="Model configuration" href="/docs/model-configuration" />
 </CardGroup>

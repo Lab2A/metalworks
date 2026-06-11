@@ -1,6 +1,6 @@
 """Question bank — the 8 ordered topics the planner walks through.
 
-Ported verbatim (pure data) from clique-research-api's ``question_bank.py``.
+The D1-D8 planner question bank (pure data).
 Each topic is a :class:`QuestionSpec`; the actual ELI10 / recommendation /
 option content is produced by the content provider in ``llm_planner.py``.
 

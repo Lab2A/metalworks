@@ -1,6 +1,6 @@
 """Deterministic compliance gate — the zero-key safety check on reply/post text.
 
-Ported verbatim from Clique's production `prompts/judge.py` heuristic layer.
+The deterministic compliance heuristic layer.
 Pure and dependency-free (no LLM, no network), so it ships as a zero-key MCP
 tool and runs on every keystroke if a UI wants it.
 

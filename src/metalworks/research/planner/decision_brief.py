@@ -1,7 +1,6 @@
 """DecisionBrief — one question the conversational planner asks the user.
 
-Ported verbatim from clique-research-api's ``decision_brief.py``. Format
-(gstack-style decision brief):
+Format (decision-brief style):
 
 - D<N> header chip
 - ELI10 paragraph (>= 80 chars)

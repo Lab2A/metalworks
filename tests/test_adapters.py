@@ -507,3 +507,40 @@ def test_with_backoff_respects_attempts(sleeps: list[float]) -> None:
 )
 def test_is_rate_limit_error(exc: Exception, expected: bool) -> None:
     assert is_rate_limit_error(exc) is expected
+
+
+# ── OpenAI-compatible adapter (WS2.1: base_url / api_key_env / native_structured) ──
+
+
+def test_openai_compat_adapter_uses_named_env_and_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("openai")
+    from metalworks.llm.adapters.openai import OpenAIChatModel
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    model = OpenAIChatModel(
+        model_id="meta-llama/llama-3-70b",
+        api_key_env="OPENROUTER_API_KEY",
+        base_url="https://openrouter.ai/api/v1",
+        native_structured=False,
+    )
+    assert model.model_id == "meta-llama/llama-3-70b"
+    # compat endpoints don't advertise OpenAI-only grounding/reasoning
+    assert model.capabilities.native_grounding is False
+    assert model.capabilities.thinking is False
+    assert model.capabilities.native_structured is False
+
+
+def test_openai_compat_missing_key_names_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("openai")
+    from metalworks.errors import MissingKeyError
+    from metalworks.llm.adapters.openai import OpenAIChatModel
+
+    monkeypatch.delenv("CUSTOM_LLM_KEY", raising=False)
+    with pytest.raises(MissingKeyError) as exc:
+        OpenAIChatModel(api_key_env="CUSTOM_LLM_KEY", base_url="http://localhost:1234/v1")
+    assert "CUSTOM_LLM_KEY" in str(exc.value.fix)

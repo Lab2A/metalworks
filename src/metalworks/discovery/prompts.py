@@ -1,7 +1,6 @@
 """Discovery prompt builders + their structured output models.
 
-Ported from Clique's production `prompts/filter.py` and `prompts/generate.py`.
-Two structural changes against the source:
+The filter and generate prompt builders. Two structural choices:
 
 - Inputs are contract models, not loose dicts. Posts are `RedditPost`; voice
   and knowledge come from `DiscoveryContext` + `Persona` (the public seam),

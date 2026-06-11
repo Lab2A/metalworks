@@ -1,6 +1,6 @@
 """Planner brief-in-progress state.
 
-Ported from clique-research-api's ``store.py``, heavily simplified for M2.
+Brief-state persistence, intentionally minimal.
 
 Port change / scope decision: the source's ``InMemoryStore`` and
 ``SupabaseStore`` (full CRUD + workspace-scoped Supabase persistence) are

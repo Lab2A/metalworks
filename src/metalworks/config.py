@@ -42,6 +42,14 @@ _CHAT_KEY_ORDER: tuple[tuple[str, str], ...] = (
 # The full list named in MissingKeyError so the message is actionable.
 _ALL_CHAT_KEYS = "ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY (or GEMINI_API_KEY)"
 
+# `provider/model` slash-ref routing (the Hermes/OpenClaw convention). Native
+# heads dispatch to the official SDK adapter; compat heads dispatch to the
+# OpenAI-compatible adapter. Any *other* head (a vendor namespace such as
+# ``meta-llama/llama-3``) is treated as an OpenRouter model id verbatim, so a
+# bare ``anthropic/claude-x`` never silently mis-routes to OpenRouter.
+_NATIVE_PROVIDERS = frozenset({"anthropic", "openai", "google", "gemini"})
+_COMPAT_PROVIDERS = frozenset({"openrouter", "openai-compatible", "compat"})
+
 _CONFIG_FILENAME = "metalworks.toml"
 _DEFAULT_STORE_PATH = Path.home() / ".metalworks" / "store.db"
 
@@ -126,6 +134,13 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     if model and ":" in model:
         provider, _, model_id = model.partition(":")
         return provider.strip().lower(), (model_id.strip() or None)
+    if model and "/" in model:
+        head, _, rest = model.partition("/")
+        head_l = head.strip().lower()
+        if head_l in _NATIVE_PROVIDERS or head_l in _COMPAT_PROVIDERS:
+            return head_l, (rest.strip() or None)
+        # Unknown vendor namespace → OpenRouter, with the full ref as the id.
+        return "openrouter", model.strip()
 
     cfg = load_config()
     configured = cfg.get("provider")
@@ -162,8 +177,44 @@ def resolve_chat(model: str | None = None) -> ChatModel:
         from metalworks.llm.adapters.google import GoogleChatModel
 
         return GoogleChatModel(model_id=model_id) if model_id else GoogleChatModel()
+    if provider == "openrouter":
+        from metalworks.llm.adapters.openai import OpenAIChatModel
+
+        return OpenAIChatModel(
+            model_id=model_id or "openrouter/auto",
+            api_key_env="OPENROUTER_API_KEY",
+            base_url="https://openrouter.ai/api/v1",
+            native_structured=False,  # OpenRouter passthrough varies by model
+        )
+    if provider in ("openai-compatible", "compat"):
+        from metalworks.llm.adapters.openai import OpenAIChatModel
+
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        if not base_url:
+            raise MissingKeyError("OPENAI_BASE_URL", provider="openai-compatible")
+        return OpenAIChatModel(
+            model_id=model_id or "",
+            api_key_env="OPENAI_API_KEY",
+            base_url=base_url,
+            native_structured=False,
+        )
 
     raise MissingKeyError(_ALL_CHAT_KEYS, provider=f"unknown chat provider '{provider}'")
+
+
+def resolve_models(
+    model: str | None = None, fast_model: str | None = None
+) -> tuple[ChatModel, ChatModel]:
+    """Resolve a (main, fast) :class:`~metalworks.llm.ChatModel` pair.
+
+    ``model`` and ``fast_model`` are each a ``provider:id`` / ``provider/model``
+    ref or ``None`` (env inference). When ``fast_model`` is not given, the fast
+    slot falls back to the main model — the same rule the deps objects apply via
+    their ``filter_model`` property, lifted to construction time.
+    """
+    main = resolve_chat(model)
+    fast = resolve_chat(fast_model) if fast_model else main
+    return main, fast
 
 
 def resolve_embeddings() -> EmbeddingProvider:
@@ -233,6 +284,7 @@ __all__ = [
     "load_config",
     "resolve_chat",
     "resolve_embeddings",
+    "resolve_models",
     "resolve_search",
     "save_config",
     "setting",

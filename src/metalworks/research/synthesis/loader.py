@@ -8,7 +8,7 @@ storage: every other synthesis module operates on the in-memory `LoadedComment`
 We never keep `[deleted]` / `[removed]` / empty bodies — synthesis ranking on
 those is meaningless and they'd just chew up LLM tokens.
 
-PORT CHANGE (from clique-research-api): the source read Supabase tables directly
+DESIGN NOTE: an earlier internal version read Supabase tables directly
 with a manual 200-id IN-chunk loop. Here we read through
 `deps.corpus.get_posts(...)` / `deps.corpus.get_comments_for_posts(...)`, which
 return contract `RedditPost` / `RedditComment` and already paginate to

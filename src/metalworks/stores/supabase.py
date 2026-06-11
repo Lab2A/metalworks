@@ -8,7 +8,7 @@ paginates with .range() until exhaustion. The conformance suite's
 Schema: metalworks-native tables (payload jsonb + the columns queries filter
 on); `SCHEMA_SQL` below bootstraps them. `table_map` renames logical →
 physical tables so hosted deployments can place them anywhere. Binding to
-PRE-EXISTING columnar schemas (the Clique migration) is done by subclassing
+PRE-EXISTING columnar schemas is done by subclassing
 per-repo methods with column codecs — that lands with the migration, not
 here.
 

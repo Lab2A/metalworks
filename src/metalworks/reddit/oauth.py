@@ -1,6 +1,6 @@
 """Reddit OAuth + posting — rewritten on httpx with typed errors.
 
-This is a deliberate rewrite of Clique's `reddit_oauth.py`, not a port. The
+A deliberate, hardened OAuth implementation. The
 source had four problems this fixes (per the plan review):
 
 1. No HTTP timeouts anywhere → a stalled Reddit endpoint hung the caller
@@ -35,6 +35,7 @@ from metalworks.errors import (
     ReauthRequiredError,
     RedditError,
 )
+from metalworks.reddit.audit import append_post_log
 from metalworks.reddit.ratelimit import RateLimiter, retry_after_seconds
 from metalworks.stores.repos import StoredRedditAccount
 
@@ -295,7 +296,18 @@ class RedditOAuth:
             data={"api_type": "json", "thing_id": thing_id, "text": body},
         )
         if not resp.is_success:
-            return PostResult(success=False, error=f"Reddit API error: {resp.status_code}")
+            error = f"Reddit API error: {resp.status_code}"
+            append_post_log(
+                {
+                    "action": "post",
+                    "thing_id": thing_id,
+                    "url": post_url,
+                    "username": username,
+                    "success": False,
+                    "error": error,
+                }
+            )
+            return PostResult(success=False, error=error)
         result: dict[str, Any] = resp.json()
         json_block: dict[str, Any] = result.get("json", {}) or {}
         data_block: dict[str, Any] = json_block.get("data", {}) or {}
@@ -305,6 +317,17 @@ class RedditOAuth:
             first: dict[str, Any] = things[0].get("data", {}) or {}
             comment_id = _str_or_none(first.get("id"))
         comment_url = f"{post_url.rstrip('/')}/{comment_id}/" if (post_url and comment_id) else None
+        # Audit the one irreversible action: every successful post is recorded.
+        append_post_log(
+            {
+                "action": "post",
+                "thing_id": thing_id,
+                "url": comment_url or post_url,
+                "username": username,
+                "success": True,
+                "comment_id": comment_id,
+            }
+        )
         return PostResult(
             success=True, comment_id=comment_id, comment_url=comment_url, username=username
         )

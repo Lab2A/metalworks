@@ -1,6 +1,6 @@
 """Brief assembler — folds the planner's 8 answers into a ResearchBrief.
 
-Ported from clique-research-api's ``brief_assembler.py``. The mapping from
+Assembles a ResearchBrief from answered planner decisions. The mapping from
 answers to structured Brief fields is deterministic; the one LLM touch is the
 subreddit picker, which APPENDS suggested communities to the user's D5
 selection.
