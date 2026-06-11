@@ -2,8 +2,10 @@
 
 The typed repos ARE the protocol (no public generic doc-store — see
 repos.py for why). `MemoryStores` and `SqliteStores` each satisfy all six
-repo protocols structurally; the Supabase backend (extra: [supabase]) binds
-to existing schemas via table_map + column codecs.
+repo protocols structurally. Hosted backends (e.g. a Postgres impl for a
+SaaS deployment) live downstream in the consuming app and bind to the same
+protocols — that downstream-impl path is exactly what the seam is for, so the
+OSS core ships only the two zero-infra backends.
 """
 
 from metalworks.stores.crypto import TokenCipher

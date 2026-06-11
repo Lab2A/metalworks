@@ -3,14 +3,16 @@
 Design decision (from plan review, do not regress): the typed repos ARE the
 protocol. There is no public generic doc-store — real production tables
 are columnar, and a generic put/get cannot bind to them. Each backend
-(memory, sqlite, supabase) implements these protocols directly; the Supabase
-backend additionally takes a table_map + column codecs so it can bind to
-pre-existing schemas at migration time.
+implements these protocols directly. The OSS core ships two zero-infra
+backends (memory, sqlite); a hosted backend (e.g. Postgres for a SaaS
+deployment) lives downstream and binds to pre-existing columnar schemas via
+its own table_map + column codecs — the protocol seam is what makes that
+downstream impl possible without changing the core.
 
 Backends own their own query semantics:
-- ID-chunk size for IN-style queries is per-backend (PostgREST ~200,
-  SQLite parameter ceiling differs).
-- Supabase implementations MUST paginate to exhaustion (PostgREST silently
+- ID-chunk size for IN-style queries is per-backend (a PostgREST-backed impl
+  caps ~200; SQLite's parameter ceiling differs).
+- A hosted/PostgREST impl MUST paginate to exhaustion (PostgREST silently
   truncates at max-rows with HTTP 200).
 - SQLite implementations MUST be safe under the pipeline's thread model
   (synthesis + web research run in a ThreadPoolExecutor).

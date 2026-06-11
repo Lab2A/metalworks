@@ -85,9 +85,10 @@ class CorpusRepo(Protocol):
 ```
 
 `BriefRepo`, `RunRepo`, `AccountRepo`, `OpportunityRepo`, and `InboxRepo` follow
-the same shape. Backends: `MemoryStores`, `SqliteStores` (WAL, serialized
-writer), `SupabaseStores` (paginate-to-exhaustion). Verify a custom backend
-with `metalworks.testing.check_all_repos`.
+the same shape. Backends shipped in core: `MemoryStores` and `SqliteStores`
+(WAL, serialized writer). Hosted backends (Postgres/PostgREST) are a custom
+store you implement downstream — see [how-to-custom-store](how-to-custom-store).
+Verify any backend with `metalworks.testing.check_all_repos`.
 
 ## Errors
 
