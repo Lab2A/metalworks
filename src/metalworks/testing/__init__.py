@@ -27,7 +27,8 @@ from metalworks.contract import (
     RunSummary,
     TargetSubreddit,
 )
-from metalworks.embeddings import FakeEmbedding
+from metalworks.embeddings import FakeEmbedding, IndexIdentity
+from metalworks.errors import EmbeddingModelMismatch
 from metalworks.llm.fake import FakeChatModel
 from metalworks.stores.repos import (
     AccountRepo,
@@ -115,6 +116,36 @@ def check_corpus_repo(repo: CorpusRepo, *, rows: int = 1500) -> None:
     )
     got_posts = repo.get_posts(["mwtest-p0", "mwtest-p2", "mwtest-missing"])
     assert {p.post_id for p in got_posts} == {"mwtest-p0", "mwtest-p2"}
+    _check_corpus_embeddings(repo)
+
+
+def _check_corpus_embeddings(repo: CorpusRepo) -> None:
+    """Vector storage round-trip + cosine search + model-mismatch guard.
+
+    Storage (upsert) is always exercised; the cosine search needs the ``[research]``
+    extra (numpy), so it is skipped when numpy is absent — keeping the bare CI
+    matrix green while still proving the write path on every backend.
+    """
+    import importlib.util
+
+    identity = IndexIdentity(embedding_model_id="mwtest-embed", dim=4)
+    repo.upsert_embeddings(
+        {"mwtest-c0": [1.0, 0.0, 0.0, 0.0], "mwtest-c1": [0.0, 1.0, 0.0, 0.0]},
+        identity=identity,
+    )
+    if importlib.util.find_spec("numpy") is None:
+        return  # search needs the [research] extra; the write path is already proven
+
+    nearest = repo.search_embeddings([0.9, 0.1, 0.0, 0.0], k=1, identity=identity)
+    assert nearest and nearest[0][0] == "mwtest-c0", "cosine search missed the nearest vector"
+
+    other_model = IndexIdentity(embedding_model_id="mwtest-other", dim=4)
+    try:
+        repo.search_embeddings([1.0, 0.0, 0.0, 0.0], k=1, identity=other_model)
+    except EmbeddingModelMismatch:
+        pass
+    else:
+        raise AssertionError("search must reject a mismatched embedding model")
 
 
 def check_account_repo(repo: AccountRepo) -> None:

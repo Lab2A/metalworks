@@ -27,11 +27,13 @@ from metalworks.contract import (
     ResearchBrief,
     RunSummary,
 )
-from metalworks.errors import StoreError
+from metalworks.embeddings import IndexIdentity
+from metalworks.errors import EmbeddingModelMismatch, StoreError
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
+from metalworks.stores.vectors import blob_to_vector, cosine_topk, vector_to_blob
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
 _ID_CHUNK = 500
 
@@ -60,6 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_opps_url ON opportunities(post_url);
 CREATE INDEX IF NOT EXISTS idx_opps_status ON opportunities(status);
 CREATE TABLE IF NOT EXISTS inbox (
     message_id TEXT PRIMARY KEY, read INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS embeddings (
+    corpus_id TEXT PRIMARY KEY, vector BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS embedding_meta (
+    id INTEGER PRIMARY KEY CHECK (id = 1), model_id TEXT NOT NULL, dim INTEGER NOT NULL);
 """
 
 
@@ -206,6 +212,51 @@ class SqliteStores:
                 ).fetchall()
                 out.extend(RedditComment.model_validate_json(r[0]) for r in rows)
         return out
+
+    def upsert_embeddings(
+        self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
+    ) -> None:
+        with self._lock:
+            row = self._con.execute(
+                "SELECT model_id, dim FROM embedding_meta WHERE id = 1"
+            ).fetchone()
+            changed = row is not None and (
+                row[0] != identity.embedding_model_id or row[1] != identity.dim
+            )
+            if changed:
+                # Model changed: vectors from different models don't mix — rebuild.
+                self._con.execute("DELETE FROM embeddings")
+                self._con.execute("DELETE FROM embedding_meta")
+                row = None
+            if row is None:
+                self._con.execute(
+                    "INSERT INTO embedding_meta (id, model_id, dim) VALUES (1, ?, ?)",
+                    (identity.embedding_model_id, identity.dim),
+                )
+            self._con.executemany(
+                "INSERT INTO embeddings (corpus_id, vector) VALUES (?, ?) "
+                "ON CONFLICT(corpus_id) DO UPDATE SET vector = excluded.vector",
+                [(corpus_id, vector_to_blob(vec)) for corpus_id, vec in vectors.items()],
+            )
+            self._con.commit()
+
+    def search_embeddings(
+        self, query: Sequence[float], *, k: int, identity: IndexIdentity
+    ) -> list[tuple[str, float]]:
+        with self._lock:
+            meta = self._con.execute(
+                "SELECT model_id, dim FROM embedding_meta WHERE id = 1"
+            ).fetchone()
+            if meta is None:
+                return []
+            if meta[0] != identity.embedding_model_id or meta[1] != identity.dim:
+                raise EmbeddingModelMismatch(
+                    index_model=f"{meta[0]} (dim={meta[1]})",
+                    current_model=f"{identity.embedding_model_id} (dim={identity.dim})",
+                )
+            rows = self._con.execute("SELECT corpus_id, vector FROM embeddings").fetchall()
+        vectors = {corpus_id: blob_to_vector(blob) for corpus_id, blob in rows}
+        return cosine_topk(query, vectors, k)
 
     # ── AccountRepo ──
 

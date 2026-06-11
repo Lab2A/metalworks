@@ -39,7 +39,9 @@ from metalworks.contract import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+
+    from metalworks.embeddings import IndexIdentity
 
 _M = TypeVar("_M", bound=BaseModel)
 
@@ -119,6 +121,25 @@ class CorpusRepo(Protocol):
     def get_comments_for_posts(self, post_ids: Sequence[str]) -> list[RedditComment]:
         """ALL comments for the given posts — backends paginate to exhaustion;
         silent truncation here corrupts every downstream count."""
+        ...
+
+    def upsert_embeddings(
+        self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
+    ) -> None:
+        """Idempotently store ``comment_id -> embedding vector``, tagged with the
+        embedding model ``identity``. Upserting under a different identity than the
+        stored one replaces the index — vectors from different models are
+        geometrically incompatible and must not be mixed."""
+        ...
+
+    def search_embeddings(
+        self, query: Sequence[float], *, k: int, identity: IndexIdentity
+    ) -> list[tuple[str, float]]:
+        """Brute-force cosine over the stored vectors → the ``k`` nearest
+        ``(comment_id, score)`` pairs, score descending. Empty index → ``[]``.
+        Raises :class:`~metalworks.errors.EmbeddingModelMismatch` when the stored
+        index was built with a different model than ``identity``. Needs the
+        ``[research]`` extra (numpy) for the cosine math."""
         ...
 
 
