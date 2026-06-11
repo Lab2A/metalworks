@@ -26,7 +26,24 @@ def _backends(tmp_path: Path) -> list[object]:
 def test_blob_codec_roundtrips_floats() -> None:
     vec = [0.5, -1.25, 3.0, 0.0]
     restored = blob_to_vector(vector_to_blob(vec))
-    assert restored == pytest.approx(vec)
+    assert restored == vec  # float64 round-trip is exact, not just approx
+
+
+def test_cosine_topk_k_bounds() -> None:
+    from metalworks.stores.vectors import cosine_topk
+
+    vecs = {"a": [1.0, 0.0], "b": [0.0, 1.0]}
+    assert cosine_topk([1.0, 0.0], vecs, 0) == []  # k <= 0 → empty
+    assert cosine_topk([1.0, 0.0], vecs, -1) == []
+    assert len(cosine_topk([1.0, 0.0], vecs, 99)) == 2  # k > store size → all
+
+
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+def test_upsert_rejects_wrong_length_vector(kind: str, tmp_path: Path) -> None:
+    store = MemoryStores() if kind == "memory" else SqliteStores(tmp_path / "v.db")
+    bad = {"c": [1.0, 0.0, 0.0]}  # length 3, but _IDENT.dim == 4
+    with pytest.raises(ValueError, match="length 3, expected dim=4"):
+        store.upsert_embeddings(bad, identity=_IDENT)  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize("backend_index", [0, 1])

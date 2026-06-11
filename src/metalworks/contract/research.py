@@ -538,8 +538,8 @@ class DemandReport(BaseModel):
         This is what downstream pillars' ``EvidenceRef``s resolve against
         (by ``EvidenceRecord.id``). Derived on access — never stored or
         serialized, so it is always consistent with the report's own fields
-        after a round-trip through the FileStore. De-dups by id (the same
-        quote can back more than one cluster).
+        after a JSON round-trip. De-dups by id (the same quote can back more
+        than one cluster).
         """
         records: dict[str, EvidenceRecord] = {}
         for cluster in self.ranked_clusters:

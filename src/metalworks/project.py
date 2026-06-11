@@ -136,8 +136,15 @@ class Project:
         ``~/.metalworks/``, the home state dir for the post-log and a default
         store) is deliberately NOT matched.
         """
+        home = Path.home().resolve()
         current = (start or Path.cwd()).resolve()
         for directory in (current, *current.parents):
+            # `~/.metalworks/` is the reserved home state dir (post-log, default
+            # store). Never treat it as a project root, even if a stray
+            # `project.json` lands there — otherwise it would silently capture
+            # every casual run anywhere under $HOME.
+            if directory == home:
+                continue
             if (directory / DIRNAME / "project.json").is_file():
                 return cls(directory / DIRNAME)
         return None

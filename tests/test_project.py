@@ -58,6 +58,18 @@ def test_find_returns_none_with_no_project(tmp_path: Path) -> None:
     assert Project.find(tmp_path) is None
 
 
+def test_find_ignores_a_project_at_the_home_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A `.metalworks/project.json` at $HOME must never capture runs beneath it.
+    home = tmp_path.resolve()
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
+    Project.init(home, idea="stray home project")
+    nested = home / "work" / "repo"
+    nested.mkdir(parents=True)
+    assert Project.find(nested) is None
+
+
 def test_find_ignores_a_bare_metalworks_dir_without_manifest(tmp_path: Path) -> None:
     # ~/.metalworks/ (post-log, default store) is a bare dir, not a project.
     (tmp_path / DIRNAME).mkdir()

@@ -20,7 +20,7 @@ from metalworks.contract import (
 from metalworks.embeddings import IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
-from metalworks.stores.vectors import cosine_topk
+from metalworks.stores.vectors import check_dims, cosine_topk
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -104,6 +104,7 @@ class MemoryStores:
     def upsert_embeddings(
         self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
     ) -> None:
+        check_dims(vectors, identity.dim)
         if self._embedding_identity != identity:
             self._embeddings.clear()  # model changed → rebuild the index
             self._embedding_identity = identity

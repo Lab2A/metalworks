@@ -28,7 +28,14 @@ def cached_embed(
 ) -> dict[str, list[float]]:
     """Embed ``(corpus_id, text)`` pairs, reusing any vectors already stored for
     the current embedding model and persisting the newly-computed ones. Returns
-    ``{corpus_id: vector}`` covering every input id."""
+    ``{corpus_id: vector}`` covering every input id.
+
+    Assumes corpus ids are content-stable: a cache hit reuses the stored vector by
+    id and ignores the supplied text. This holds because corpus ids (post_id /
+    comment_id) key immutable Reddit content in our append-only corpus. If a future
+    refresh ever re-fetches an *edited* comment under the same id, key the cache on
+    (id, content-hash) instead — today the id IS the content key.
+    """
     if not pairs:
         return {}
     identity = IndexIdentity(embedding_model_id=deps.embeddings.model_id, dim=deps.embeddings.dim)

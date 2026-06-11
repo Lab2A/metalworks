@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from metalworks.contract import (
     DemandReport,
     Fork,
@@ -81,6 +83,39 @@ def test_markdown_links_claims_to_real_permalinks() -> None:
     # the representative quote links back to its source thread
     assert "https://reddit.com/r/Supplements/comments/x/c/" in md
     assert "rep-123" in md
+
+
+def test_facade_persists_run_inside_a_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The facade's `if not offline: Project.find()->write_run` wiring: a real
+    # (non-demo) research run inside a project writes committed files + a RunRef.
+    monkeypatch.chdir(tmp_path)
+    import metalworks.research as research_pkg
+    from metalworks import Metalworks
+    from metalworks.embeddings import FakeEmbedding
+    from metalworks.llm import FakeChatModel
+
+    Project.init(tmp_path, idea="focus supplement")
+    research = _research()  # report_id="rep-123"
+    monkeypatch.setattr(research_pkg, "run_research", lambda *a, **k: research.demand)
+
+    class _Reader:
+        def close(self) -> None:
+            return None
+
+    mw = Metalworks(
+        chat=FakeChatModel(), embeddings=FakeEmbedding(), reader=_Reader(), _offline=False
+    )
+    result = mw.research("demand?", subreddits=["Supplements"])  # explicit subs → no planner LLM
+
+    assert result.demand.report_id == "rep-123"
+    run_dir = tmp_path / ".metalworks" / "runs" / "rep-123"
+    assert (run_dir / "research.json").is_file()
+    assert (run_dir / "research.md").is_file()
+    found = Project.find(tmp_path)
+    assert found is not None
+    assert found.read_manifest().runs[0].report_id == "rep-123"
 
 
 def test_markdown_renders_web_findings_and_partial_caveat() -> None:

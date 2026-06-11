@@ -18,14 +18,34 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 
+def check_dims(vectors: Mapping[str, Sequence[float]], dim: int) -> None:
+    """Reject a batch whose vectors don't all match ``dim``.
+
+    A wrong-length vector would otherwise store happily and only blow up later in
+    ``cosine_topk`` (``np.asarray`` over ragged rows raises far from the upsert that
+    admitted it). Fail fast at the boundary instead.
+    """
+    for corpus_id, vector in vectors.items():
+        if len(vector) != dim:
+            raise ValueError(
+                f"embedding for {corpus_id!r} has length {len(vector)}, expected dim={dim}"
+            )
+
+
 def vector_to_blob(vector: Sequence[float]) -> bytes:
-    """Pack a float vector into bytes (float32) for a sqlite BLOB column."""
-    return array("f", vector).tobytes()
+    """Pack a float vector into bytes for a sqlite BLOB column.
+
+    Uses float64 (``'d'``) so a vector round-tripped through the db is bit-identical
+    to the provider's native float and to what ``MemoryStores`` keeps in memory.
+    f32 would silently drift dedup/triage cosine scores near their thresholds,
+    making results differ across backends and across runs of the same corpus.
+    """
+    return array("d", vector).tobytes()
 
 
 def blob_to_vector(blob: bytes) -> list[float]:
     """Unpack bytes written by :func:`vector_to_blob` back into a float list."""
-    out = array("f")
+    out = array("d")
     out.frombytes(blob)
     return out.tolist()
 
@@ -51,4 +71,4 @@ def cosine_topk(
     return [(ids[int(i)], float(sims[int(i)])) for i in order]
 
 
-__all__ = ["blob_to_vector", "cosine_topk", "vector_to_blob"]
+__all__ = ["blob_to_vector", "check_dims", "cosine_topk", "vector_to_blob"]

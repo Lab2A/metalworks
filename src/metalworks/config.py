@@ -308,7 +308,8 @@ def auto_store() -> MemoryStores | SqliteStores:
         return MemoryStores()
     from metalworks.stores import SqliteStores
 
-    project.root.mkdir(parents=True, exist_ok=True)
+    # project.root necessarily exists: find() only returns a project when its
+    # project.json is present. SqliteStores creates corpus.db + parent as needed.
     return SqliteStores(project.corpus_db)
 
 

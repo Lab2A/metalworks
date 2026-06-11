@@ -30,7 +30,7 @@ from metalworks.contract import (
 from metalworks.embeddings import IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch, StoreError
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
-from metalworks.stores.vectors import blob_to_vector, cosine_topk, vector_to_blob
+from metalworks.stores.vectors import blob_to_vector, check_dims, cosine_topk, vector_to_blob
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, Sequence
@@ -216,6 +216,7 @@ class SqliteStores:
     def upsert_embeddings(
         self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
     ) -> None:
+        check_dims(vectors, identity.dim)
         with self._lock:
             row = self._con.execute(
                 "SELECT model_id, dim FROM embedding_meta WHERE id = 1"
