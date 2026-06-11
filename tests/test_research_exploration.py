@@ -7,7 +7,9 @@ LLM (pytest-socket blocks sockets via --disable-socket).
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, Literal
 
 import pytest
 
@@ -22,7 +24,7 @@ from metalworks.research.exploration import (
 )
 from metalworks.research.exploration.llm_classifier import _BatchVerdicts, _Verdict
 from metalworks.research.types import ExplorationItem
-from metalworks.stores import MemoryStores
+from metalworks.stores import MemoryStores, SqliteStores
 
 
 class _NullReader:
@@ -94,6 +96,41 @@ def test_triage_empty_items_returns_empty_buckets() -> None:
     assert buckets.accepted == []
     assert buckets.rejected == []
     assert buckets.middle == []
+
+
+class _CountingEmbedding:
+    """Deterministic FakeEmbedding that counts how many texts it embedded."""
+
+    protocol_version = "test"
+
+    def __init__(self, *, dim: int = 8) -> None:
+        self._fake = FakeEmbedding(dim=dim)
+        self.model_id = self._fake.model_id
+        self.dim = dim
+        self.texts_embedded = 0
+
+    def embed(
+        self, texts: Sequence[str], *, task: Literal["document", "query"] = "document"
+    ) -> list[list[float]]:
+        self.texts_embedded += len(texts)
+        return self._fake.embed(texts, task=task)
+
+
+def test_triage_reuses_persisted_item_vectors_across_runs(tmp_path: Path) -> None:
+    pytest.importorskip("rank_bm25")  # triage needs the [research] extra
+    store = SqliteStores(tmp_path / "corpus.db")
+    emb = _CountingEmbedding()
+    deps = ResearchDeps(chat=FakeChatModel(), embeddings=emb, corpus=store, reader=_NullReader())
+    items = _items(6)
+    thresholds = TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.5)
+
+    triage_by_embedding(deps, question="thread 3", items=items, thresholds=thresholds)
+    assert emb.texts_embedded == 1 + 6  # the query + every item
+
+    emb.texts_embedded = 0
+    triage_by_embedding(deps, question="thread 3", items=items, thresholds=thresholds)
+    assert emb.texts_embedded == 1  # items reused from corpus.db; only the query re-embeds
+    store.close()
 
 
 def test_triage_accept_plus_reject_over_n_squeezes_middle() -> None:

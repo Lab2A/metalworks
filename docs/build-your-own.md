@@ -13,7 +13,7 @@ reorder.
 
 ```python
 from metalworks.reddit import RedditSearch, heuristic_check
-from metalworks.discovery import filter_post, generate_reply
+from metalworks.discovery import filter_post, draft_reply
 from metalworks.contract import DiscoveryContext, Persona
 
 search = RedditSearch()                      # or your own search
@@ -24,8 +24,8 @@ for post in search.search_posts("elk alternatives", subreddit="devops"):
     decision = filter_post(search_model, post, context)        # 1. is it worth it?
     if not decision or not decision.keep:
         continue
-    reply = generate_reply(capable_model, post, persona,       # 2. draft in your voice
-                           decision.account_type or "expert", context)
+    reply = draft_reply(capable_model, post, persona,          # 2. draft in your voice
+                        decision.account_type or "expert", context)
     if reply is None:
         continue
     verdict = heuristic_check(reply.reply_text)                # 3. your compliance gate
@@ -40,7 +40,7 @@ and `mw.discovery.generate(...)`.
 
 - **Your own filter.** `filter_post` is a convenience over a `complete_structured`
   call. Replace it with your own classifier, a keyword rule, or an embedding score
-  — `generate_reply` doesn't care how a post was selected.
+  — `draft_reply` doesn't care how a post was selected.
 - **Your own voice.** `DiscoveryContext` + `Persona` carry voice guidelines,
   winning examples, pinned notes, an avoid-list, and per-account-type personas.
   This is the seam a memory system renders into.

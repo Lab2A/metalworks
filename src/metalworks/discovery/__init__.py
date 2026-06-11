@@ -13,24 +13,22 @@ adapters.
 """
 
 from metalworks.discovery.deps import DiscoveryDeps
-from metalworks.discovery.judge import build_llm_judge_prompt, llm_judge
-from metalworks.discovery.prompts import (
-    FilterDecision,
-    ReplyGenerationV2,
-    build_filter_prompt,
-    build_generate_prompt,
-)
-from metalworks.discovery.service import filter_post, generate_reply, run_discovery
+from metalworks.discovery.judge import llm_judge
+from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
+from metalworks.discovery.service import draft_reply, filter_post, run_discovery
 
+# Public surface: the loop (`run_discovery`), its dependency bundle
+# (`DiscoveryDeps`), the three standalone seams a caller composes
+# (`filter_post`, `draft_reply`, `llm_judge`), and the two structured-output
+# types they return (`FilterDecision`, `ReplyGenerationV2`). The prompt builders
+# (`build_filter_prompt`, `build_generate_prompt`, `build_llm_judge_prompt`) are
+# internal — import them from `metalworks.discovery.prompts` / `.judge`.
 __all__ = [
     "DiscoveryDeps",
     "FilterDecision",
     "ReplyGenerationV2",
-    "build_filter_prompt",
-    "build_generate_prompt",
-    "build_llm_judge_prompt",
+    "draft_reply",
     "filter_post",
-    "generate_reply",
     "llm_judge",
     "run_discovery",
 ]

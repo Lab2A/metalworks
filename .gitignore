@@ -20,3 +20,6 @@ build/
 
 # OS
 .DS_Store
+
+# gstack local runtime state (browse daemon, tokens) — never committed
+.gstack/

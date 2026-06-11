@@ -144,9 +144,9 @@ def _process_single_post(deps: DiscoveryDeps, post: RedditPost) -> Opportunity |
 
     subreddit_rules = _subreddit_rules(deps, post.subreddit)
 
-    # Stage 2: generate (capable model, with pro→flash degradation retry) — the
-    # public generate_reply seam.
-    reply = generate_reply(
+    # Stage 2: draft (capable model, with pro→flash degradation retry) — the
+    # public draft_reply seam.
+    reply = draft_reply(
         deps.chat,
         post,
         persona,
@@ -201,7 +201,7 @@ def filter_post(
         return None
 
 
-def generate_reply(
+def draft_reply(
     chat: ChatModel,
     post: RedditPost,
     persona: Persona,

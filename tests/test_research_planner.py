@@ -16,6 +16,7 @@ from metalworks.research.planner import (
     InMemoryBriefStates,
     Option,
     assemble_brief,
+    brief_from_question,
     pick_target_subreddits,
     provide_content,
 )
@@ -281,3 +282,30 @@ def test_decision_brief_validates_recommended_count() -> None:
                 ),
             ],
         )
+
+
+# ── brief_from_question (the lightweight --question path) ────────────────────
+
+
+def test_brief_from_question_uses_explicit_subreddits() -> None:
+    deps = _deps(FakeChatModel())
+    brief = brief_from_question(
+        deps,
+        "demand for a focus supplement?",
+        subreddits=["Supplements", "Nootropics"],
+        time_window_months=6,
+    )
+    assert brief.question == "demand for a focus supplement?"
+    assert [t.name for t in brief.target_subreddits] == ["Supplements", "Nootropics"]
+    assert brief.time_window_months == 6
+    assert brief.relevance_rubric.endswith("demand for a focus supplement?")
+
+
+def test_brief_from_question_invokes_picker_when_subreddits_omitted() -> None:
+    # Unscripted FakeChatModel → the picker raises and falls back, but the brief
+    # still assembles with a default 12-month window.
+    deps = _deps(FakeChatModel())
+    brief = brief_from_question(deps, "is there demand for X?")
+    assert brief.question == "is there demand for X?"
+    assert brief.time_window_months == 12
+    assert isinstance(brief.target_subreddits, list)

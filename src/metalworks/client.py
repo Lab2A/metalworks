@@ -16,7 +16,6 @@ top level — every such symbol is imported inside the method that needs it, so
 
 from __future__ import annotations
 
-import uuid
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,10 +26,10 @@ if TYPE_CHECKING:
         Persona,
         RedditComment,
         RedditPost,
+        Research,
         ResearchBrief,
         SubredditIntel,
     )
-    from metalworks.contract.research import DemandReport
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
@@ -41,10 +40,6 @@ if TYPE_CHECKING:
     from metalworks.stores import MemoryStores, SqliteStores
 
     Store = MemoryStores | SqliteStores
-
-
-def _new_id() -> str:
-    return str(uuid.uuid4())
 
 
 class _Resolver:
@@ -110,9 +105,11 @@ class _Resolver:
 
     def store(self) -> Store:
         if self._store is None:
-            from metalworks.stores import MemoryStores
+            from metalworks import config
 
-            self._store = MemoryStores()
+            # No-footprint: a project's corpus.db inside `.metalworks/`, else an
+            # in-process MemoryStores that persists nothing.
+            self._store = config.auto_store()
         return self._store
 
     def reader(self) -> CorpusReader:
@@ -211,9 +208,10 @@ class Metalworks:
         """A fully offline facade — fake models + a bundled local corpus.
 
         ``Metalworks.demo().research("...", subreddits=["Supplements"])`` runs the
-        whole pipeline with **zero API keys and zero network** and renders a
-        small :class:`~metalworks.contract.research.DemandReport`, so you can see
-        the output shape before plugging in a provider. Requires the ``[arctic]``
+        whole pipeline with **zero API keys and zero network** and returns a
+        small :class:`~metalworks.contract.Research` bundle (its ``.demand`` is a
+        :class:`~metalworks.contract.research.DemandReport`), so you can see the
+        output shape before plugging in a provider. Requires the ``[arctic]``
         extra (duckdb) for the local corpus.
         """
         import tempfile
@@ -253,17 +251,25 @@ class Metalworks:
         time_window_months: int | None = None,
         per_sub_limit: int | None = None,
         max_findings: int = 10,
-    ) -> DemandReport:
-        """Run the demand-research pipeline → a :class:`DemandReport`.
+    ) -> Research:
+        """Run stage 1 ("Research") → a frozen :class:`~metalworks.contract.Research` bundle.
 
         Pass a plain ``question`` (and optionally the ``subreddits`` to cover; if
         omitted, the planner picks them) or a fully-formed
         :class:`~metalworks.contract.ResearchBrief` for full control. The corpus
         window defaults to 12 months (1 month in ``demo()`` mode, where the
         bundled corpus is a single month).
+
+        The demand report is on ``.demand``; ``.evidence`` surfaces its grounded
+        evidence on the bundle. ``.competitors`` / ``.positioning`` are reserved
+        for the landscape and positioning pillars and are ``None`` until they
+        ship — so today this returns one demand report wrapped for forward
+        compatibility, and the front door's return shape never breaks as the
+        stage grows.
         """
-        from metalworks.contract import ResearchBrief, TargetSubreddit
+        from metalworks.contract import Research, ResearchBrief
         from metalworks.research import run_research
+        from metalworks.research.planner import brief_from_question
 
         deps = self._r.research_deps()
         if isinstance(question, ResearchBrief):
@@ -274,29 +280,24 @@ class Metalworks:
                 if time_window_months is not None
                 else (1 if self._r.offline else 12)
             )
-            targets = [
-                TargetSubreddit(name=s, rationale="caller-specified") for s in (subreddits or [])
-            ]
-            brief = ResearchBrief(
-                brief_id=_new_id(),
-                question=question,
-                decision_context="Assess the Reddit demand signal behind this question.",
-                success_criteria=["Surface the top unmet needs and the demand signal."],
-                must_address=[],
-                target_subreddits=targets,
-                web_research_directions=[],
-                relevance_rubric=f"Posts and comments relevant to: {question}",
-                time_window_months=window,
+            brief = brief_from_question(
+                deps, question, subreddits=subreddits, time_window_months=window
             )
-            if not targets:
-                from metalworks.research.planner import pick_target_subreddits
-
-                brief = brief.model_copy(
-                    update={"target_subreddits": pick_target_subreddits(deps, brief=brief)}
-                )
-        return run_research(
+        report = run_research(
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )
+        result = Research(demand=report)
+        # Persist as committed files inside a project (real runs only — demo()
+        # is offline and stays footprint-free).
+        if not self._r.offline:
+            from metalworks.project import Project
+
+            project = Project.find()
+            if project is not None:
+                from metalworks.runs import write_run
+
+                write_run(project, result, question=brief.question)
+        return result
 
     def plan(self, prompt: str) -> ResearchBrief:
         """Walk the D1-D8 planner (recommended answers) → a ``ResearchBrief``."""
@@ -445,9 +446,9 @@ class _DiscoveryNamespace:
     ) -> ReplyGenerationV2 | None:
         """Draft a reply to one thread in your voice (a building block)."""
         from metalworks.contract import DiscoveryContext, Persona
-        from metalworks.discovery import generate_reply
+        from metalworks.discovery import draft_reply
 
-        return generate_reply(
+        return draft_reply(
             self._r.chat(),
             post,
             persona or Persona(),

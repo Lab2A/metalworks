@@ -5,6 +5,24 @@
 export type Fork = "product_pinned" | "demographic_pinned" | "both";
 export type SignalStrength = "low" | "medium" | "high";
 
+export interface EvidenceRef {
+  /** Target QuoteCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
+  evidence_id?: string;
+  /** Which evidence family this points at. */
+  kind: "quote" | "web" | "price" | "cluster";
+  /** Set only when kind=='cluster' — 1-based InsightCluster.rank. */
+  cluster_rank?: number | null;
+}
+
+export interface EvidenceRecord {
+  id: string;
+  kind: "quote" | "web" | "price";
+  text: string;
+  /** permalink (quote/price) or source_url (web); '' if none. */
+  url: string;
+  provenance: "verbatim" | "grounded-web" | "derived";
+}
+
 export interface QuoteCitation {
   /** Verbatim quote, exact-matched to the source comment. */
   text: string;
@@ -16,6 +34,8 @@ export interface QuoteCitation {
   author_hash: string;
   /** Upvotes on the source comment, for context. */
   upvotes?: number;
+  /** Stable content-addressed evidence id (``q:<hash of permalink|text>``). */
+  id: string;
 }
 
 export interface InsightCluster {
@@ -73,6 +93,8 @@ export interface PriceEvidence {
   kind: string;
   amount?: number | null;
   permalink?: string | null;
+  /** Stable content-addressed evidence id (``p:<hash of permalink|text>``). */
+  id: string;
 }
 
 export interface PriceFinding {
@@ -162,6 +184,8 @@ export interface WebFinding {
   published_at?: string | null;
   /** Service-assigned, not LLM-assigned. */
   confidence: SignalStrength;
+  /** Stable content-addressed evidence id (``w:<hash of source_url|claim>``). */
+  id: string;
 }
 
 export interface ExplorationReport {
@@ -231,6 +255,10 @@ export interface DemandReport {
   cross_references?: CrossReference[];
   /** must_address item → 'cluster:N' | 'web:N' | 'unaddressable: <reason>'. */
   must_address_resolution?: Record<string, string>;
+}
+
+export interface Research {
+  demand: DemandReport;
 }
 
 export interface ReportSummary {

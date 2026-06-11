@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 from metalworks.contract import DiscoveryContext, Persona, RedditPost
-from metalworks.discovery import (
-    FilterDecision,
-    ReplyGenerationV2,
-    build_filter_prompt,
-    build_generate_prompt,
-)
+from metalworks.discovery import FilterDecision, ReplyGenerationV2
+from metalworks.discovery.prompts import build_filter_prompt, build_generate_prompt
 
 
 def _post() -> RedditPost:

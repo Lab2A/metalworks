@@ -53,12 +53,17 @@ def test_demo_runs_fully_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     monkeypatch.chdir(tmp_path)
     _clear_keys(monkeypatch)
     from metalworks.cli._demo import DEMO_SUBREDDIT
+    from metalworks.contract import Research
     from metalworks.contract.research import DemandReport
 
-    report = Metalworks.demo().research(
+    result = Metalworks.demo().research(
         "Is there demand for a focus supplement?", subreddits=[DEMO_SUBREDDIT]
     )
-    assert isinstance(report, DemandReport)
+    assert isinstance(result, Research)
+    assert isinstance(result.demand, DemandReport)
+    assert result.evidence == result.demand.evidence
+    assert result.competitors is None
+    assert result.positioning is None
 
 
 def test_demo_accepts_a_prebuilt_brief(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -66,8 +71,7 @@ def test_demo_accepts_a_prebuilt_brief(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.chdir(tmp_path)
     _clear_keys(monkeypatch)
     from metalworks.cli._demo import DEMO_SUBREDDIT
-    from metalworks.contract import ResearchBrief, TargetSubreddit
-    from metalworks.contract.research import DemandReport
+    from metalworks.contract import Research, ResearchBrief, TargetSubreddit
 
     brief = ResearchBrief(
         brief_id="demo-brief",
@@ -80,8 +84,9 @@ def test_demo_accepts_a_prebuilt_brief(monkeypatch: pytest.MonkeyPatch, tmp_path
         relevance_rubric="Posts about focus supplements.",
         time_window_months=1,
     )
-    report = Metalworks.demo().research(brief)
-    assert isinstance(report, DemandReport)
+    result = Metalworks.demo().research(brief)
+    assert isinstance(result, Research)
+    assert result.demand.query
 
 
 def test_post_refuses_and_audits_blocked_draft(

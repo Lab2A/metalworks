@@ -10,7 +10,7 @@ Brief-state persistence is out of scope for M2 — see ``store.py``. Only the
 for tests survive here.
 """
 
-from metalworks.research.planner.auto import plan_brief
+from metalworks.research.planner.auto import brief_from_question, plan_brief
 from metalworks.research.planner.brief_assembler import assemble_brief
 from metalworks.research.planner.decision_brief import DecisionBrief, Option
 from metalworks.research.planner.llm_planner import provide_content
@@ -26,6 +26,7 @@ __all__ = [
     "Option",
     "QuestionSpec",
     "assemble_brief",
+    "brief_from_question",
     "pick_target_subreddits",
     "plan_brief",
     "provide_content",

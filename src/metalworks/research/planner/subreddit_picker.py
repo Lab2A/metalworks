@@ -113,9 +113,13 @@ def pick_target_subreddits(
             temperature=0.3,
         )
         suggestions = out.suggestions
-    except Exception:
-        logger.exception(
-            "subreddit_picker: LLM call failed; falling back to user list of %d subs",
+    except Exception as exc:
+        # Expected, handled degradation (e.g. offline/demo with an unscripted fake):
+        # fall back to the user's list. This is NOT an error path, so log it at debug
+        # without a stack trace — a traceback on a clean happy path reads as "broken".
+        logger.debug(
+            "subreddit_picker: LLM call failed (%s); falling back to user list of %d subs",
+            exc,
             len(user_subs),
         )
         return user_subs

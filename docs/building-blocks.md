@@ -51,7 +51,7 @@ public functions you can wire into your own flow.
 - `RedditSearch` — search, comments, subreddit rules. No OAuth needed.
 - `fetch_subreddit_intel(...)`, `fetch_inbox(...)`, `RedditOAuth` — intel, inbox, posting.
 - `filter_post(model, post, context)` — is this thread worth engaging?
-- `generate_reply(chat, post, persona, account_type, context)` — draft a reply in a voice.
+- `draft_reply(chat, post, persona, account_type, context)` — draft a reply in a voice.
 - `heuristic_check(text)` / `llm_judge(...)` — the deterministic gate, then the escalation.
 - `run_discovery(deps, queries=...)` — the whole filter → generate → gate loop.
 
