@@ -268,14 +268,18 @@ def resolve_search() -> SearchProvider | None:
 
 
 def default_store(path: str | None = None) -> MemoryStores | SqliteStores:
-    """The local store backend.
+    """The local store backend for explicit CLI invocations.
 
     ``":memory:"`` → :class:`~metalworks.stores.MemoryStores` (ephemeral, for
-    tests and one-shot runs). Any other ``path`` (or the
-    ``~/.metalworks/store.db`` default) → :class:`~metalworks.stores.SqliteStores`.
-    Resolution order: explicit ``path`` > config ``store`` > default.
+    tests and one-shot runs). Otherwise a :class:`~metalworks.stores.SqliteStores`
+    at the resolved path. Resolution order: explicit ``path`` > config ``store`` >
+    the active project's ``corpus.db`` > the ``~/.metalworks/store.db`` default.
+    (For the library facade's *no-footprint* behaviour, see :func:`auto_store`.)
     """
-    resolved = path or setting("store") or str(_DEFAULT_STORE_PATH)
+    resolved = path or setting("store")
+    if resolved is None:
+        project = Project.find()
+        resolved = str(project.corpus_db) if project is not None else str(_DEFAULT_STORE_PATH)
     if resolved == ":memory:":
         from metalworks.stores import MemoryStores
 
@@ -287,7 +291,29 @@ def default_store(path: str | None = None) -> MemoryStores | SqliteStores:
     return SqliteStores(store_path)
 
 
+def auto_store() -> MemoryStores | SqliteStores:
+    """The library facade's no-footprint store.
+
+    Inside a ``.metalworks/`` project → a :class:`~metalworks.stores.SqliteStores`
+    on the project's ``corpus.db`` (the memory accumulates across runs). With no
+    project → a :class:`~metalworks.stores.MemoryStores` that persists nothing, so
+    a casual ``metalworks.research("idea")`` leaves zero footprint, like git
+    before ``git init``. Reads no config ``store`` setting — that is a CLI concern
+    (see :func:`default_store`).
+    """
+    project = Project.find()
+    if project is None:
+        from metalworks.stores import MemoryStores
+
+        return MemoryStores()
+    from metalworks.stores import SqliteStores
+
+    project.root.mkdir(parents=True, exist_ok=True)
+    return SqliteStores(project.corpus_db)
+
+
 __all__ = [
+    "auto_store",
     "config_search_paths",
     "default_config_path",
     "default_store",

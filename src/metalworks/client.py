@@ -110,9 +110,11 @@ class _Resolver:
 
     def store(self) -> Store:
         if self._store is None:
-            from metalworks.stores import MemoryStores
+            from metalworks import config
 
-            self._store = MemoryStores()
+            # No-footprint: a project's corpus.db inside `.metalworks/`, else an
+            # in-process MemoryStores that persists nothing.
+            self._store = config.auto_store()
         return self._store
 
     def reader(self) -> CorpusReader:

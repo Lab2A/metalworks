@@ -82,3 +82,26 @@ def test_legacy_cwd_toml_still_read_without_a_project(
     (tmp_path / "metalworks.toml").write_text('provider = "anthropic"\n', encoding="utf-8")
     assert Project.find(tmp_path) is None
     assert config.load_config().get("provider") == "anthropic"
+
+
+def test_auto_store_is_memory_and_leaves_no_footprint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    from metalworks.stores import MemoryStores
+
+    assert isinstance(config.auto_store(), MemoryStores)
+    assert not (tmp_path / DIRNAME).exists()  # casual use = zero footprint
+
+
+def test_auto_store_is_sqlite_on_corpus_db_inside_a_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    Project.init(tmp_path)
+    from metalworks.stores import SqliteStores
+
+    store = config.auto_store()
+    assert isinstance(store, SqliteStores)
+    assert (tmp_path / DIRNAME / "corpus.db").is_file()
+    store.close()
