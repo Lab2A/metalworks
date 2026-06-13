@@ -23,3 +23,6 @@ build/
 
 # gstack local runtime state (browse daemon, tokens) — never committed
 .gstack/
+
+# Gate / scratch run artifacts (local evidence, not committed)
+.gate/

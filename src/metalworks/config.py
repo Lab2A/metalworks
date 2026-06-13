@@ -24,6 +24,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from metalworks._genai_client import vertex_enabled
 from metalworks.errors import MissingKeyError
 from metalworks.project import Project
 
@@ -161,6 +162,10 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     for provider, env_var in _CHAT_KEY_ORDER:
         if os.environ.get(env_var):
             return provider, model
+    # Vertex AI uses ADC (a service account), not a chat API key — so the key
+    # loop above misses it. When Vertex mode is on, route to the Google adapter.
+    if vertex_enabled():
+        return "google", model
     raise MissingKeyError(_ALL_CHAT_KEYS, provider="chat model")
 
 
@@ -233,7 +238,7 @@ def resolve_embeddings() -> EmbeddingProvider:
     Google (``GOOGLE_API_KEY`` / ``GEMINI_API_KEY``) is preferred, then OpenAI.
     Raises :class:`~metalworks.errors.MissingKeyError` when neither is set.
     """
-    if os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+    if vertex_enabled() or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         from metalworks.embeddings.adapters.google import GoogleEmbedding
 
         return GoogleEmbedding()

@@ -114,9 +114,18 @@ class _Resolver:
 
     def reader(self) -> CorpusReader:
         if self._reader is None:
-            from metalworks.research.arctic import ArcticReader
+            import os
 
-            self._reader = ArcticReader(probe_sleep_s=0.0)
+            if (os.environ.get("ARCTIC_SHIFT_SOURCE") or "").strip().lower() == "mirror":
+                # Supabase Storage mirror tier (metalworks[supabase]) — faster
+                # than HF and removes it as a runtime dependency.
+                from metalworks.research.arctic import ArcticMirrorReader
+
+                self._reader = ArcticMirrorReader()
+            else:
+                from metalworks.research.arctic import ArcticReader
+
+                self._reader = ArcticReader(probe_sleep_s=0.0)
         return self._reader
 
     def search(self) -> SearchProvider | None:

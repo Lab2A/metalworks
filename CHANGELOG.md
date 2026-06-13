@@ -54,6 +54,18 @@ Pre-release foundations. Nothing here is stable yet.
 - **Front door**: `Metalworks().research(question, subreddits=...)` returns a
   frozen `Research` bundle, and the CLI gains `metalworks research run
   --question "..."` (no `brief.json` round-trip for the common case).
+- **Vertex AI**: the Google chat + embedding adapters authenticate via Vertex
+  (Application Default Credentials) when `GOOGLE_GENAI_USE_VERTEXAI=true`
+  (`VERTEX_PROJECT_ID`/`GOOGLE_CLOUD_PROJECT` + `VERTEX_LOCATION`), not just an
+  API key — `build_genai_client` in `metalworks._genai_client`; provider
+  resolution routes to Google under Vertex even with no `GOOGLE_API_KEY`.
+- **Supabase mirror reader**: `ArcticMirrorReader` (`metalworks[supabase]`) reads
+  the Arctic submission corpus from a Supabase Storage bucket — months from the
+  `arctic_shift_pulls` table, shards listed and signed at query time, DuckDB
+  reading the signed URLs with `WHERE subreddit`/`id IN` pushdown. A faster
+  alternative to the HF mirror that removes HF as a runtime dependency;
+  implements `CorpusReader` and is selected at runtime with
+  `ARCTIC_SHIFT_SOURCE=mirror`.
 
 ### Changed
 
@@ -62,8 +74,12 @@ Pre-release foundations. Nothing here is stable yet.
   `.evidence`. This stabilizes the stage-1 front-door shape before the 0.1.0 tag.
 - Renamed the low-level discovery export `generate_reply` → `draft_reply` (the
   MCP tool name is unchanged).
-- Cut `SupabaseStores` and the `[supabase]` extra from the OSS core; hosted
-  backends bind to the same repo protocols downstream.
+- Cut `SupabaseStores` from the OSS core; hosted store backends bind to the
+  same repo protocols downstream. The `[supabase]` extra now scopes the Arctic
+  mirror reader (above) instead of the dropped stores.
+- The Google adapters respect Vertex's request ceilings: embeddings are batched
+  at 100 instances/request (Vertex caps at 250) and chat clamps
+  `max_output_tokens` to 65536, so large triage/synthesis calls no longer 400.
 - Tightened package public surfaces: demoted internal plumbing out of the
   `reddit` / `research` / `discovery` package `__all__`s (still importable from
   their submodules).

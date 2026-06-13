@@ -29,12 +29,12 @@ from __future__ import annotations
 
 import contextlib
 import importlib
-import os
 from typing import Any, ClassVar, TypeVar
 
 from pydantic import BaseModel
 
-from metalworks.errors import GroundingUnavailable, MissingExtraError, MissingKeyError
+from metalworks._genai_client import build_genai_client
+from metalworks.errors import GroundingUnavailable, MissingExtraError
 from metalworks.llm.adapters._retry import with_backoff
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
@@ -52,6 +52,10 @@ T = TypeVar("T", bound=BaseModel)
 
 # Hidden-thinking headroom for thinking_budget == 0 (see module docstring).
 _HIDDEN_THINKING_HEADROOM = 2048
+# Hard ceiling for max_output_tokens. Vertex rejects > 65536 (the Gemini 3.x
+# output cap); adding thinking headroom to a large max_tokens can otherwise
+# push the request over the limit.
+_MAX_OUTPUT_TOKENS = 65536
 
 
 def _byte_to_char_offsets(text: str) -> list[int]:
@@ -137,14 +141,10 @@ class GoogleChatModel:
         on_generation: GenerationHook | None = None,
     ) -> None:
         try:
-            genai = importlib.import_module("google.genai")
             types_module = importlib.import_module("google.genai.types")
             errors_module = importlib.import_module("google.genai.errors")
         except ImportError as exc:
             raise MissingExtraError("google", package="google-genai") from exc
-        key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-        if not key:
-            raise MissingKeyError("GOOGLE_API_KEY", provider="Google")
         self.model_id = model_id
         self.capabilities = ChatCapabilities(
             native_structured=True,
@@ -154,8 +154,10 @@ class GoogleChatModel:
         )
         self._on_generation = on_generation
         self._types: Any = types_module
+        # Build the client first — it raises MissingKeyError when neither a key
+        # nor Vertex creds are present, before we touch the errors module.
+        self._client: Any = build_genai_client(api_key=api_key)
         self._client_error: type[Exception] = errors_module.ClientError
-        self._client: Any = genai.Client(api_key=key)
 
     # ── ChatModel ──
 
@@ -283,12 +285,13 @@ class GoogleChatModel:
         }
         if thinking_budget > 0:
             # Thinking tokens count against max_output_tokens on Gemini.
-            kwargs["max_output_tokens"] = max_tokens + thinking_budget
+            requested = max_tokens + thinking_budget
             kwargs["thinking_config"] = self._types.ThinkingConfig(thinking_budget=thinking_budget)
         else:
             # Hidden-thinking headroom — see module docstring / project memory:
             # Gemini 3.x burns ~1-2k thinking tokens even at thinking_budget=0.
-            kwargs["max_output_tokens"] = max_tokens + _HIDDEN_THINKING_HEADROOM
+            requested = max_tokens + _HIDDEN_THINKING_HEADROOM
+        kwargs["max_output_tokens"] = min(requested, _MAX_OUTPUT_TOKENS)
         return kwargs
 
     def _emit(self, kind: str, usage: Usage) -> None:

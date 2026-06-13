@@ -11,16 +11,21 @@ Mapping notes:
 from __future__ import annotations
 
 import importlib
-import os
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
+from metalworks._genai_client import build_genai_client
 from metalworks.embeddings import PROTOCOL_VERSION
-from metalworks.errors import MissingExtraError, MissingKeyError
+from metalworks.errors import MissingExtraError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 _TASK_TYPES = {"document": "RETRIEVAL_DOCUMENT", "query": "RETRIEVAL_QUERY"}
+
+# Vertex AI's embed_content caps each request at 250 instances (the API-key
+# endpoint is more lenient, but 100 is a safe batch for both and keeps payloads
+# well under per-request size limits).
+_MAX_BATCH = 100
 
 
 class GoogleEmbedding:
@@ -36,17 +41,13 @@ class GoogleEmbedding:
         api_key: str | None = None,
     ) -> None:
         try:
-            genai = importlib.import_module("google.genai")
             types_module = importlib.import_module("google.genai.types")
         except ImportError as exc:
             raise MissingExtraError("google", package="google-genai") from exc
-        key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-        if not key:
-            raise MissingKeyError("GOOGLE_API_KEY", provider="Google")
         self.model_id = model_id
         self.dim = dim
         self._types: Any = types_module
-        self._client: Any = genai.Client(api_key=key)
+        self._client: Any = build_genai_client(api_key=api_key)
 
     def embed(
         self,
@@ -58,12 +59,16 @@ class GoogleEmbedding:
             task_type=_TASK_TYPES[task],
             output_dimensionality=self.dim,
         )
-        response = self._client.models.embed_content(
-            model=self.model_id, contents=list(texts), config=config
-        )
-        embeddings: list[Any] = list(getattr(response, "embeddings", None) or [])
+        items = list(texts)
         out: list[list[float]] = []
-        for embedding in embeddings:
-            values: list[Any] = list(getattr(embedding, "values", None) or [])
-            out.append([float(v) for v in values])
+        # Chunk to respect Vertex's 250-instance-per-request ceiling.
+        for start in range(0, len(items), _MAX_BATCH):
+            batch = items[start : start + _MAX_BATCH]
+            response = self._client.models.embed_content(
+                model=self.model_id, contents=batch, config=config
+            )
+            embeddings: list[Any] = list(getattr(response, "embeddings", None) or [])
+            for embedding in embeddings:
+                values: list[Any] = list(getattr(embedding, "values", None) or [])
+                out.append([float(v) for v in values])
         return out
