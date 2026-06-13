@@ -59,6 +59,19 @@ Pre-release foundations. Nothing here is stable yet.
   (`VERTEX_PROJECT_ID`/`GOOGLE_CLOUD_PROJECT` + `VERTEX_LOCATION`), not just an
   API key — `build_genai_client` in `metalworks._genai_client`; provider
   resolution routes to Google under Vertex even with no `GOOGLE_API_KEY`.
+- **Positioning (Pillar B)**: `build_positioning_brief(deps, report) -> PositioningBrief`
+  (`metalworks.research.synthesis.positioning`) turns a demand report into a
+  grounded Dunford wedge + price hypothesis. Wedge SELECTION is deterministic —
+  it stands on an `InsightCluster` the web stream is `silent_web`/`disagree` on at
+  ≥ MEDIUM signal (a pain competitors miss), ranked by `demand_score`; no white
+  space → an honest null brief. Exactly one LLM call phrases the three free-text
+  slots (constrained to the Dunford template) and a second pass verifies each
+  clause is entailed by its cited quotes (marks the brief `partial` if not). The
+  price band is copied through from `PriceFinding`, never recomputed. New
+  contract `metalworks.contract.positioning` (`PositioningBrief` / `WedgeClaim` /
+  `PriceHypothesis`), every slot an `EvidenceRef`; `Research.positioning` is now a
+  real optional field. Surfaced via the `metalworks position <report_id>` CLI,
+  the synchronous `positioning_from_report` MCP tool, and the `position-wedge` skill.
 - **Supabase mirror reader**: `ArcticMirrorReader` (`metalworks[supabase]`) reads
   the Arctic submission corpus from a Supabase Storage bucket — months from the
   `arctic_shift_pulls` table, shards listed and signed at query time, DuckDB

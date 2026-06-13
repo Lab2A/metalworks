@@ -24,6 +24,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from metalworks.contract.evidence import EvidenceRecord
+from metalworks.contract.positioning import PositioningBrief
 from metalworks.contract.research import DemandReport
 
 
@@ -39,6 +40,7 @@ class Research(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     demand: DemandReport
+    positioning: PositioningBrief | None = None
 
     @property
     def evidence(self) -> list[EvidenceRecord]:
@@ -52,11 +54,4 @@ class Research(BaseModel):
         """The competitor map for this idea. Not built yet (Phase 2,
         ``CompetitorMap``) — always ``None`` today. Becomes an optional field
         when the landscape pillar ships."""
-        return None
-
-    @property
-    def positioning(self) -> None:
-        """The positioning brief for this idea. Not built yet (Phase 1,
-        ``PositioningBrief``) — always ``None`` today. Becomes an optional
-        field when the positioning pillar ships."""
         return None

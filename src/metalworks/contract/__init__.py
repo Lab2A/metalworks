@@ -14,6 +14,11 @@ from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
 )
+from metalworks.contract.positioning import (
+    PositioningBrief,
+    PriceHypothesis,
+    WedgeClaim,
+)
 from metalworks.contract.reddit import (
     ComplianceVerdict,
     DiscoveryContext,
@@ -80,6 +85,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "TargetSubreddit",
     "TriageThresholds",
     "WebFinding",
+    # Positioning stage (Pillar B) — the grounded Dunford wedge + price hypothesis.
+    "PositioningBrief",
+    "PriceHypothesis",
+    "WedgeClaim",
     # Reddit + discovery — engagement surfaces and the compliance gate.
     "ComplianceVerdict",
     "DiscoveryContext",

@@ -259,6 +259,7 @@ export interface DemandReport {
 
 export interface Research {
   demand: DemandReport;
+  positioning?: PositioningBrief | null;
 }
 
 export interface ReportSummary {
@@ -283,6 +284,51 @@ export interface RunSummary {
   created_at: string;
   generated_at?: string | null;
   ready_at?: string | null;
+}
+
+export interface WedgeClaim {
+  /** What the beachhead audience uses today, from real web findings. */
+  competitive_alternative: string;
+  /** What this product does differently — the white space competitors miss. */
+  unique_attribute: string;
+  /** Why that attribute matters to the audience. */
+  value: string;
+  /** The narrow first audience to win. */
+  beachhead: string;
+  /** The frame of reference the product competes in. */
+  market_category: string;
+  /** 1-based InsightCluster.rank the wedge stands on (silent_web/disagree). */
+  source_cluster_rank: number;
+  /** Refs (cluster quotes + web findings) backing the wedge. */
+  evidence?: EvidenceRef[];
+}
+
+export interface PriceHypothesis {
+  /** Low end of the willingness-to-pay band. */
+  low?: number | null;
+  /** High end of the band. */
+  high?: number | null;
+  currency?: string;
+  /** One-line PMC/PME framing of how the band was derived (from price evidence). */
+  framing?: string;
+  /** Refs to the PriceEvidence backing the band. */
+  evidence?: EvidenceRef[];
+  insufficient_signal?: boolean;
+}
+
+export interface PositioningBrief {
+  /** The DemandReport this brief was derived from. */
+  report_id: string;
+  /** The assembled Dunford statement (or an honest null when no wedge). */
+  positioning_statement: string;
+  /** The wedge; None when no white-space cluster qualifies. */
+  wedge?: WedgeClaim | null;
+  /** Price band copied through from the report; None if absent. */
+  price_hypothesis?: PriceHypothesis | null;
+  /** True when the wedge is absent or a clause failed verification. */
+  partial?: boolean;
+  /** Why the brief is partial / what to treat as unconfirmed. */
+  caveat?: string | null;
 }
 
 export interface ComplianceVerdict {

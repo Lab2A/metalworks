@@ -373,6 +373,63 @@ def research_run(
     _print_report(report)
 
 
+def _print_positioning(brief: object) -> None:
+    stmt = getattr(brief, "positioning_statement", "")
+    console.print(f"\n[bold]Positioning[/bold] — report {getattr(brief, 'report_id', '')}")
+    console.print(f"  [italic]{stmt}[/italic]")
+    wedge = getattr(brief, "wedge", None)
+    if wedge is not None:
+        console.print("  [bold]wedge:[/bold]")
+        console.print(f"    alternative: {wedge.competitive_alternative}")
+        console.print(f"    unique:      {wedge.unique_attribute}")
+        console.print(f"    value:       {wedge.value}")
+        console.print(f"    beachhead:   {wedge.beachhead}")
+        console.print(f"    category:    {wedge.market_category}")
+    price = getattr(brief, "price_hypothesis", None)
+    if price is not None and not price.insufficient_signal and price.low is not None:
+        console.print(f"  [bold]price:[/bold] {price.currency} {price.low:g}-{price.high:g}")
+    if getattr(brief, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(brief, 'caveat', '')}")
+
+
+@research_app.command("position")
+def research_position(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the positioning brief JSON here.")
+    ] = None,
+) -> None:
+    """Derive a grounded positioning wedge from a stored report (one LLM call)."""
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Positioning[/bold] report {report_id}...")
+    try:
+        brief = build_positioning_brief(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(brief.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote brief[/green] {out}")
+    _print_positioning(brief)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

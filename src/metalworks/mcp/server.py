@@ -86,6 +86,11 @@ async def research_plan_brief(prompt: str, store_path: str | None = None) -> dic
     return tools.research_plan_brief(prompt, store_path)
 
 
+async def positioning_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Derive a grounded positioning wedge from a stored report (chat key, synchronous)."""
+    return tools.positioning_from_report(report_id, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -144,6 +149,7 @@ _TOOL_WRAPPERS = (
     research_list_runs,
     research_get_report,
     research_plan_brief,
+    positioning_from_report,
     research_start,
     research_status,
     research_result,
