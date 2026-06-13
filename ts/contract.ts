@@ -259,6 +259,7 @@ export interface DemandReport {
 
 export interface Research {
   demand: DemandReport;
+  competitors?: CompetitorMap | null;
   positioning?: PositioningBrief | null;
 }
 
@@ -284,6 +285,52 @@ export interface RunSummary {
   created_at: string;
   generated_at?: string | null;
   ready_at?: string | null;
+}
+
+export interface StrengthClaim {
+  /** A concrete strength, one clause. */
+  claim: string;
+  /** A WebFinding ref backing the strength, when one matched. */
+  evidence?: EvidenceRef | null;
+}
+
+export interface GapClaim {
+  /** 1-based index within the competitor's gaps. */
+  gap_index: number;
+  /** The gap, phrased as what the competitor misses. */
+  claim: string;
+  /** Service-assigned, never LLM. */
+  severity: SignalStrength;
+  /** The single resolvable ref backing this gap. */
+  evidence: EvidenceRef;
+}
+
+export interface Competitor {
+  /** 1-based index within the map. */
+  competitor_index: number;
+  /** The competitor / alternative name. */
+  name: string;
+  /** direct | adjacent | status_quo. */
+  kind: "direct" | "adjacent" | "status_quo";
+  /** What it is, in one line. */
+  one_liner: string;
+  strengths?: StrengthClaim[];
+  gaps?: GapClaim[];
+}
+
+export interface CompetitorMap {
+  /** Stable id for this map (derived from report_id). */
+  map_id: string;
+  /** The DemandReport this map was derived from. */
+  report_id: string;
+  competitors?: Competitor[];
+  /** The mandatory 'do nothing' alternative (kind=status_quo). */
+  status_quo_alternative: Competitor;
+  generated_at: string;
+  /** True when a stage degraded. */
+  partial?: boolean;
+  /** What to treat as lower-confidence. */
+  caveat?: string | null;
 }
 
 export interface WedgeClaim {

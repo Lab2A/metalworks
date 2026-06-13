@@ -10,6 +10,7 @@ no provider dependencies (the heavy bits live behind the `[research]` extra).
 """
 
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
+from metalworks.research.landscape import run_competitor_map
 from metalworks.research.pipeline import run_research
 
 # Public surface: the entry point (`run_research`), the dependency bundle
@@ -22,5 +23,6 @@ __all__ = [
     "CommentSource",
     "CorpusReader",
     "ResearchDeps",
+    "run_competitor_map",
     "run_research",
 ]

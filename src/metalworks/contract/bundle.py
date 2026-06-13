@@ -24,6 +24,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from metalworks.contract.evidence import EvidenceRecord
+from metalworks.contract.landscape import CompetitorMap
 from metalworks.contract.positioning import PositioningBrief
 from metalworks.contract.research import DemandReport
 
@@ -40,6 +41,7 @@ class Research(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     demand: DemandReport
+    competitors: CompetitorMap | None = None
     positioning: PositioningBrief | None = None
 
     @property
@@ -48,10 +50,3 @@ class Research(BaseModel):
         report's evidence, surfaced on the bundle so every stage can resolve
         ``EvidenceRef``s against one object."""
         return self.demand.evidence
-
-    @property
-    def competitors(self) -> None:
-        """The competitor map for this idea. Not built yet (Phase 2,
-        ``CompetitorMap``) — always ``None`` today. Becomes an optional field
-        when the landscape pillar ships."""
-        return None

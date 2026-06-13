@@ -14,6 +14,12 @@ from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
 )
+from metalworks.contract.landscape import (
+    Competitor,
+    CompetitorMap,
+    GapClaim,
+    StrengthClaim,
+)
 from metalworks.contract.positioning import (
     PositioningBrief,
     PriceHypothesis,
@@ -85,6 +91,11 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "TargetSubreddit",
     "TriageThresholds",
     "WebFinding",
+    # Landscape stage (Pillar A) — the grounded competitive map.
+    "Competitor",
+    "CompetitorMap",
+    "GapClaim",
+    "StrengthClaim",
     # Positioning stage (Pillar B) — the grounded Dunford wedge + price hypothesis.
     "PositioningBrief",
     "PriceHypothesis",

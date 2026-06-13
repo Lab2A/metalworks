@@ -430,6 +430,61 @@ def research_position(
     _print_positioning(brief)
 
 
+def _print_competitor_map(cmap: object) -> None:
+    console.print(f"\n[bold]Competitive landscape[/bold] — report {getattr(cmap, 'report_id', '')}")
+    if getattr(cmap, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(cmap, 'caveat', '')}")
+    sq = getattr(cmap, "status_quo_alternative", None)
+    competitors = getattr(cmap, "competitors", [])
+    rows = [sq, *competitors] if sq is not None else list(competitors)
+    for c in rows:
+        console.print(f"  [bold]{c.name}[/bold] ({c.kind}) — {c.one_liner}")
+        for g in c.gaps:
+            console.print(f"    [red]gap[/red] [{g.severity}]: {g.claim}")
+
+
+@research_app.command("competitor-map")
+def research_competitor_map(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the competitor map JSON here.")
+    ] = None,
+) -> None:
+    """Map the competitive landscape for a stored report (grounded names, cited gaps)."""
+    from metalworks.research import run_competitor_map
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Mapping competitors[/bold] for report {report_id}...")
+    try:
+        cmap = run_competitor_map(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(cmap.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote competitor map[/green] {out}")
+    _print_competitor_map(cmap)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

@@ -91,6 +91,13 @@ async def positioning_from_report(report_id: str, store_path: str | None = None)
     return tools.positioning_from_report(report_id, store_path)
 
 
+async def competitor_map_from_report(
+    report_id: str, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Map the competitive landscape for a stored report (chat + embedding keys, sync)."""
+    return tools.competitor_map_from_report(report_id, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -150,6 +157,7 @@ _TOOL_WRAPPERS = (
     research_get_report,
     research_plan_brief,
     positioning_from_report,
+    competitor_map_from_report,
     research_start,
     research_status,
     research_result,

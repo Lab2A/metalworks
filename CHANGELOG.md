@@ -59,6 +59,22 @@ Pre-release foundations. Nothing here is stable yet.
   (`VERTEX_PROJECT_ID`/`GOOGLE_CLOUD_PROJECT` + `VERTEX_LOCATION`), not just an
   API key — `build_genai_client` in `metalworks._genai_client`; provider
   resolution routes to Google under Vertex even with no `GOOGLE_API_KEY`.
+- **Landscape (Pillar A)**: `run_competitor_map(deps, report) -> CompetitorMap`
+  (`metalworks.research.landscape`) maps the competitive set — direct, adjacent,
+  and the mandatory status-quo "do nothing" alternative — with an exploitable,
+  EVIDENCED gap per competitor. Four deterministic stages: grounded enumeration
+  (names with zero grounding chunks dropped; degrades to an ungrounded structured
+  call marked `partial`); per-competitor strength/gap harvest; cosine
+  complaint-matching of each gap against the report's real evidence (cluster
+  quotes first, then web findings); assemble, dropping any gap with no resolvable
+  evidence (no-quote-no-gap). `severity` is service-assigned from the matched
+  complaint's distinct-author breadth, never LLM. The status-quo alternative is
+  built deterministically from the top clusters (always verbatim-grounded). New
+  contract `metalworks.contract.landscape` (`CompetitorMap` / `Competitor` /
+  `GapClaim` / `StrengthClaim`), every gap an `EvidenceRef`; `Research.competitors`
+  is now a real optional field. Surfaced via the `metalworks competitor-map
+  <report_id>` CLI, the synchronous `competitor_map_from_report` MCP tool, and the
+  `competitor-map` skill.
 - **Positioning (Pillar B)**: `build_positioning_brief(deps, report) -> PositioningBrief`
   (`metalworks.research.synthesis.positioning`) turns a demand report into a
   grounded Dunford wedge + price hypothesis. Wedge SELECTION is deterministic —
