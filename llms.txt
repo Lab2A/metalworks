@@ -28,7 +28,7 @@ provider modules. Install only what matches the API key you have:
   Reddit comments; web findings carry source URLs from grounding metadata, never
   model prose.
 - `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
-  `generate_reply` building blocks.
+  `draft_reply` building blocks.
 - `metalworks.reddit`: `RedditSearch`, `RedditOAuth`, `RedditMetrics`,
   `fetch_subreddit_intel`, `RateLimiter`, and `heuristic_check` /
   `heuristic_check_post` (a deterministic, zero-key compliance gate).
@@ -46,8 +46,9 @@ api_key_env=...)`. Set a cheap triage model with `Metalworks(model=..., fast_mod
   (adds `complete_grounded` with char-offset provenance).
 - `SearchProvider`, `EmbeddingProvider` (with a hard index-identity guard).
 - Typed repos: `CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`,
-  `OpportunityRepo`, `InboxRepo`. Backends: `MemoryStores`, `SqliteStores`,
-  `SupabaseStores` (extra).
+  `OpportunityRepo`, `InboxRepo`. Backends shipped in core: `MemoryStores`,
+  `SqliteStores`; hosted backends (Postgres/PostgREST) are a downstream custom
+  store.
 
 ## Usage policy
 

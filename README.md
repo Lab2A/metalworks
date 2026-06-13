@@ -44,6 +44,11 @@ pip install "metalworks[google,research]"
 export GOOGLE_API_KEY=...     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
 ```
 
+Prefer Vertex AI over an API key? Set `GOOGLE_GENAI_USE_VERTEXAI=true` plus
+`VERTEX_PROJECT_ID` and `VERTEX_LOCATION` and the Google adapters authenticate
+via Application Default Credentials. See
+[docs/model-configuration.md](docs/model-configuration.md).
+
 ```python
 from metalworks import Metalworks
 
@@ -60,8 +65,10 @@ citation metadata, not from model prose. See
 The `Metalworks` facade is the easy path over `run_research` / `run_discovery`
 and the protocols — drop down to those whenever you want more control. Submissions
 come from the Hugging Face `open-index/arctic` Parquet mirror; comments from the
-live Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months, or
-[bring your own corpus](docs/how-to-custom-corpus.md) to skip Arctic Shift.
+live Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months. To read
+the submission corpus from a Supabase Storage bucket instead (no HF runtime
+dependency), install `metalworks[supabase]` and set `ARCTIC_SHIFT_SOURCE=mirror`,
+or [bring your own corpus](docs/how-to-custom-corpus.md) to skip Arctic Shift.
 
 ## Extras
 
@@ -85,7 +92,7 @@ pip install "metalworks[all]"
 | `reddit` | `redditwarp`, `cryptography` | Reddit search, OAuth, posting, token encryption |
 | `arctic` | `duckdb` | Read Arctic Shift Parquet shards (submissions corpus) |
 | `research` | `arctic` + `rank-bm25` | The full demand-report pipeline |
-| `supabase` | `supabase` | Supabase-backed repos (bind existing tables via `table_map`) |
+| `supabase` | `arctic` + `supabase` | `ArcticMirrorReader` — Arctic corpus from a Supabase Storage bucket (`ARCTIC_SHIFT_SOURCE=mirror`) |
 | `exa` | `exa-py` | Exa `SearchProvider` adapter |
 | `tavily` | `tavily-python` | Tavily `SearchProvider` adapter |
 | `mcp` | `mcp[cli]` | MCP server surface |
@@ -107,7 +114,9 @@ default. The protocols are the seam your code and the pipeline speak through:
 - `EmbeddingProvider` — embeddings with a hard index-identity guard.
 - The typed repos (`CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`,
   `OpportunityRepo`, `InboxRepo`) are the storage protocol. `MemoryStores` and
-  `SqliteStores` ship in core; `SupabaseStores` is behind `[supabase]`.
+  `SqliteStores` ship in core; hosted backends (Postgres/PostgREST) are a custom
+  store you implement downstream — see
+  [docs/how-to-custom-store.md](docs/how-to-custom-store.md).
 
 See [docs/reference-protocols.md](docs/reference-protocols.md) for signatures.
 

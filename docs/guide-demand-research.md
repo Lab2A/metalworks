@@ -64,8 +64,10 @@ mw.research("...", subreddits=["Nootropics"], time_window_months=6, per_sub_limi
 - `max_findings` — cap web findings.
 
 Submissions come from the Hugging Face Arctic mirror; comments from the live
-Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months. To run without
-Arctic Shift at all, [bring your own corpus](/docs/how-to-custom-corpus).
+Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months. To read the
+submission corpus from a Supabase Storage bucket instead (no HF runtime
+dependency), install `metalworks[supabase]` and set `ARCTIC_SHIFT_SOURCE=mirror`.
+To run without Arctic Shift at all, [bring your own corpus](/docs/how-to-custom-corpus).
 
 ## Provenance, by construction
 
