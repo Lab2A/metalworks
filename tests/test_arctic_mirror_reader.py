@@ -64,21 +64,25 @@ class _FakeQuery:
 
 
 class _FakeStorageBucket:
-    def __init__(self, shard_path: str, *, empty: bool = False) -> None:
+    def __init__(self, shard_path: str, *, empty: bool = False, sign_mode: str = "ok") -> None:
         self._shard_path = shard_path
         self._empty = empty
+        self._sign_mode = sign_mode
 
     def list(self, _prefix: str, _opts: dict[str, Any]) -> list[dict[str, str]]:
         return [] if self._empty else [{"name": "skincare.parquet"}]
 
-    def create_signed_urls(self, paths: list[str], _ttl: int) -> list[dict[str, str]]:
-        # Resolve every requested object to the one local parquet file.
+    def create_signed_urls(self, paths: list[str], _ttl: int) -> list[dict[str, Any]]:
+        if self._sign_mode == "error":  # per-path failure: null URL + error
+            return [{"signedURL": None, "error": "boom"} for _ in paths]
+        if self._sign_mode == "short":  # fewer entries than requested
+            return []
         return [{"signedURL": self._shard_path} for _ in paths]
 
 
 class _FakeStorage:
-    def __init__(self, shard_path: str, *, empty: bool = False) -> None:
-        self._bucket = _FakeStorageBucket(shard_path, empty=empty)
+    def __init__(self, shard_path: str, *, empty: bool = False, sign_mode: str = "ok") -> None:
+        self._bucket = _FakeStorageBucket(shard_path, empty=empty, sign_mode=sign_mode)
 
     def from_(self, _bucket: str) -> _FakeStorageBucket:
         return self._bucket
@@ -86,10 +90,15 @@ class _FakeStorage:
 
 class FakeSupabase:
     def __init__(
-        self, *, months: list[dict[str, Any]], shard_path: str, empty_listing: bool = False
+        self,
+        *,
+        months: list[dict[str, Any]],
+        shard_path: str,
+        empty_listing: bool = False,
+        sign_mode: str = "ok",
     ) -> None:
         self._months = months
-        self.storage = _FakeStorage(shard_path, empty=empty_listing)
+        self.storage = _FakeStorage(shard_path, empty=empty_listing, sign_mode=sign_mode)
 
     def table(self, _name: str) -> _FakeQuery:
         return _FakeQuery(self._months)
@@ -180,6 +189,36 @@ def test_no_shards_raises() -> None:
                 subreddit="X", content_type="submissions", months=[MonthRef(2026, 2)]
             )
         )
+
+
+def test_sign_failure_raises_not_silent_subset() -> None:
+    # A per-path sign failure (null signedURL + error) must raise, never inject
+    # "None" into the SQL or silently query a subset.
+    client = FakeSupabase(
+        months=[{"year": 2026, "month": 2}], shard_path="x", sign_mode="error"
+    )
+    with pytest.raises(RuntimeError, match="failed to sign"):
+        list(
+            ArcticMirrorReader(client=client).pull_subreddit(
+                subreddit="X", content_type="submissions", months=[MonthRef(2026, 2)]
+            )
+        )
+
+
+def test_sign_count_mismatch_raises() -> None:
+    client = FakeSupabase(months=[{"year": 2026, "month": 2}], shard_path="x", sign_mode="short")
+    with pytest.raises(RuntimeError, match="signed 0 of"):
+        list(
+            ArcticMirrorReader(client=client).pull_subreddit(
+                subreddit="X", content_type="submissions", months=[MonthRef(2026, 2)]
+            )
+        )
+
+
+def test_malformed_pulls_row_raises() -> None:
+    client = FakeSupabase(months=[{"year": 2026}], shard_path="x")  # missing "month"
+    with pytest.raises(RuntimeError, match="malformed"):
+        ArcticMirrorReader(client=client).latest_available_month()
 
 
 def test_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:

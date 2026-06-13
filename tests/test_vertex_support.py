@@ -22,6 +22,8 @@ class _RecordingClient:
 
     last: _RecordingClient | None = None
 
+    drop_one = False  # when True, embed_content returns one fewer embedding than inputs
+
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
         self.embed_batches: list[int] = []
@@ -31,7 +33,8 @@ class _RecordingClient:
         class _Models:
             def embed_content(self, *, model: str, contents: list[str], config: Any) -> Any:
                 outer.embed_batches.append(len(contents))
-                embs = [SimpleNamespace(values=[float(i), 0.5]) for i in range(len(contents))]
+                n = len(contents) - 1 if _RecordingClient.drop_one else len(contents)
+                embs = [SimpleNamespace(values=[float(i), 0.5]) for i in range(n)]
                 return SimpleNamespace(embeddings=embs)
 
         self.models = _Models()
@@ -190,6 +193,18 @@ def test_embedding_batches_at_100_and_preserves_order(monkeypatch: pytest.Monkey
     assert _RecordingClient.last.embed_batches == [100, 100, 50]
     # Order preserved: each batch restarts its index, so first of each batch is [0.0, 0.5].
     assert vecs[0] == [0.0, 0.5]
+
+
+def test_embedding_count_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_google_fakes(monkeypatch)
+    _clear_google_env(monkeypatch)
+    monkeypatch.setenv("GOOGLE_API_KEY", "k")
+    from metalworks.embeddings.adapters.google import GoogleEmbedding
+
+    monkeypatch.setattr(_RecordingClient, "drop_one", True)
+    emb = GoogleEmbedding(dim=2)
+    with pytest.raises(RuntimeError, match="count mismatch"):
+        emb.embed(["a", "b", "c"], task="document")
 
 
 # ── GoogleChatModel max_output_tokens clamp ──────────────────────────────

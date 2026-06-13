@@ -190,7 +190,12 @@ class ArcticMirrorReader:
                 f"ArcticMirrorReader: no complete {content_type} months in arctic_shift_pulls"
             )
         top = rows[0]
-        return MonthRef(int(top["year"]), int(top["month"]))
+        try:
+            return MonthRef(int(top["year"]), int(top["month"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"ArcticMirrorReader: malformed arctic_shift_pulls row {top!r}"
+            ) from exc
 
     def _list_shards(self, sb: Any, prefix: str) -> Any:
         return sb.storage.from_(self._bucket).list(prefix, {"limit": _LIST_LIMIT})
@@ -226,7 +231,21 @@ class ArcticMirrorReader:
             batch: list[Any] = list(
                 _retry(partial(self._sign, sb, chunk), what=f"sign({len(chunk)})") or []
             )
-            urls.extend(str(item["signedURL"]) for item in batch)
+            # Supabase returns one entry per path; a per-path failure has a null
+            # signedURL + populated error. Never silently subset the corpus or
+            # inject a "None" URL — fail loud so a partial sign can't masquerade
+            # as a complete (but truncated) run.
+            if len(batch) != len(chunk):
+                raise RuntimeError(
+                    f"ArcticMirrorReader: signed {len(batch)} of {len(chunk)} shards "
+                    f"(content prefix sign batch {i // _SIGN_BATCH})"
+                )
+            for item in batch:
+                signed = item.get("signedURL") if hasattr(item, "get") else item["signedURL"]
+                err = item.get("error") if hasattr(item, "get") else None
+                if err or not signed:
+                    raise RuntimeError(f"ArcticMirrorReader: failed to sign a shard ({err})")
+                urls.append(str(signed))
         return urls
 
     # ── Pulls ───────────────────────────────────────────────────────────

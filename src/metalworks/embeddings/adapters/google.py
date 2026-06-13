@@ -68,6 +68,12 @@ class GoogleEmbedding:
                 model=self.model_id, contents=batch, config=config
             )
             embeddings: list[Any] = list(getattr(response, "embeddings", None) or [])
+            # Positional alignment: a dropped/reordered instance would silently
+            # misalign every downstream vector with its text — fail loud instead.
+            if len(embeddings) != len(batch):
+                raise RuntimeError(
+                    f"embedding count mismatch: got {len(embeddings)} for {len(batch)} inputs"
+                )
             for embedding in embeddings:
                 values: list[Any] = list(getattr(embedding, "values", None) or [])
                 out.append([float(v) for v in values])
