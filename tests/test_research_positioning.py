@@ -273,7 +273,9 @@ def test_phrasing_failure_returns_partial_null() -> None:
 
 
 def test_price_hypothesis_copied_through() -> None:
-    pe = PriceEvidence(text="$45 feels right", kind="willingness", amount=45.0, permalink="https://r/x/9")
+    pe = PriceEvidence(
+        text="$45 feels right", kind="willingness", amount=45.0, permalink="https://r/x/9"
+    )
     report = _report(
         clusters=[_cluster(1, quotes=[_quote("p", "https://r/x/1")])],
         cross_references=[_xref(1, "silent_web")],
@@ -336,9 +338,7 @@ def test_mcp_positioning_from_report_ok(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _scripted_chat())
     monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
     monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
-    monkeypatch.setattr(
-        "metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader()
-    )
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
     res = tools.positioning_from_report(report.report_id)
     assert "positioning" in res
     assert res["positioning"]["report_id"] == "rpt-1"

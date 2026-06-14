@@ -168,8 +168,11 @@ def _enumerate(deps: ResearchDeps, report: DemandReport) -> tuple[list[_Competit
     )
     try:
         out = deps.chat.complete_structured(
-            system=system, user=ctx, output_model=_CompetitorList,
-            max_tokens=_MAX_TOKENS, temperature=0.2,
+            system=system,
+            user=ctx,
+            output_model=_CompetitorList,
+            max_tokens=_MAX_TOKENS,
+            temperature=0.2,
         )
         return out.competitors[:_MAX_COMPETITORS], False
     except Exception:
@@ -232,15 +235,15 @@ def _match_gaps(
     from metalworks.stores.vectors import cosine_topk
 
     ids = list(evidence_texts)
+    matched: dict[int, tuple[EvidenceRef, SignalStrength]] = {}
     try:
         ev_vecs = deps.embeddings.embed([evidence_texts[i] for i in ids], task="document")
         gap_vecs = deps.embeddings.embed(gap_texts, task="document")
-    except Exception:
+        vectors = {ids[i]: ev_vecs[i] for i in range(len(ids))}
+        cosine = [cosine_topk(gvec, vectors, 1) for gvec in gap_vecs]
+    except Exception:  # embeddings down, or numpy ([research] extra) absent → no matches
         return {}
-    vectors = {ids[i]: ev_vecs[i] for i in range(len(ids))}
-    matched: dict[int, tuple[EvidenceRef, SignalStrength]] = {}
-    for gi, gvec in enumerate(gap_vecs):
-        top = cosine_topk(gvec, vectors, 1)
+    for gi, top in enumerate(cosine):
         if not top or top[0][1] < _MATCH_THRESHOLD:
             continue
         ev_id, _score = top[0]
@@ -302,9 +305,7 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
             if gi not in matched:
                 continue  # no-quote-no-gap
             ref, sev = matched[gi]
-            gaps.append(
-                GapClaim(gap_index=len(gaps) + 1, claim=text, severity=sev, evidence=ref)
-            )
+            gaps.append(GapClaim(gap_index=len(gaps) + 1, claim=text, severity=sev, evidence=ref))
         competitors.append(
             Competitor(
                 competitor_index=ci,

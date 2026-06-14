@@ -113,9 +113,7 @@ def _price_hypothesis(report: DemandReport) -> PriceHypothesis | None:
 
 def _whitespace_clusters(report: DemandReport) -> list[InsightCluster]:
     """Clusters the web is silent on / disagrees with, ≥ MEDIUM, by demand_score."""
-    ranks = {
-        cr.cluster_rank for cr in report.cross_references if cr.agreement in _WHITESPACE
-    }
+    ranks = {cr.cluster_rank for cr in report.cross_references if cr.agreement in _WHITESPACE}
     candidates = [
         c
         for c in report.ranked_clusters
@@ -124,9 +122,7 @@ def _whitespace_clusters(report: DemandReport) -> list[InsightCluster]:
     return sorted(candidates, key=lambda c: c.demand_score, reverse=True)
 
 
-def _cluster_web_findings(
-    report: DemandReport, cluster: InsightCluster
-) -> list[WebFinding]:
+def _cluster_web_findings(report: DemandReport, cluster: InsightCluster) -> list[WebFinding]:
     """Web findings cross-referenced to this cluster (the competitive context)."""
     indices: set[int] = set()
     for cr in report.cross_references:

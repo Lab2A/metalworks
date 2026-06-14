@@ -13,6 +13,8 @@ from typing import Any
 
 import pytest
 
+pytest.importorskip("numpy")  # complaint-matching uses cosine_topk (the [research] extra)
+
 from metalworks.contract import (
     DemandReport,
     Fork,
@@ -80,9 +82,7 @@ def _web(index: int, claim: str) -> WebFinding:
     )
 
 
-def _report(
-    *, clusters: list[InsightCluster], web: list[WebFinding] | None = None
-) -> DemandReport:
+def _report(*, clusters: list[InsightCluster], web: list[WebFinding] | None = None) -> DemandReport:
     return DemandReport(
         report_id="rpt-1",
         query="best fade for post-acne marks",
@@ -120,7 +120,9 @@ def _chat(*, competitors: list[_CompetitorCand], harvest: _Harvest) -> FakeChatM
 
 
 def test_status_quo_always_present_even_with_no_competitors() -> None:
-    report = _report(clusters=[_cluster(1, quotes=[_quote("PIE lingers for months", "https://r/1")])])
+    report = _report(
+        clusters=[_cluster(1, quotes=[_quote("PIE lingers for months", "https://r/1")])]
+    )
     chat = _chat(competitors=[], harvest=_Harvest())
     cmap = run_competitor_map(_deps(chat), report)
     assert cmap.status_quo_alternative.kind == "status_quo"

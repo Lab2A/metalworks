@@ -44,11 +44,11 @@ from metalworks.contract import (  # noqa: E402
     CrossReference,
     DemandReport,
     DiscoveryContext,
-    GapClaim,
     EvidenceRecord,
     EvidenceRef,
     ExplorationReport,
     Fork,
+    GapClaim,
     InboxItem,
     InsightCluster,
     LintViolation,
@@ -66,7 +66,6 @@ from metalworks.contract import (  # noqa: E402
     RedditPost,
     ReportSummary,
     Research,
-    WedgeClaim,
     ResearchBrief,
     RunSummary,
     SignalStrength,
@@ -77,6 +76,7 @@ from metalworks.contract import (  # noqa: E402
     TargetSubreddit,
     TriageThresholds,
     WebFinding,
+    WedgeClaim,
 )
 
 ENUMS: list[type[enum.Enum]] = [
