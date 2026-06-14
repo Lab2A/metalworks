@@ -38,8 +38,29 @@ Metalworks.demo().research("Is there demand for a focus supplement?",
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `.research(question, *, subreddits=None, time_window_months=None, per_sub_limit=None, max_findings=10)` | `DemandReport` | `question` is a string or a `ResearchBrief`. With no subreddits, the planner picks them. |
+| `.research(question, *, subreddits=None, time_window_months=None, per_sub_limit=None, max_findings=10)` | `Research` | `question` is a string or a `ResearchBrief`. The `DemandReport` is on `.demand`. With no subreddits, the planner picks them. |
 | `.plan(prompt)` | `ResearchBrief` | Walks the D1-D8 planner choosing recommended answers. |
+
+## The pillar arc
+
+Each method takes the `Research` bundle (or a bare `DemandReport`) and threads the
+one resolved `ResearchDeps` for you — no hand-built deps, no private internals.
+See [the arc](/docs/the-arc) and the per-pillar guides.
+
+| Method | Returns | Pillar |
+| --- | --- | --- |
+| `.deps` (property) | `ResearchDeps` | The resolved deps — the escape hatch to call raw pillar functions. |
+| `.positioning(research)` | `PositioningBrief` | B — Dunford wedge + price hypothesis. |
+| `.competitors(research)` | `CompetitorMap` | A — direct/adjacent/status-quo rivals, cited gaps. |
+| `.surface(research, positioning)` | `SurfaceRecommendation` | C — grounded surface pick + rubric. |
+| `.ux(research, positioning, surface)` | `UxSkeleton` | C — 3-5 screen skeleton (`surface` is a `SurfaceKind`). |
+| `.site(research, positioning=None)` | `MarketingSite` | E — verbatim-cited marketing site. |
+| `.render_site(site, research=None)` | `str` | E — a self-contained `index.html`. |
+| `.build_spec(research, positioning=None, surface="web", *, stack="empty")` | `BuildSpec` | D — grounded build spec. |
+| `.scaffold(spec, research, dest, *, base="empty")` | `list[Path]` | D — writes the cite-or-die harness. |
+| `.launch(research, positioning=None)` | `list[LaunchAsset]` | F — cited drafts (`[]` on a no-go). Never posts. |
+| `.channel_plan(research, surfaces=None)` | `ChannelPlan` | F — deterministic, human-gated plan. |
+| `.content_plan(research)` | `ContentPlan` | G — deterministic, zero-key content/SEO plan. |
 
 ## `.reddit`
 

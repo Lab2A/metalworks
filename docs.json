@@ -22,9 +22,17 @@
         "pages": ["docs/index", "docs/quickstart", "docs/concepts"]
       },
       {
+        "group": "The full arc",
+        "pages": ["docs/the-arc"]
+      },
+      {
         "group": "Guides",
         "pages": [
           "docs/guide-demand-research",
+          "docs/guide-positioning-landscape",
+          "docs/guide-design",
+          "docs/guide-build",
+          "docs/guide-launch-growth",
           "docs/guide-reddit-engagement",
           "docs/build-your-own"
         ]
@@ -43,6 +51,8 @@
         "pages": [
           "docs/building-blocks",
           "docs/reference-client",
+          "docs/reference-cli",
+          "docs/reference-mcp",
           "docs/reference-protocols"
         ]
       },

@@ -14,10 +14,11 @@ and returns a `DemandReport` whose every quote is exact-matched to a real commen
 from metalworks import Metalworks
 
 mw = Metalworks()                       # provider from your env key
-report = mw.research(
+research = mw.research(
     "Is there demand for a focus supplement aimed at developers?",
     subreddits=["Nootropics", "Supplements"],
 )
+report = research.demand                # .research() bundles the report on .demand
 ```
 
 What you get back:
@@ -25,7 +26,7 @@ What you get back:
 ```python
 report.verdict                 # synthesized go / no-go summary (str | None)
 report.ranked_clusters         # themes, ranked by distinct-author breadth
-report.findings                # web findings with real source URLs
+report.web_findings            # web findings with real source URLs
 report.partial, report.caveat  # set when a best-effort stage degraded
 ```
 
@@ -46,7 +47,7 @@ walk the planner:
 
 ```python
 brief = mw.plan("Should I build a focus-supplement brand for developers?")
-report = mw.research(brief)             # pass the brief straight back
+report = mw.research(brief).demand      # pass the brief straight back
 ```
 
 Or build a `ResearchBrief` by hand for full control over every field (see

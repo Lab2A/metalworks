@@ -57,9 +57,20 @@ public functions you can wire into your own flow.
   surface recommendation and a 3-5 screen UX skeleton.
 - `build_marketing_site(deps, report, positioning=None)` / `render_site_html(site, report)`
   — a verbatim-grounded marketing site + self-contained `index.html`.
+- `build_spec_from_report(deps, report, positioning=None, surface="web")` /
+  `scaffold(spec, report, dest)` (`metalworks.build`) — a grounded `BuildSpec`
+  (each feature mapped to a real demand cluster) + a cite-or-die build harness for
+  your own coding agent. metalworks specs and scaffolds; it writes no product code.
+  See the [Build guide](/docs/guide-build).
 - `build_launch_assets(deps, report, positioning)` / `plan_channels(report)` —
   drafting-only launch copy (never posts) + a human-executed channel plan.
 - `content_plan_from_report(report)` — a deterministic, zero-key content/SEO plan.
+
+All seven of these are also on the `Metalworks` facade —
+`mw.positioning(research)`, `mw.competitors(...)`, `mw.surface(...)` /
+`mw.ux(...)`, `mw.site(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
+`mw.launch(...)` / `mw.channel_plan(...)`, `mw.content_plan(...)` — which thread
+the one resolved `ResearchDeps` for you. See [the arc](/docs/the-arc).
 
 **Reddit + discovery** (`metalworks.reddit`, `metalworks.discovery`):
 

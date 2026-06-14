@@ -12,7 +12,7 @@ from metalworks import Metalworks
 mw = Metalworks()                       # provider inferred from env keys
 ```
 
-- `mw.research(question, subreddits=[...]) -> DemandReport` — demand research.
+- `mw.research(question, subreddits=[...]) -> Research` — demand research (the `DemandReport` is on `.demand`).
 - `mw.reddit.search / subreddit / comments / rules / inbox / post` — Reddit surfaces.
 - `mw.discovery.run / filter / generate` — discovery loop + building blocks.
 - `Metalworks.demo()` — offline, zero-key, for a smoke test (needs `[arctic]`).
@@ -23,16 +23,22 @@ when a call needs a key. Every error carries `error_code`, `message`, `fix`, and
 
 ## MCP tools (the language-agnostic surface)
 
-Run `metalworks mcp serve` (stdio). Tools are tiered:
+Run `metalworks mcp serve` (stdio). **26 tools** are registered. The full table —
+every tool, its tier, purpose, and params — is the [MCP tools
+reference](/docs/reference-mcp). The tier split:
 
-- **Tier 1 (zero-key):** `compliance_lint`, `reddit_search_posts`,
-  `reddit_get_post_comments`, `reddit_subreddit_info`, `reddit_subreddit_rules`,
-  `channel_plan_build`, `content_plan_from_report`.
-- **Tier 2 (keys):** `arctic_*`, `corpus_stats`, `research_plan_brief`,
+- **Tier 1 (zero-key):** the data + deterministic tools — `compliance_lint`,
+  `reddit_search_posts`, `reddit_get_post_comments`, `reddit_subreddit_info`,
+  `reddit_subreddit_rules`, `arctic_list_months`, `arctic_pull_threads`,
+  `corpus_stats`, `research_list_runs`, `research_get_report`, `channel_plan_build`,
+  `content_plan_from_report`. No provider key needed (`[reddit]`/`[arctic]` extras
+  where noted).
+- **Tier 2 (keys):** anything that calls a model — `research_plan_brief`,
   `research_start` / `research_status` / `research_result`, `generate_reply`,
-  `discovery_run`, and the report-derived pillars (synchronous, run after a
-  stored report exists): `positioning_from_report`, `competitor_map_from_report`,
-  `surface_recommend`, `ux_skeleton_build`, `site_render`, `launch_assets_build`.
+  `discovery_run`, and the synchronous report-derived pillars (run after a stored
+  report exists): `positioning_from_report`, `competitor_map_from_report`,
+  `surface_recommend`, `ux_skeleton_build`, `site_render`, `launch_assets_build`,
+  `build_spec`.
 - **Posting (the security boundary):** `reddit_post_comment` requires a
   `confirm_token` emitted by a `compliance_lint` pass over that exact text **and**
   `METALWORKS_ALLOW_POSTING=1`. There is no override.
