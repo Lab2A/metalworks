@@ -130,6 +130,13 @@ async def content_plan_from_report(report_id: str, store_path: str | None = None
     return tools.content_plan_from_report(report_id, store_path)
 
 
+async def build_spec(
+    report_id: str, surface: str = "web", stack: str = "empty", store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Derive an evidence-grounded BuildSpec for a stored report (chat + embedding keys)."""
+    return tools.build_spec(report_id, surface, stack, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -196,6 +203,7 @@ _TOOL_WRAPPERS = (
     launch_assets_build,
     channel_plan_build,
     content_plan_from_report,
+    build_spec,
     research_start,
     research_status,
     research_result,

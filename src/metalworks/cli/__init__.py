@@ -669,6 +669,98 @@ def research_content_plan(
     console.print(render_content_markdown(plan))
 
 
+# ── build sub-app ────────────────────────────────────────────────────────────
+
+build_app = typer.Typer(
+    help="Scaffold an evidence-grounded build harness from a report.", no_args_is_help=True
+)
+
+
+def _load_report_for_build(report: str):
+    """Resolve a report id or a report.json path into a DemandReport (or exit)."""
+    from metalworks.contract import DemandReport
+
+    candidate = Path(report)
+    if candidate.exists() and candidate.suffix == ".json":
+        return DemandReport.model_validate_json(candidate.read_text(encoding="utf-8"))
+    stored = config.default_store().get_report(report)
+    if stored is None:
+        err_console.print(
+            f"[red]No report {report!r}[/red] — pass a stored report id "
+            "(`metalworks research list`) or a path to a report.json."
+        )
+        raise typer.Exit(code=1)
+    return stored
+
+
+@build_app.command("init")
+def build_init(
+    report: Annotated[
+        str, typer.Argument(help="Report id (from `research list`) or a path to report.json.")
+    ],
+    dest: Annotated[
+        Path, typer.Option("--dest", "-d", help="Directory to scaffold the build harness into.")
+    ] = Path("./build"),
+    surface: Annotated[
+        str,
+        typer.Option(
+            "--surface",
+            help="Target surface: web | mobile | cli | api | sdk | browser_extension | desktop.",
+        ),
+    ] = "web",
+    base: Annotated[
+        str, typer.Option("--base", help="Stack hint recorded in the spec (e.g. next-shipfast).")
+    ] = "empty",
+) -> None:
+    """Derive a grounded BuildSpec and scaffold a cite-or-die build harness (no product code)."""
+    from typing import cast, get_args
+
+    from metalworks.build import build_spec_from_report, scaffold
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    valid_surfaces = get_args(SurfaceKind)
+    if surface not in valid_surfaces:
+        err_console.print(
+            f"[red]Unknown surface {surface!r}.[/red] Choose one of: {', '.join(valid_surfaces)}."
+        )
+        raise typer.Exit(code=1)
+
+    report_obj = _load_report_for_build(report)
+    chat = _resolve_chat_or_exit()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=config.default_store(),
+        reader=reader,
+    )
+    console.print(f"[bold]Speccing build[/bold] for report {report_obj.report_id} ({surface})...")
+    try:
+        positioning = build_positioning_brief(deps, report_obj)
+        spec = build_spec_from_report(
+            deps, report_obj, positioning, cast(SurfaceKind, surface), stack=base
+        )
+    finally:
+        reader.close()
+    if spec.partial:
+        console.print(f"  [yellow]partial:[/yellow] {spec.caveat}")
+    written = scaffold(spec, report_obj, dest, base=base)
+    console.print(
+        f"[green]Scaffolded {len(written)} files[/green] into {dest} "
+        f"({len(spec.features)} features, {len(spec.personas)} personas, "
+        f"{len(spec.pricing_tiers)} tiers)."
+    )
+    for path in written:
+        console.print(f"  [dim]{path}[/dim]")
+    console.print(
+        "\nOpen the harness in your coding agent and run [bold]/scaffold-startup[/bold]. "
+        "metalworks specced it; you build it."
+    )
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
@@ -1059,6 +1151,7 @@ reddit_app.add_typer(subreddit_app, name="subreddit")
 reddit_app.add_typer(auth_app, name="auth")
 
 app.add_typer(research_app, name="research")
+app.add_typer(build_app, name="build")
 app.add_typer(reddit_app, name="reddit")
 app.add_typer(arctic_app, name="arctic")
 app.add_typer(discovery_app, name="discovery")

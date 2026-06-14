@@ -461,6 +461,45 @@ def content_plan_from_report(report_id: str, store_path: str | None = None) -> T
 
 
 @guard
+def build_spec(
+    report_id: str,
+    surface: str = "web",
+    stack: str = "empty",
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Derive an evidence-grounded BuildSpec for a
+    stored report — each feature maps to a real demand cluster and carries its
+    quotes (un-grounded features are dropped). Does NOT write files (that is the
+    `metalworks build init` CLI); returns the spec for a coding agent to build from."""
+    from typing import cast, get_args
+
+    from metalworks.build import build_spec_from_report
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research.synthesis import build_positioning_brief
+
+    valid = get_args(SurfaceKind)
+    if surface not in valid:
+        return {
+            "error_code": "invalid_argument",
+            "message": f"Unknown surface {surface!r}.",
+            "fix": f"Pass one of: {', '.join(valid)}.",
+            "docs_url": _DOCS_BASE,
+        }
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    spec = build_spec_from_report(
+        deps,
+        report,
+        build_positioning_brief(deps, report),
+        cast("SurfaceKind", surface),
+        stack=stack,
+    )
+    return {"build_spec": spec.model_dump(mode="json")}
+
+
+@guard
 def research_start(
     brief: dict[str, Any],
     *,
