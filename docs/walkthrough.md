@@ -101,5 +101,10 @@ all reads from the same report, **every recommendation links back to a real comm
 open and read for yourself.** That's the difference between this and a tool that just makes
 things up — see [why you can trust the output](/docs/how-it-works).
 
+Run `metalworks init` first and metalworks **remembers** all of this — each run is saved under
+`.metalworks/` and later steps chain off its `report_id` instead of re-running research. See
+[Projects & memory](/docs/projects).
+
 Prefer the command line or an agent? The exact same flow is available in the
-[CLI](/docs/cli), the [MCP tools](/docs/mcp-tools), and the Claude Code plugin.
+[CLI](/docs/cli), the [MCP tools](/docs/mcp-tools), and the
+[Claude Code plugin](/docs/claude-code).
