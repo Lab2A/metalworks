@@ -342,15 +342,15 @@ def test_render_site_html_includes_permalink_for_verbatim_section() -> None:
 
 
 def test_render_without_report_falls_back_to_evidence_id_anchor() -> None:
-    q = _quote("real verified line", "https://r/x/1")
+    q = _quote("this is a real verified line", "https://r/x/1")
     report = _report(clusters=[_cluster(1, quotes=[q])])
     phrasing = _SitePhrasing(
         sections=[
             _SectionPhrasing(
                 cluster_rank=1,
                 role="feature",
-                copy="real verified line",
-                fragment="real verified line",
+                copy="this is a real verified line",
+                fragment="this is a real verified line",
             )
         ],
     )
@@ -358,3 +358,41 @@ def test_render_without_report_falls_back_to_evidence_id_anchor() -> None:
     html_out = render_site_html(site)  # no report passed
     assert f'data-evidence="{q.id}"' in html_out
     assert f"#evidence-{q.id}" in html_out
+
+
+def test_short_fragment_is_not_grounding() -> None:
+    # A 1-2 word substring is real but doesn't ground the copy → section dropped.
+    q = _quote("nothing fades PIE without burning my skin", "https://r/x/1")
+    report = _report(clusters=[_cluster(1, quotes=[q])])
+    phrasing = _SitePhrasing(
+        sections=[
+            _SectionPhrasing(
+                cluster_rank=1,
+                role="hero",
+                copy="Our serum cures everything overnight, guaranteed.",
+                fragment="PIE",  # real substring, but only 1 word
+            )
+        ],
+    )
+    site = build_marketing_site(_deps(_chat(phrasing)), report)
+    assert all(s.provenance != "verbatim" for s in site.sections)
+
+
+def test_render_neutralizes_dangerous_url() -> None:
+    # EvidenceRecord.url is unconstrained; a javascript: scheme must not ship as href.
+    q = _quote("this actually fades the marks fast", "javascript:alert(1)")
+    report = _report(clusters=[_cluster(1, quotes=[q])])
+    phrasing = _SitePhrasing(
+        sections=[
+            _SectionPhrasing(
+                cluster_rank=1,
+                role="hero",
+                copy="this actually fades the marks fast",
+                fragment="this actually fades the marks fast",
+            )
+        ],
+    )
+    site = build_marketing_site(_deps(_chat(phrasing)), report)
+    html_out = render_site_html(site, report)
+    assert "javascript:" not in html_out  # neutralized to "#"
+    assert 'href="#"' in html_out

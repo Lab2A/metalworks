@@ -35,10 +35,13 @@ class ClaimCitation(BaseModel):
 
     ``span_start`` / ``span_end`` are character offsets of ``claim_text`` within
     the owning :class:`LaunchAsset.body` — a surviving citation always satisfies
-    ``body[span_start:span_end] == claim_text``. ``evidence_ref`` points at the
-    verbatim Reddit quote backing the claim and resolves against the source
-    report's ``evidence`` by id. A claim whose support doesn't resolve is dropped
-    before the asset ships (no-cite-no-claim).
+    ``body[span_start:span_end] == claim_text``. NOTE: these are Python
+    code-point offsets; a non-Python consumer (JS uses UTF-16 code units) must
+    treat ``claim_text`` as authoritative and re-find it rather than slicing by
+    these offsets if the body contains astral characters (emoji). ``evidence_ref``
+    points at the verbatim Reddit quote backing the claim and resolves against the
+    source report's ``evidence`` by id. A claim whose support doesn't resolve is
+    dropped before the asset ships (no-cite-no-claim).
     """
 
     claim_text: str = Field(

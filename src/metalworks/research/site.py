@@ -60,9 +60,31 @@ _DIGIT_RE = re.compile(r"\d")
 _SUPERLATIVE_RE = re.compile(
     r"\b(best|most|fastest|cheapest|#1|number one|guaranteed|proven|"
     r"largest|biggest|leading|only|always|never|all|every|"
-    r"-est)\b",
+    # Common -est superlatives (an exact list, not \w+est which false-positives
+    # on honest/request/forest/interest).
+    r"simplest|easiest|smartest|safest|strongest|greatest|finest|cleverest|"
+    r"sharpest|sleekest|hardest|lightest)\b",
     re.IGNORECASE,
 )
+
+# A grounding fragment must be substantive — a 1-2 word substring like "users"
+# is a real substring of a quote but does not grounded-support the surrounding
+# claim. Require a minimum word count for the verbatim match to count.
+_MIN_FRAGMENT_WORDS = 4
+
+
+def _safe_href(url: str) -> str:
+    """Allowlist URL schemes for an HTML href — http(s) or a local ``#`` anchor.
+
+    ``EvidenceRecord.url`` is an unconstrained string (a web finding's source
+    URL), and ``html.escape`` does NOT neutralize ``javascript:`` / ``data:``
+    schemes — so a crafted URL would ship a clickable script in the rendered
+    index.html. Anything that isn't http(s) or a ``#`` anchor collapses to ``#``.
+    """
+    u = (url or "").strip()
+    if u.startswith(("http://", "https://", "#")):
+        return u
+    return "#"
 
 
 # ── LLM I/O shapes (private) ─────────────────────────────────────────────────
@@ -140,7 +162,9 @@ def _matching_quote(cluster: InsightCluster, fragment: str) -> QuoteCitation | N
     blank or whitespace-only fragment never matches.
     """
     needle = fragment.strip()
-    if not needle:
+    # A blank or too-short fragment never grounds — a 1-2 word substring is real
+    # but doesn't support the surrounding copy (no-cite-no-claim, honestly).
+    if not needle or len(needle.split()) < _MIN_FRAGMENT_WORDS:
         return None
     for q in cluster.quotes:
         if needle in q.text:
@@ -340,7 +364,8 @@ def render_site_html(site: MarketingSite, report: DemandReport | None = None) ->
             eid = ref.evidence_id
             note_n += 1
             record = lookup.get(eid)
-            permalink = record.url if record is not None and record.url else f"#evidence-{eid}"
+            raw_url = record.url if record is not None and record.url else f"#evidence-{eid}"
+            permalink = _safe_href(raw_url)
             sup = (
                 f'<sup class="fn"><a href="{html.escape(permalink)}" '
                 f'data-evidence="{html.escape(eid)}">[{note_n}]</a></sup>'

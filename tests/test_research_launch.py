@@ -241,3 +241,16 @@ def test_plan_channels_marks_every_step_human_and_gated() -> None:
 def test_plan_channels_defaults_to_all_surfaces() -> None:
     plan = plan_channels(_two_author_report())
     assert [s.surface for s in plan.steps] == list(DEFAULT_SURFACES)
+
+
+def test_short_supporting_quote_does_not_ground_claim() -> None:
+    # "PIE" is a real substring of a quote but only 1 word — it must not ground
+    # the surrounding claim (no-cite-no-claim against trivial substrings).
+    report = _two_author_report()
+    claim_text = "PIE is brutal and nothing helps"
+    body = f"Real talk. {claim_text}. Until now."
+    phrasing = _phrasing(body, [_ClaimDraft(text=claim_text, supporting_quote="PIE")])
+    chat = _scripted_chat([phrasing for _ in DEFAULT_SURFACES])
+    assets = build_launch_assets(_deps(chat), report)
+    assert assets  # asset still ships...
+    assert all(a.claim_citations == [] for a in assets)  # ...but the trivial claim is uncited
