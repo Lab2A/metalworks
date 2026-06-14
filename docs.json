@@ -67,7 +67,7 @@
           },
           {
             "group": "How it works",
-            "pages": ["docs/how-it-works", "docs/data-model"]
+            "pages": ["docs/how-it-works", "docs/projects", "docs/data-model"]
           }
         ]
       },
