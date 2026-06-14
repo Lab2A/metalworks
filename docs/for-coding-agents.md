@@ -26,10 +26,13 @@ when a call needs a key. Every error carries `error_code`, `message`, `fix`, and
 Run `metalworks mcp serve` (stdio). Tools are tiered:
 
 - **Tier 1 (zero-key):** `compliance_lint`, `reddit_search_posts`,
-  `reddit_get_post_comments`, `reddit_subreddit_info`, `reddit_subreddit_rules`.
+  `reddit_get_post_comments`, `reddit_subreddit_info`, `reddit_subreddit_rules`,
+  `channel_plan_build`, `content_plan_from_report`.
 - **Tier 2 (keys):** `arctic_*`, `corpus_stats`, `research_plan_brief`,
   `research_start` / `research_status` / `research_result`, `generate_reply`,
-  `discovery_run`.
+  `discovery_run`, and the report-derived pillars (synchronous, run after a
+  stored report exists): `positioning_from_report`, `competitor_map_from_report`,
+  `surface_recommend`, `ux_skeleton_build`, `site_render`, `launch_assets_build`.
 - **Posting (the security boundary):** `reddit_post_comment` requires a
   `confirm_token` emitted by a `compliance_lint` pass over that exact text **and**
   `METALWORKS_ALLOW_POSTING=1`. There is no override.

@@ -86,6 +86,57 @@ async def research_plan_brief(prompt: str, store_path: str | None = None) -> dic
     return tools.research_plan_brief(prompt, store_path)
 
 
+async def positioning_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Derive a grounded positioning wedge from a stored report (chat key, synchronous)."""
+    return tools.positioning_from_report(report_id, store_path)
+
+
+async def competitor_map_from_report(
+    report_id: str, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Map the competitive landscape for a stored report (chat + embedding keys, sync)."""
+    return tools.competitor_map_from_report(report_id, store_path)
+
+
+async def surface_recommend(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Recommend a product surface for a stored report (chat + embedding keys, sync)."""
+    return tools.surface_recommend(report_id, store_path)
+
+
+async def ux_skeleton_build(
+    report_id: str, surface: str, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Build a UX skeleton for a stored report on the given surface (chat + embeddings)."""
+    return tools.ux_skeleton_build(report_id, surface, store_path)
+
+
+async def site_render(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Build a grounded marketing site (+ index.html) for a stored report (chat + emb)."""
+    return tools.site_render(report_id, store_path)
+
+
+async def launch_assets_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Draft grounded, channel-native launch assets for a stored report (chat key)."""
+    return tools.launch_assets_build(report_id, store_path)
+
+
+async def channel_plan_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 1. Deterministic, human-executed launch channel plan for a stored report (zero-key)."""
+    return tools.channel_plan_build(report_id, store_path)
+
+
+async def content_plan_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 1. Project a stored report into a deterministic content/SEO plan (zero-key)."""
+    return tools.content_plan_from_report(report_id, store_path)
+
+
+async def build_spec(
+    report_id: str, surface: str = "web", stack: str = "empty", store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Derive an evidence-grounded BuildSpec for a stored report (chat + embedding keys)."""
+    return tools.build_spec(report_id, surface, stack, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -144,6 +195,15 @@ _TOOL_WRAPPERS = (
     research_list_runs,
     research_get_report,
     research_plan_brief,
+    positioning_from_report,
+    competitor_map_from_report,
+    surface_recommend,
+    ux_skeleton_build,
+    site_render,
+    launch_assets_build,
+    channel_plan_build,
+    content_plan_from_report,
+    build_spec,
     research_start,
     research_status,
     research_result,

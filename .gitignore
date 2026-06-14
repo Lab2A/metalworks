@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
-build/
+/build/  # packaging output only — anchored so it never shadows src/metalworks/build/
 .venv/
 .python-version
 

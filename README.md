@@ -124,7 +124,13 @@ Two verticals sit on top of those protocols:
 
 - **Research** (`metalworks.research`) — brief to Reddit corpus to triage to a
   clustered `DemandReport` with verified, permalinked quotes. Entry point:
-  `run_research(deps, brief=...)`.
+  `run_research(deps, brief=...)`. Seven grounded pillars build on a finished
+  report, each tracing its output back to that report's real evidence:
+  positioning (`build_positioning_brief`), competitive landscape
+  (`run_competitor_map`), surface + UX (`decide_surface` / `build_ux_skeleton`),
+  marketing site (`build_marketing_site`), launch assets (`build_launch_assets` /
+  `plan_channels`), a deterministic content/SEO plan (`content_plan_from_report`),
+  and an evidence-grounded build harness (`build_spec_from_report` / `scaffold`).
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.
@@ -133,8 +139,10 @@ Four form factors share that contract:
 
 1. **Library** — `from metalworks import Metalworks`, or the functions and
    protocols underneath.
-2. **CLI** — `metalworks research|reddit|arctic|discovery run`, `metalworks
-   quickstart`, `metalworks doctor`, `metalworks mcp serve`.
+2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report-derived
+   pillars (`metalworks research position|competitor-map|surface|site|launch|content-plan`,
+   `metalworks build init`),
+   `metalworks quickstart`, `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
    or SSE.
 4. **Claude Code plugin** — `/demand-report` and friends, zero keys on the demo

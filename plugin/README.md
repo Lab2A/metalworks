@@ -1,7 +1,8 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and four skills.
+the metalworks MCP server and eleven skills: the four engagement skills below,
+plus seven grounded pillars that build on a finished demand report.
 
 ## Install
 
@@ -37,6 +38,24 @@ the metalworks MCP server and four skills.
 - **/draft-reply `<thread-url>`** — draft an authentic reply and run it through
   the compliance gate. Drafting is free; posting requires explicit confirmation.
 - **/subreddit-intel `<r/name>`** — a community brief before you participate.
+
+Pillars run on a finished demand report and trace every claim back to a real
+Reddit quote by permalink:
+
+- **/position-wedge** — a grounded Dunford positioning wedge + price hypothesis.
+- **/competitor-map** — direct, adjacent, and status-quo rivals, each with an
+  exploitable gap backed by a cited complaint.
+- **/surface-and-ux** — what surface to build (sdk / web / mobile / cli / ...) and
+  a 3-5 screen UX skeleton, each decision traced to a customer voice.
+- **/generate-site** — a small marketing site whose every claim-bearing line is a
+  verbatim Reddit quote, footnoted to its permalink.
+- **/launch-kit** — drafting-only Product Hunt / Show HN / X-thread assets plus a
+  human-executed channel plan. Never posts.
+- **/content-plan** — a deterministic, zero-key content/SEO plan: one page per
+  demand cluster with real stat anchors and the actual permalinks to cite.
+- **/build-spec** — an evidence-grounded build harness for a coding agent: core
+  features each mapped to a real demand cluster, plus a scaffolded repo with a
+  cite-or-die rule and a frozen quote table. metalworks specs it; you build it.
 
 ## Keys (optional)
 

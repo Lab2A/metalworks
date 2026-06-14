@@ -259,6 +259,8 @@ export interface DemandReport {
 
 export interface Research {
   demand: DemandReport;
+  competitors?: CompetitorMap | null;
+  positioning?: PositioningBrief | null;
 }
 
 export interface ReportSummary {
@@ -283,6 +285,314 @@ export interface RunSummary {
   created_at: string;
   generated_at?: string | null;
   ready_at?: string | null;
+}
+
+export interface StrengthClaim {
+  /** A concrete strength, one clause. */
+  claim: string;
+  /** A WebFinding ref backing the strength, when one matched. */
+  evidence?: EvidenceRef | null;
+}
+
+export interface GapClaim {
+  /** 1-based index within the competitor's gaps. */
+  gap_index: number;
+  /** The gap, phrased as what the competitor misses. */
+  claim: string;
+  /** Service-assigned, never LLM. */
+  severity: SignalStrength;
+  /** The single resolvable ref backing this gap. */
+  evidence: EvidenceRef;
+}
+
+export interface Competitor {
+  /** 1-based index within the map. */
+  competitor_index: number;
+  /** The competitor / alternative name. */
+  name: string;
+  /** direct | adjacent | status_quo. */
+  kind: "direct" | "adjacent" | "status_quo";
+  /** What it is, in one line. */
+  one_liner: string;
+  strengths?: StrengthClaim[];
+  gaps?: GapClaim[];
+}
+
+export interface CompetitorMap {
+  /** Stable id for this map (derived from report_id). */
+  map_id: string;
+  /** The DemandReport this map was derived from. */
+  report_id: string;
+  competitors?: Competitor[];
+  /** The mandatory 'do nothing' alternative (kind=status_quo). */
+  status_quo_alternative: Competitor;
+  generated_at: string;
+  /** True when a stage degraded. */
+  partial?: boolean;
+  /** What to treat as lower-confidence. */
+  caveat?: string | null;
+}
+
+export interface WedgeClaim {
+  /** What the beachhead audience uses today, from real web findings. */
+  competitive_alternative: string;
+  /** What this product does differently — the white space competitors miss. */
+  unique_attribute: string;
+  /** Why that attribute matters to the audience. */
+  value: string;
+  /** The narrow first audience to win. */
+  beachhead: string;
+  /** The frame of reference the product competes in. */
+  market_category: string;
+  /** 1-based InsightCluster.rank the wedge stands on (silent_web/disagree). */
+  source_cluster_rank: number;
+  /** Refs (cluster quotes + web findings) backing the wedge. */
+  evidence?: EvidenceRef[];
+}
+
+export interface PriceHypothesis {
+  /** Low end of the willingness-to-pay band. */
+  low?: number | null;
+  /** High end of the band. */
+  high?: number | null;
+  currency?: string;
+  /** One-line PMC/PME framing of how the band was derived (from price evidence). */
+  framing?: string;
+  /** Refs to the PriceEvidence backing the band. */
+  evidence?: EvidenceRef[];
+  insufficient_signal?: boolean;
+}
+
+export interface PositioningBrief {
+  /** The DemandReport this brief was derived from. */
+  report_id: string;
+  /** The assembled Dunford statement (or an honest null when no wedge). */
+  positioning_statement: string;
+  /** The wedge; None when no white-space cluster qualifies. */
+  wedge?: WedgeClaim | null;
+  /** Price band copied through from the report; None if absent. */
+  price_hypothesis?: PriceHypothesis | null;
+  /** True when the wedge is absent or a clause failed verification. */
+  partial?: boolean;
+  /** Why the brief is partial / what to treat as unconfirmed. */
+  caveat?: string | null;
+}
+
+export interface RubricDimension {
+  /** The fixed rubric dimension. */
+  name: "where_are_the_users" | "technical_sophistication" | "usage_frequency" | "realtime_or_hardware" | "distribution";
+  /** What the evidence says for this dimension (LLM-phrased). */
+  finding: string;
+  /** Refs backing the finding. Empty iff is_assumption is True. */
+  evidence_refs?: EvidenceRef[];
+  /** True when no evidence backs this dimension — a stated guess. */
+  is_assumption?: boolean;
+}
+
+export interface TradeOff {
+  /** The trade-off, one clause. */
+  text: string;
+  evidence_refs?: EvidenceRef[];
+}
+
+export interface SurfaceRecommendation {
+  report_id: string;
+  /** The recommended surface to build. */
+  chosen: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  /** The second-best surface. */
+  runner_up?: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop" | null;
+  /** Why this surface, in one short paragraph (LLM-phrased). */
+  rationale: string;
+  rubric?: RubricDimension[];
+  trade_offs?: TradeOff[];
+  /** Service-assigned from grounded rubric coverage. */
+  confidence?: SignalStrength;
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
+export interface Screen {
+  /** Screen name. */
+  name: string;
+  /** What this screen is for, one line. */
+  purpose: string;
+  /** The single primary action on this screen. */
+  primary_action: string;
+  /** True when this screen directly serves the positioning wedge. */
+  serves_wedge?: boolean;
+  /** Voices asking for this screen. Empty → an unvalidated hypothesis. */
+  evidence_refs?: EvidenceRef[];
+  /** True iff at least one evidence_ref backs the screen. */
+  validated?: boolean;
+}
+
+export interface UxSkeleton {
+  report_id: string;
+  surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  screens?: Screen[];
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
+export interface DesignBrief {
+  report_id: string;
+  /** A short brief for the design step (tone, surface, audience). */
+  summary: string;
+  /** Always present: this brief is NOT evidence-backed. */
+  note?: string;
+}
+
+export interface SiteSection {
+  /** Section job on the page: hero/feature/objection/pricing/social_proof/cta. */
+  role: string;
+  /** Rendered section text (contains a verbatim fragment if claimed). */
+  copy: string;
+  /** Refs backing the section — one quote ref for verbatim, empty for connective. */
+  evidence_refs?: EvidenceRef[];
+  /** verbatim = exact-matched quote fragment; connective = claim-free glue. */
+  provenance: "verbatim" | "derived" | "connective";
+}
+
+export interface MarketingSite {
+  /** Stable id for this generated site. */
+  site_id: string;
+  /** The DemandReport this site was derived from. */
+  report_id: string;
+  /** Ordered sections; verbatim sections carry quote refs, connective ones none. */
+  sections?: SiteSection[];
+  /** True when synthesis was unavailable and the site is empty. */
+  partial?: boolean;
+  /** Why the site is partial / what to treat as unbuilt. */
+  caveat?: string | null;
+}
+
+export interface ClaimCitation {
+  /** The exact claim substring as it appears in the asset body. */
+  claim_text: string;
+  /** 0-based char offset of claim_text in body. */
+  span_start: number;
+  /** Exclusive char offset; body[span_start:span_end]==claim_text. */
+  span_end: number;
+  /** Ref to the supporting quote — resolves against the report's evidence by id. */
+  evidence_ref: EvidenceRef;
+}
+
+export interface LaunchAsset {
+  /** Channel id: 'product_hunt' | 'show_hn' | 'x_thread' | ... */
+  surface: string;
+  /** The headline / title / first-tweet hook for this surface. */
+  title: string;
+  /** The channel-native body copy. ClaimCitation spans index into it. */
+  body: string;
+  /** Alternate hooks/headlines a human can choose from. */
+  variants?: string[];
+  /** Grounded claims; each span indexes body and each ref resolves in the report. */
+  claim_citations?: ClaimCitation[];
+}
+
+export interface ChannelStep {
+  /** Channel id this step acts on. */
+  surface: string;
+  /** What the human does (e.g. 'Submit the Product Hunt draft'). */
+  action: string;
+  /** Relative schedule, e.g. 'T+0h', 'T+2h'. */
+  scheduled_offset: string;
+  /** Always true — a person executes this step, never the library. */
+  requires_human?: boolean;
+  /** Always true — posting is gated behind explicit human action. */
+  posting_gated?: boolean;
+}
+
+export interface ChannelPlan {
+  /** The DemandReport this plan was derived from. */
+  report_id: string;
+  /** One step per launch surface, in execution order. */
+  steps?: ChannelStep[];
+}
+
+export interface FaqItem {
+  /** The sub-question, copied verbatim from brief.must_address. */
+  question: string;
+  /** Always '' at plan time — the answer is authored later, never invented here. */
+  answer_hint?: string;
+}
+
+export interface ContentPage {
+  /** Normalized cluster claim (lowercased, collapsed whitespace). Not invented. */
+  target_phrase: string;
+  /** Deterministic heuristic: 'comparison' | 'guide' | 'answer'. */
+  page_kind: string;
+  /** 1-based InsightCluster.rank this page is projected from. */
+  source_cluster_rank: number;
+  /** FAQ items, built verbatim from brief.must_address (empty when no brief). */
+  faq?: FaqItem[];
+  /** Real counts: {'distinct_authors': ..., 'mentions': ...} from the cluster. */
+  stat_anchors?: Record<string, number>;
+  /** Deterministic markdown section headings for answer-first formatting. */
+  outline?: string[];
+}
+
+export interface CitationStrategy {
+  /** Example LLM prompts derived from target_phrases (for citability checks). */
+  prompt_set?: string[];
+  /** Deduped, disclosed quote permalinks to cite — real sources, not placeholders. */
+  reddit_targets?: string[];
+}
+
+export interface ContentPlan {
+  /** The DemandReport this plan was projected from. */
+  report_id: string;
+  /** One page per ranked InsightCluster, in rank order. */
+  pages?: ContentPage[];
+  /** LLM-citability play: prompt set + disclosed Reddit permalink targets. */
+  citation_strategy: CitationStrategy;
+}
+
+export interface FeatureSpec {
+  /** Stable slug for the feature (e.g. 'fade-tracker'). */
+  feature_id: string;
+  /** The feature, in a few words. */
+  title: string;
+  /** Why this feature — what consumer pain it serves. */
+  rationale: string;
+  /** ≥1 resolvable ref backing the feature. Empty → dropped at assembly. */
+  evidence?: EvidenceRef[];
+}
+
+export interface BuildPersona {
+  /** Short persona label. */
+  name: string;
+  /** Who they are + what they want, one or two lines. */
+  description: string;
+  evidence?: EvidenceRef[];
+}
+
+export interface PricingTier {
+  /** Tier name (e.g. 'Starter'). */
+  name: string;
+  /** Monthly price; None when unpriced. */
+  price?: number | null;
+  currency?: string;
+  /** What the tier includes / why this price. */
+  rationale: string;
+  evidence?: EvidenceRef[];
+}
+
+export interface BuildSpec {
+  /** Stable id for this spec (derived from report_id). */
+  spec_id: string;
+  report_id: string;
+  /** The surface this build targets. */
+  surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  /** The chosen starter/stack hint (e.g. 'next-shipfast', 'empty'). */
+  stack: string;
+  features?: FeatureSpec[];
+  personas?: BuildPersona[];
+  pricing_tiers?: PricingTier[];
+  partial?: boolean;
+  caveat?: string | null;
 }
 
 export interface ComplianceVerdict {

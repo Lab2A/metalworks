@@ -52,6 +52,10 @@ shovel**: assemble exactly the product you want.
 - **Discovery + reply generation** — find threads worth engaging and draft replies
   in your own voice, with the filter, generation, and compliance steps each a
   standalone building block.
+- **Pillars on a report** — turn a finished demand report into a grounded
+  positioning wedge, competitive landscape, surface + UX recommendation,
+  marketing site, launch kit, or content/SEO plan. Every claim traces back to a
+  real Reddit quote by permalink; the library never invents one.
 - **Four form factors** — a Python library, a CLI, an MCP server, and a Claude
   Code plugin that share one typed contract. Non-Python? Drive it from the MCP
   server or the CLI.

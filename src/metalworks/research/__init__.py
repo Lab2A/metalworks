@@ -10,7 +10,12 @@ no provider dependencies (the heavy bits live behind the `[research]` extra).
 """
 
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
+from metalworks.research.landscape import run_competitor_map
+from metalworks.research.launch import build_launch_assets, plan_channels
+from metalworks.research.marketing import content_plan_from_report
 from metalworks.research.pipeline import run_research
+from metalworks.research.site import build_marketing_site, render_site_html
+from metalworks.research.surface import build_ux_skeleton, decide_surface
 
 # Public surface: the entry point (`run_research`), the dependency bundle
 # (`ResearchDeps`), and the two injection protocols a caller implements to swap
@@ -22,5 +27,13 @@ __all__ = [
     "CommentSource",
     "CorpusReader",
     "ResearchDeps",
+    "build_launch_assets",
+    "build_marketing_site",
+    "build_ux_skeleton",
+    "content_plan_from_report",
+    "decide_surface",
+    "plan_channels",
+    "render_site_html",
+    "run_competitor_map",
     "run_research",
 ]

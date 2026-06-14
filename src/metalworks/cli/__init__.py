@@ -373,6 +373,394 @@ def research_run(
     _print_report(report)
 
 
+def _print_positioning(brief: object) -> None:
+    stmt = getattr(brief, "positioning_statement", "")
+    console.print(f"\n[bold]Positioning[/bold] — report {getattr(brief, 'report_id', '')}")
+    console.print(f"  [italic]{stmt}[/italic]")
+    wedge = getattr(brief, "wedge", None)
+    if wedge is not None:
+        console.print("  [bold]wedge:[/bold]")
+        console.print(f"    alternative: {wedge.competitive_alternative}")
+        console.print(f"    unique:      {wedge.unique_attribute}")
+        console.print(f"    value:       {wedge.value}")
+        console.print(f"    beachhead:   {wedge.beachhead}")
+        console.print(f"    category:    {wedge.market_category}")
+    price = getattr(brief, "price_hypothesis", None)
+    if price is not None and not price.insufficient_signal and price.low is not None:
+        console.print(f"  [bold]price:[/bold] {price.currency} {price.low:g}-{price.high:g}")
+    if getattr(brief, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(brief, 'caveat', '')}")
+
+
+@research_app.command("position")
+def research_position(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the positioning brief JSON here.")
+    ] = None,
+) -> None:
+    """Derive a grounded positioning wedge from a stored report (one LLM call)."""
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Positioning[/bold] report {report_id}...")
+    try:
+        brief = build_positioning_brief(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(brief.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote brief[/green] {out}")
+    _print_positioning(brief)
+
+
+def _print_competitor_map(cmap: object) -> None:
+    console.print(f"\n[bold]Competitive landscape[/bold] — report {getattr(cmap, 'report_id', '')}")
+    if getattr(cmap, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(cmap, 'caveat', '')}")
+    sq = getattr(cmap, "status_quo_alternative", None)
+    competitors = getattr(cmap, "competitors", [])
+    rows = [sq, *competitors] if sq is not None else list(competitors)
+    for c in rows:
+        console.print(f"  [bold]{c.name}[/bold] ({c.kind}) — {c.one_liner}")
+        for g in c.gaps:
+            console.print(f"    [red]gap[/red] [{g.severity}]: {g.claim}")
+
+
+@research_app.command("competitor-map")
+def research_competitor_map(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the competitor map JSON here.")
+    ] = None,
+) -> None:
+    """Map the competitive landscape for a stored report (grounded names, cited gaps)."""
+    from metalworks.research import run_competitor_map
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Mapping competitors[/bold] for report {report_id}...")
+    try:
+        cmap = run_competitor_map(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(cmap.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote competitor map[/green] {out}")
+    _print_competitor_map(cmap)
+
+
+def _print_surface(rec: object, skeleton: object) -> None:
+    console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
+    console.print(
+        f"  [bold]{getattr(rec, 'chosen', '?')}[/bold]"
+        f" (runner-up: {getattr(rec, 'runner_up', None) or 'none'})"
+        f"  [{getattr(rec, 'confidence', '')}]"
+    )
+    console.print(f"  [italic]{getattr(rec, 'rationale', '')}[/italic]")
+    for d in getattr(rec, "rubric", []):
+        tag = "assumption" if d.is_assumption else f"{len(d.evidence_refs)} cited"
+        console.print(f"    - {d.name}: {d.finding}  [dim]({tag})[/dim]")
+    if getattr(rec, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(rec, 'caveat', '')}")
+    console.print(f"  [bold]UX skeleton[/bold] ({getattr(skeleton, 'surface', '')}):")
+    for s in getattr(skeleton, "screens", []):
+        mark = "validated" if s.validated else "[yellow]hypothesis[/yellow]"
+        console.print(f"    - {s.name}: {s.purpose} → {s.primary_action}  [dim]({mark})[/dim]")
+
+
+@research_app.command("surface")
+def research_surface(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the surface recommendation JSON here.")
+    ] = None,
+) -> None:
+    """Recommend a product surface + UX skeleton for a stored report (grounded)."""
+    from metalworks.research import build_ux_skeleton, decide_surface
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Deciding surface[/bold] for report {report_id}...")
+    try:
+        positioning = build_positioning_brief(deps, report)
+        rec = decide_surface(deps, report, positioning)
+        skeleton = build_ux_skeleton(deps, report, positioning, rec.chosen)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(rec.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote surface recommendation[/green] {out}")
+    _print_surface(rec, skeleton)
+
+
+@research_app.command("site")
+def research_site(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the rendered index.html here.")
+    ] = None,
+    json_out: Annotated[
+        Path | None, typer.Option("--json", help="Write the MarketingSite JSON here.")
+    ] = None,
+) -> None:
+    """Build a grounded marketing site from a stored report (verbatim, cited copy)."""
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Building site[/bold] for report {report_id}...")
+    try:
+        site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+    finally:
+        reader.close()
+    if json_out is not None:
+        json_out.write_text(site.model_dump_json(indent=2), encoding="utf-8")
+    if out is not None:
+        out.write_text(render_site_html(site, report), encoding="utf-8")
+        console.print(f"[green]Wrote site[/green] {out}")
+    if site.partial:
+        console.print(f"  [yellow]partial:[/yellow] {site.caveat}")
+    for s in site.sections:
+        console.print(f"  [bold]{s.role}[/bold] [{s.provenance}]: {s.copy[:70]}")
+
+
+@research_app.command("launch")
+def research_launch(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the launch assets JSON here.")
+    ] = None,
+) -> None:
+    """Draft grounded, channel-native launch assets + a human-run channel plan (never posts)."""
+    from metalworks.research import build_launch_assets, plan_channels
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Drafting launch assets[/bold] for report {report_id}...")
+    try:
+        assets = build_launch_assets(deps, report, build_positioning_brief(deps, report))
+    finally:
+        reader.close()
+    plan = plan_channels(report)
+    if not assets:
+        console.print("[yellow]No-go:[/yellow] demand is too thin to draft launch assets.")
+    for a in assets:
+        console.print(f"\n[bold]{a.surface}[/bold]: {a.title}")
+        console.print(f"  {a.body[:200]}")
+        for c in a.claim_citations:
+            console.print(f"  [dim]cited:[/dim] {c.claim_text[:50]}")
+    console.print("\n[bold]Channel plan[/bold] (every step human-gated):")
+    for step in plan.steps:
+        console.print(f"  {step.scheduled_offset} {step.surface}: {step.action}")
+    if out is not None:
+        out.write_text(
+            json.dumps([a.model_dump(mode="json") for a in assets], indent=2), encoding="utf-8"
+        )
+        console.print(f"[green]Wrote launch assets[/green] {out}")
+
+
+@research_app.command("content-plan")
+def research_content_plan(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the content plan JSON here.")
+    ] = None,
+) -> None:
+    """Project a stored report into a deterministic content/SEO plan (no LLM, zero-key)."""
+    from metalworks.research import content_plan_from_report
+    from metalworks.research.marketing import render_content_markdown
+
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    plan = content_plan_from_report(report)
+    if out is not None:
+        out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote content plan[/green] {out}")
+    console.print(render_content_markdown(plan))
+
+
+# ── build sub-app ────────────────────────────────────────────────────────────
+
+build_app = typer.Typer(
+    help="Scaffold an evidence-grounded build harness from a report.", no_args_is_help=True
+)
+
+
+def _load_report_for_build(report: str):
+    """Resolve a report id or a report.json path into a DemandReport (or exit)."""
+    from metalworks.contract import DemandReport
+
+    candidate = Path(report)
+    if candidate.exists() and candidate.suffix == ".json":
+        return DemandReport.model_validate_json(candidate.read_text(encoding="utf-8"))
+    stored = config.default_store().get_report(report)
+    if stored is None:
+        err_console.print(
+            f"[red]No report {report!r}[/red] — pass a stored report id "
+            "(`metalworks research list`) or a path to a report.json."
+        )
+        raise typer.Exit(code=1)
+    return stored
+
+
+@build_app.command("init")
+def build_init(
+    report: Annotated[
+        str, typer.Argument(help="Report id (from `research list`) or a path to report.json.")
+    ],
+    dest: Annotated[
+        Path, typer.Option("--dest", "-d", help="Directory to scaffold the build harness into.")
+    ] = Path("./build"),
+    surface: Annotated[
+        str,
+        typer.Option(
+            "--surface",
+            help="Target surface: web | mobile | cli | api | sdk | browser_extension | desktop.",
+        ),
+    ] = "web",
+    base: Annotated[
+        str, typer.Option("--base", help="Stack hint recorded in the spec (e.g. next-shipfast).")
+    ] = "empty",
+) -> None:
+    """Derive a grounded BuildSpec and scaffold a cite-or-die build harness (no product code)."""
+    from typing import cast, get_args
+
+    from metalworks.build import build_spec_from_report, scaffold
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    valid_surfaces = get_args(SurfaceKind)
+    if surface not in valid_surfaces:
+        err_console.print(
+            f"[red]Unknown surface {surface!r}.[/red] Choose one of: {', '.join(valid_surfaces)}."
+        )
+        raise typer.Exit(code=1)
+
+    report_obj = _load_report_for_build(report)
+    chat = _resolve_chat_or_exit()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=config.default_store(),
+        reader=reader,
+    )
+    console.print(f"[bold]Speccing build[/bold] for report {report_obj.report_id} ({surface})...")
+    try:
+        positioning = build_positioning_brief(deps, report_obj)
+        spec = build_spec_from_report(
+            deps, report_obj, positioning, cast(SurfaceKind, surface), stack=base
+        )
+    finally:
+        reader.close()
+    if spec.partial:
+        console.print(f"  [yellow]partial:[/yellow] {spec.caveat}")
+    written = scaffold(spec, report_obj, dest, base=base)
+    console.print(
+        f"[green]Scaffolded {len(written)} files[/green] into {dest} "
+        f"({len(spec.features)} features, {len(spec.personas)} personas, "
+        f"{len(spec.pricing_tiers)} tiers)."
+    )
+    for path in written:
+        console.print(f"  [dim]{path}[/dim]")
+    console.print(
+        "\nOpen the harness in your coding agent and run [bold]/scaffold-startup[/bold]. "
+        "metalworks specced it; you build it."
+    )
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
@@ -763,6 +1151,7 @@ reddit_app.add_typer(subreddit_app, name="subreddit")
 reddit_app.add_typer(auth_app, name="auth")
 
 app.add_typer(research_app, name="research")
+app.add_typer(build_app, name="build")
 app.add_typer(reddit_app, name="reddit")
 app.add_typer(arctic_app, name="arctic")
 app.add_typer(discovery_app, name="discovery")

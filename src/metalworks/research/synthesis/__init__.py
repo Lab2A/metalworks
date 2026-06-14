@@ -53,6 +53,7 @@ from metalworks.research.synthesis import (
     segments,
     verdict,
 )
+from metalworks.research.synthesis.positioning import build_positioning_brief
 from metalworks.research.types import LoadedComment, LoadedPost, SynthesisOutput
 
 if TYPE_CHECKING:
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "audience_mod",
+    "build_positioning_brief",
     "cluster_ranker",
     "embed_group",
     "loader",

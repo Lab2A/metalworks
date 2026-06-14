@@ -31,6 +31,8 @@ from metalworks.errors import MetalworksError, MissingKeyError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from metalworks.contract.research import DemandReport
+
 ToolResult = dict[str, Any]
 F = TypeVar("F", bound="Callable[..., ToolResult]")
 
@@ -303,6 +305,198 @@ def research_plan_brief(prompt: str, store_path: str | None = None) -> ToolResul
     )
     research_brief = plan_brief(deps, prompt)
     return {"brief": research_brief.model_dump(mode="json")}
+
+
+@guard
+def positioning_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Derive a grounded positioning wedge from a stored
+    report — one LLM call, synchronous (no job pattern). Needs a chat-model key."""
+    from metalworks import config
+    from metalworks.research.synthesis import build_positioning_brief
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    brief = build_positioning_brief(deps, report)
+    return {"positioning": brief.model_dump(mode="json")}
+
+
+@guard
+def competitor_map_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Map the competitive landscape for a stored
+    report — grounded competitor enumeration + cited gaps, synchronous. Bounded
+    competitor count keeps it responsive; needs chat + embedding keys."""
+    from metalworks import config
+    from metalworks.research import run_competitor_map
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    cmap = run_competitor_map(deps, report)
+    return {"competitor_map": cmap.model_dump(mode="json")}
+
+
+def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
+    from metalworks import config
+
+    report = config.default_store(store_path).get_report(report_id)
+    if report is None:
+        envelope: ToolResult = {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+        return envelope
+    return report
+
+
+@guard
+def surface_recommend(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Recommend a product surface for a stored
+    report — grounded rubric + trade-offs, synchronous. Needs chat + embeddings."""
+    from metalworks.research import decide_surface
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    rec = decide_surface(deps, report, build_positioning_brief(deps, report))
+    return {"surface_recommendation": rec.model_dump(mode="json")}
+
+
+@guard
+def ux_skeleton_build(report_id: str, surface: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Build a UX skeleton for a stored report on
+    the given ``surface`` (sdk/web/mobile/cli/...). Synchronous; needs chat + embeddings."""
+    from typing import cast
+
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research import build_ux_skeleton
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    skeleton = build_ux_skeleton(
+        deps, report, build_positioning_brief(deps, report), cast("SurfaceKind", surface)
+    )
+    return {"ux_skeleton": skeleton.model_dump(mode="json")}
+
+
+@guard
+def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Build a grounded marketing site for a stored
+    report and return the MarketingSite plus a self-contained index.html."""
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+    return {"site": site.model_dump(mode="json"), "html": render_site_html(site, report)}
+
+
+@guard
+def launch_assets_build(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Draft grounded, channel-native launch assets for a stored
+    report — one LLM call per surface. Returns [] on a no-go report. DRAFTING ONLY."""
+    from metalworks.research import build_launch_assets
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    assets = build_launch_assets(deps, report, build_positioning_brief(deps, report))
+    return {"launch_assets": [a.model_dump(mode="json") for a in assets]}
+
+
+@guard
+def channel_plan_build(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 1. Deterministic, human-executed launch channel plan for a stored report.
+    Every step requires_human + posting_gated; the library never posts. No LLM."""
+    from metalworks.research import plan_channels
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    return {"channel_plan": plan_channels(report).model_dump(mode="json")}
+
+
+@guard
+def content_plan_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 1. Project a stored report into a deterministic content/SEO plan —
+    pure, zero-key, synchronous (no LLM, no embeddings)."""
+    from metalworks.research import content_plan_from_report as _plan
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    return {"content_plan": _plan(report).model_dump(mode="json")}
+
+
+@guard
+def build_spec(
+    report_id: str,
+    surface: str = "web",
+    stack: str = "empty",
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Derive an evidence-grounded BuildSpec for a
+    stored report — each feature maps to a real demand cluster and carries its
+    quotes (un-grounded features are dropped). Does NOT write files (that is the
+    `metalworks build init` CLI); returns the spec for a coding agent to build from."""
+    from typing import cast, get_args
+
+    from metalworks.build import build_spec_from_report
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research.synthesis import build_positioning_brief
+
+    valid = get_args(SurfaceKind)
+    if surface not in valid:
+        return {
+            "error_code": "invalid_argument",
+            "message": f"Unknown surface {surface!r}.",
+            "fix": f"Pass one of: {', '.join(valid)}.",
+            "docs_url": _DOCS_BASE,
+        }
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    spec = build_spec_from_report(
+        deps,
+        report,
+        build_positioning_brief(deps, report),
+        cast("SurfaceKind", surface),
+        stack=stack,
+    )
+    return {"build_spec": spec.model_dump(mode="json")}
 
 
 @guard
