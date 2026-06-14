@@ -485,6 +485,70 @@ def research_competitor_map(
     _print_competitor_map(cmap)
 
 
+def _print_surface(rec: object, skeleton: object) -> None:
+    console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
+    console.print(
+        f"  [bold]{getattr(rec, 'chosen', '?')}[/bold]"
+        f" (runner-up: {getattr(rec, 'runner_up', None) or 'none'})"
+        f"  [{getattr(rec, 'confidence', '')}]"
+    )
+    console.print(f"  [italic]{getattr(rec, 'rationale', '')}[/italic]")
+    for d in getattr(rec, "rubric", []):
+        tag = "assumption" if d.is_assumption else f"{len(d.evidence_refs)} cited"
+        console.print(f"    - {d.name}: {d.finding}  [dim]({tag})[/dim]")
+    if getattr(rec, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(rec, 'caveat', '')}")
+    console.print(f"  [bold]UX skeleton[/bold] ({getattr(skeleton, 'surface', '')}):")
+    for s in getattr(skeleton, "screens", []):
+        mark = "validated" if s.validated else "[yellow]hypothesis[/yellow]"
+        console.print(f"    - {s.name}: {s.purpose} → {s.primary_action}  [dim]({mark})[/dim]")
+
+
+@research_app.command("surface")
+def research_surface(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the surface recommendation JSON here.")
+    ] = None,
+) -> None:
+    """Recommend a product surface + UX skeleton for a stored report (grounded)."""
+    from metalworks.research import build_ux_skeleton, decide_surface
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=config.resolve_embeddings(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Deciding surface[/bold] for report {report_id}...")
+    try:
+        positioning = build_positioning_brief(deps, report)
+        rec = decide_surface(deps, report, positioning)
+        skeleton = build_ux_skeleton(deps, report, positioning, rec.chosen)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(rec.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote surface recommendation[/green] {out}")
+    _print_surface(rec, skeleton)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

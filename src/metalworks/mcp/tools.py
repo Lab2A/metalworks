@@ -31,6 +31,8 @@ from metalworks.errors import MetalworksError, MissingKeyError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from metalworks.contract.research import DemandReport
+
 ToolResult = dict[str, Any]
 F = TypeVar("F", bound="Callable[..., ToolResult]")
 
@@ -350,6 +352,58 @@ def competitor_map_from_report(report_id: str, store_path: str | None = None) ->
     deps = _build_deps(store_path)
     cmap = run_competitor_map(deps, report)
     return {"competitor_map": cmap.model_dump(mode="json")}
+
+
+def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
+    from metalworks import config
+
+    report = config.default_store(store_path).get_report(report_id)
+    if report is None:
+        envelope: ToolResult = {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+        return envelope
+    return report
+
+
+@guard
+def surface_recommend(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Recommend a product surface for a stored
+    report — grounded rubric + trade-offs, synchronous. Needs chat + embeddings."""
+    from metalworks.research import decide_surface
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    rec = decide_surface(deps, report, build_positioning_brief(deps, report))
+    return {"surface_recommendation": rec.model_dump(mode="json")}
+
+
+@guard
+def ux_skeleton_build(report_id: str, surface: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Build a UX skeleton for a stored report on
+    the given ``surface`` (sdk/web/mobile/cli/...). Synchronous; needs chat + embeddings."""
+    from typing import cast
+
+    from metalworks.contract.surface import SurfaceKind
+    from metalworks.research import build_ux_skeleton
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    skeleton = build_ux_skeleton(
+        deps, report, build_positioning_brief(deps, report), cast("SurfaceKind", surface)
+    )
+    return {"ux_skeleton": skeleton.model_dump(mode="json")}
 
 
 @guard

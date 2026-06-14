@@ -62,6 +62,14 @@ from metalworks.contract.research import (
     TriageThresholds,
     WebFinding,
 )
+from metalworks.contract.surface import (
+    DesignBrief,
+    RubricDimension,
+    Screen,
+    SurfaceRecommendation,
+    TradeOff,
+    UxSkeleton,
+)
 
 __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit), not globally sorted
     # Evidence chain — the cross-stage spine every pillar resolves against.
@@ -100,6 +108,13 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "PositioningBrief",
     "PriceHypothesis",
     "WedgeClaim",
+    # Design stage (Pillar C) — the grounded surface decision + UX skeleton.
+    "DesignBrief",
+    "RubricDimension",
+    "Screen",
+    "SurfaceRecommendation",
+    "TradeOff",
+    "UxSkeleton",
     # Reddit + discovery — engagement surfaces and the compliance gate.
     "ComplianceVerdict",
     "DiscoveryContext",

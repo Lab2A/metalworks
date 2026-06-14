@@ -378,6 +378,72 @@ export interface PositioningBrief {
   caveat?: string | null;
 }
 
+export interface RubricDimension {
+  /** The fixed rubric dimension. */
+  name: "where_are_the_users" | "technical_sophistication" | "usage_frequency" | "realtime_or_hardware" | "distribution";
+  /** What the evidence says for this dimension (LLM-phrased). */
+  finding: string;
+  /** Refs backing the finding. Empty iff is_assumption is True. */
+  evidence_refs?: EvidenceRef[];
+  /** True when no evidence backs this dimension — a stated guess. */
+  is_assumption?: boolean;
+}
+
+export interface TradeOff {
+  /** The trade-off, one clause. */
+  text: string;
+  evidence_refs?: EvidenceRef[];
+}
+
+export interface SurfaceRecommendation {
+  report_id: string;
+  /** The recommended surface to build. */
+  chosen: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  /** The second-best surface. */
+  runner_up?: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop" | null;
+  /** Why this surface, in one short paragraph (LLM-phrased). */
+  rationale: string;
+  rubric?: RubricDimension[];
+  trade_offs?: TradeOff[];
+  /** Service-assigned from grounded rubric coverage. */
+  confidence?: SignalStrength;
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
+export interface Screen {
+  /** Screen name. */
+  name: string;
+  /** What this screen is for, one line. */
+  purpose: string;
+  /** The single primary action on this screen. */
+  primary_action: string;
+  /** True when this screen directly serves the positioning wedge. */
+  serves_wedge?: boolean;
+  /** Voices asking for this screen. Empty → an unvalidated hypothesis. */
+  evidence_refs?: EvidenceRef[];
+  /** True iff at least one evidence_ref backs the screen. */
+  validated?: boolean;
+}
+
+export interface UxSkeleton {
+  report_id: string;
+  surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  screens?: Screen[];
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
+export interface DesignBrief {
+  report_id: string;
+  /** A short brief for the design step (tone, surface, audience). */
+  summary: string;
+  /** Always present: this brief is NOT evidence-backed. */
+  note?: string;
+}
+
 export interface ComplianceVerdict {
   /** True if the reply is OK to post. */
   pass: boolean;

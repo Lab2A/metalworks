@@ -59,6 +59,22 @@ Pre-release foundations. Nothing here is stable yet.
   (`VERTEX_PROJECT_ID`/`GOOGLE_CLOUD_PROJECT` + `VERTEX_LOCATION`), not just an
   API key — `build_genai_client` in `metalworks._genai_client`; provider
   resolution routes to Google under Vertex even with no `GOOGLE_API_KEY`.
+- **Surface + UX (Pillar C, Design stage)**: `decide_surface(deps, report,
+  positioning) -> SurfaceRecommendation` + `build_ux_skeleton(deps, report,
+  positioning, surface) -> UxSkeleton` (`metalworks.research.surface`). A FIXED
+  five-dimension rubric (where-are-the-users, technical sophistication, usage
+  frequency, realtime/hardware, distribution) drives the surface pick; one LLM
+  call phrases each dimension's finding + the chosen surface, and the service
+  GROUNDS each by cosine-matching to the report's real evidence — a dimension
+  with no match is marked `is_assumption`, and `confidence` is service-assigned
+  from grounded coverage. UX screens with no backing voice ship `validated=False`
+  (an explicit hypothesis). Text + structure only (no pixels); the `DesignBrief`
+  handoff is explicitly ungrounded. New contract `metalworks.contract.surface`
+  (`SurfaceRecommendation` / `UxSkeleton` / `RubricDimension` / `Screen` /
+  `TradeOff` / `DesignBrief`); `Research.competitors` and `.positioning` are both
+  real fields now. Surfaced via `metalworks surface <report_id>` CLI, the
+  synchronous `surface_recommend` + `ux_skeleton_build` MCP tools, and the
+  `surface-and-ux` skill.
 - **Landscape (Pillar A)**: `run_competitor_map(deps, report) -> CompetitorMap`
   (`metalworks.research.landscape`) maps the competitive set — direct, adjacent,
   and the mandatory status-quo "do nothing" alternative — with an exploitable,

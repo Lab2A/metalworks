@@ -98,6 +98,18 @@ async def competitor_map_from_report(
     return tools.competitor_map_from_report(report_id, store_path)
 
 
+async def surface_recommend(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Recommend a product surface for a stored report (chat + embedding keys, sync)."""
+    return tools.surface_recommend(report_id, store_path)
+
+
+async def ux_skeleton_build(
+    report_id: str, surface: str, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Build a UX skeleton for a stored report on the given surface (chat + embeddings)."""
+    return tools.ux_skeleton_build(report_id, surface, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -158,6 +170,8 @@ _TOOL_WRAPPERS = (
     research_plan_brief,
     positioning_from_report,
     competitor_map_from_report,
+    surface_recommend,
+    ux_skeleton_build,
     research_start,
     research_status,
     research_result,
