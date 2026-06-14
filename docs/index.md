@@ -11,9 +11,10 @@ your own product on top of it.
 ```python
 from metalworks import Metalworks
 
-# Zero keys, zero network — a real DemandReport from bundled data:
-report = Metalworks.demo().research("Is there demand for a focus supplement?",
-                                    subreddits=["Supplements"])
+# Zero keys, zero network — a real Research bundle from bundled data:
+research = Metalworks.demo().research("Is there demand for a focus supplement?",
+                                     subreddits=["Supplements"])
+report = research.demand   # .research() returns a Research bundle; the report is on .demand
 for cluster in report.ranked_clusters:
     print(cluster.signal, cluster.distinct_author_count, cluster.claim)
 ```
@@ -52,10 +53,12 @@ shovel**: assemble exactly the product you want.
 - **Discovery + reply generation** — find threads worth engaging and draft replies
   in your own voice, with the filter, generation, and compliance steps each a
   standalone building block.
-- **Pillars on a report** — turn a finished demand report into a grounded
+- **Seven pillars on a report** — turn a finished demand report into a grounded
   positioning wedge, competitive landscape, surface + UX recommendation,
-  marketing site, launch kit, or content/SEO plan. Every claim traces back to a
-  real Reddit quote by permalink; the library never invents one.
+  marketing site, a cite-or-die build harness for your coding agent, launch kit,
+  or content/SEO plan. Every claim traces back to a real Reddit quote by
+  permalink; the library never invents one. See [the arc](/docs/the-arc) for the
+  full idea-to-company chain.
 - **Four form factors** — a Python library, a CLI, an MCP server, and a Claude
   Code plugin that share one typed contract. Non-Python? Drive it from the MCP
   server or the CLI.
@@ -64,7 +67,7 @@ shovel**: assemble exactly the product you want.
 
 <CardGroup cols={2}>
   <Card title="A demand report" href="/docs/guide-demand-research">
-    `Metalworks().research("...", subreddits=[...])` → a clustered DemandReport.
+    `Metalworks().research("...", subreddits=[...])` → a clustered demand report (on `.demand`).
   </Card>
   <Card title="Find threads" href="/docs/guide-reddit-engagement">
     `mw.reddit.search("...")` and `mw.reddit.subreddit("...")` for live intel.

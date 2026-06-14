@@ -21,6 +21,14 @@ but every verifiable claim is backed by data the pipeline holds independently.
 - **Counts** — distinct authors, mention counts, must-address resolution — are
   computed from set membership, never asserted by a model.
 
+The same rule travels down every pillar as a stage-specific sibling: a marketing
+section with no exact-matched quote is dropped (`no-quote-no-section`), a
+competitor gap with no matched complaint is dropped (`no-quote-no-gap`), a launch
+claim whose support doesn't resolve is dropped (`no-cite-no-claim`), and a build
+feature not tied to a real demand cluster is dropped (`no-cite-no-feature`). Every
+downstream artifact resolves its `EvidenceRef`s against the source report's
+`evidence` by id — one grounded chain from the raw comment to the shipped claim.
+
 If you swap in your own `ChatModel`, this still holds: the verification happens in
 the pipeline, around the model, not inside it.
 

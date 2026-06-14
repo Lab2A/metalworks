@@ -1,11 +1,17 @@
 ---
-title: "Build your own"
-description: "Compose the building blocks into your own Reddit product — your filter, your voice, your compliance rules, your storage."
+title: "Build your own discovery loop"
+description: "Compose the building blocks into your own Reddit engagement product — your filter, your voice, your compliance rules, your storage."
 ---
 
 The discovery loop is one opinionated assembly. The point of metalworks is that
 you can build your own. Every step is a public function you can call, replace, or
 reorder.
+
+<Note>
+This page is about composing the **Reddit engagement / discovery loop** yourself.
+For the **Build pillar** — turning a demand report into a build harness for your
+coding agent — see the [Build guide](/docs/guide-build).
+</Note>
 
 ## The loop, unbundled
 
