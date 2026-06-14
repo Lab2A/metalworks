@@ -66,4 +66,3 @@ Research and discovery take minutes. Do not call a blocking tool and wait — us
 - [Extending metalworks](/docs/extending) — the swappable protocols + functions.
 - [Protocols](/docs/protocols) — exact protocol shapes.
 - `llms.txt` — the machine-readable index.
-</content>

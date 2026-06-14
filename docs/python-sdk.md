@@ -92,4 +92,3 @@ a failed `PostResult`); every attempt is appended to `~/.metalworks/post-log.jso
 The `Metalworks` facade method signatures are part of the stable public surface (alongside
 `metalworks.contract` and the MCP tools). Breaking changes go through a `DeprecationWarning`
 at least one minor version ahead.
-</content>
