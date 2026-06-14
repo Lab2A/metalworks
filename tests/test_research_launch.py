@@ -140,6 +140,22 @@ def test_refuses_when_no_cluster_has_two_distinct_authors() -> None:
     assert assets == []
 
 
+def test_price_caveat_in_verdict_does_not_trip_no_go() -> None:
+    # Real-world dogfood bug: a STRONG-demand verdict that appends a price caveat
+    # ("not enough price signal...") must NOT be read as weak demand. The no-go
+    # gate judges only the demand segment (before the first ';').
+    report = _two_author_report()
+    report.verdict = (
+        "Strong demand — 1313 distinct voices; ~1,313 reachable on Reddit, "
+        "~131,300 addressable; not enough price signal to recommend a price."
+    )
+    # Claims are irrelevant here — this test is purely about the no-go gate.
+    phrasing = _phrasing("We built the fade that doesn't sting.", [])
+    chat = _scripted_chat([phrasing for _ in DEFAULT_SURFACES])
+    assets = build_launch_assets(_deps(chat), report)
+    assert assets, "strong demand + thin price signal must still launch"
+
+
 # ── claim grounding ──────────────────────────────────────────────────────────
 
 
