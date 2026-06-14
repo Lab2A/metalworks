@@ -20,7 +20,7 @@ source of truth for its tier.
   report projections (`channel_plan_build`, `content_plan_from_report`). No
   provider key needed.
 - **Tier 2 — key-gated.** Anything that calls a model: planning, the
-  report-derived pillars, the research job pattern, reply drafting, discovery, and
+  report-derived tools, the research job pattern, reply drafting, discovery, and
   posting. These need a **chat provider key** (and some need an **embedding key**).
   A missing credential surfaces a `MissingKeyError` envelope naming the env var and
   extra — it does not crash.
@@ -47,7 +47,7 @@ source of truth for its tier.
 | Tool | Purpose | Key params |
 | --- | --- | --- |
 | `research_plan_brief` | Walk the D1-D8 planner with default answers → an assembled `ResearchBrief` (chat key). | `prompt`, `store_path` |
-| `positioning_from_report` | Derive a grounded positioning wedge from a stored report — one LLM call, synchronous (chat key). | `report_id`, `store_path` |
+| `positioning_from_report` | Derive grounded positioning from a stored report — one LLM call, synchronous (chat key). | `report_id`, `store_path` |
 | `competitor_map_from_report` | Map the competitive landscape — grounded names, cited gaps, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `surface_recommend` | Recommend a product surface — grounded rubric + trade-offs, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ux_skeleton_build` | Build a UX skeleton for a stored report on the given surface, synchronous (chat + embeddings). | `report_id`, `surface`, `store_path` |
@@ -62,7 +62,7 @@ source of truth for its tier.
 | `reddit_post_comment` | **Security boundary** — post a reply to a public thread (see below). | `url`, `text`, `confirm_token`, `username` |
 
 <Note>
-The report-derived pillars (`positioning_from_report`, `competitor_map_from_report`,
+The report-derived tools (`positioning_from_report`, `competitor_map_from_report`,
 `surface_recommend`, `ux_skeleton_build`, `site_render`, `launch_assets_build`,
 `build_spec`) are **synchronous** — run them after a stored report exists. They are
 distinct from the minutes-long pipeline, which uses the async job pattern below.

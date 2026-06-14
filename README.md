@@ -1,10 +1,16 @@
 # metalworks
 
-Marketing research and Reddit engagement as a Python library: demand reports
-from real Reddit conversations, plus the OAuth / search / compliance primitives
-to act on them. MIT licensed, and built to be embedded — every layer (LLM,
-search, embeddings, storage, data source) is a swappable protocol, so you can
-assemble your own product on top of it.
+**Go from a startup idea to launch, grounded in real demand.**
+
+Give metalworks one sentence about what you want to build. It reads real Reddit
+conversations to tell you whether people actually want it, then turns that into
+the things you need to launch: your positioning, the competitors to beat, a
+marketing site, a build plan for your coding agent, and launch copy. **Every claim
+links back to a real comment you can click — nothing is invented.**
+
+A Python library (also a CLI, an MCP server, and a Claude Code plugin). MIT
+licensed and built to be embedded — every layer (LLM, search, embeddings,
+storage, data source) is a swappable protocol.
 
 > **Status: pre-release (0.0.1).** APIs are unstable below 1.0. The stable
 > surface is the `Metalworks` facade, the `metalworks.contract` Pydantic models,
@@ -48,20 +54,21 @@ export GOOGLE_API_KEY=...     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
 Prefer Vertex AI over an API key? Set `GOOGLE_GENAI_USE_VERTEXAI=true` plus
 `VERTEX_PROJECT_ID` and `VERTEX_LOCATION` and the Google adapters authenticate
 via Application Default Credentials. See
-[docs/model-configuration.md](docs/model-configuration.md).
+[docs/configuration.md](docs/configuration.md).
 
 ```python
 from metalworks import Metalworks
 
 mw = Metalworks()             # provider inferred; or Metalworks(model="anthropic/claude-opus-4-6")
-report = mw.research("Is there demand for a focus supplement aimed at developers?",
-                     subreddits=["Nootropics", "Supplements"])
+research = mw.research("Is there demand for a focus supplement aimed at developers?",
+                       subreddits=["Nootropics", "Supplements"])
+report = research.demand
 ```
 
-Every quote in `report.ranked_clusters` is exact-matched to a stored Reddit
-comment, and every web finding carries its source URL from the grounding tool's
-citation metadata, not from model prose. See
-[docs/explanation-provenance.md](docs/explanation-provenance.md) for why.
+Every quote in `report.ranked_clusters` is the exact text of a real Reddit
+comment, and every web finding carries its real source URL — never model prose.
+Anything metalworks can't back with a real quote, it drops. See
+[why you can trust the output](docs/how-it-works.md).
 
 The `Metalworks` facade is the easy path over `run_research` / `run_discovery`
 and the protocols — drop down to those whenever you want more control. Submissions
@@ -69,7 +76,7 @@ come from the Hugging Face `open-index/arctic` Parquet mirror; comments from the
 live Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months. To read
 the submission corpus from a Supabase Storage bucket instead (no HF runtime
 dependency), install `metalworks[supabase]` and set `ARCTIC_SHIFT_SOURCE=mirror`,
-or [bring your own corpus](docs/how-to-custom-corpus.md) to skip Arctic Shift.
+or [bring your own corpus](docs/custom-corpus.md) to skip Arctic Shift.
 
 ## Extras
 
@@ -117,21 +124,21 @@ default. The protocols are the seam your code and the pipeline speak through:
   `OpportunityRepo`, `InboxRepo`) are the storage protocol. `MemoryStores` and
   `SqliteStores` ship in core; hosted backends (Postgres/PostgREST) are a custom
   store you implement downstream — see
-  [docs/how-to-custom-store.md](docs/how-to-custom-store.md).
+  [docs/custom-store.md](docs/custom-store.md).
 
-See [docs/reference-protocols.md](docs/reference-protocols.md) for signatures.
+See [docs/protocols.md](docs/protocols.md) for signatures.
 
 Two verticals sit on top of those protocols:
 
-- **Research** (`metalworks.research`) — brief to Reddit corpus to triage to a
-  clustered `DemandReport` with verified, permalinked quotes. Entry point:
-  `run_research(deps, brief=...)`. Seven grounded pillars build on a finished
-  report, each tracing its output back to that report's real evidence:
-  positioning (`build_positioning_brief`), competitive landscape
-  (`run_competitor_map`), surface + UX (`decide_surface` / `build_ux_skeleton`),
-  marketing site (`build_marketing_site`), launch assets (`build_launch_assets` /
-  `plan_channels`), a deterministic content/SEO plan (`content_plan_from_report`),
-  and an evidence-grounded build harness (`build_spec_from_report` / `scaffold`).
+- **Research** (`metalworks.research`) — turns an idea into a clustered
+  `DemandReport` of real, permalinked Reddit quotes. Entry point:
+  `run_research(deps, brief=...)`. Seven functions build on a finished report,
+  each linking its output back to that report's real quotes: positioning
+  (`build_positioning_brief`), competitors (`run_competitor_map`), surface + UX
+  (`decide_surface` / `build_ux_skeleton`), marketing site
+  (`build_marketing_site`), launch assets (`build_launch_assets` /
+  `plan_channels`), a content/SEO plan (`content_plan_from_report`), and a build
+  plan + scaffold (`build_spec_from_report` / `scaffold`).
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.
@@ -140,8 +147,8 @@ Four form factors share that contract:
 
 1. **Library** — `from metalworks import Metalworks`, or the functions and
    protocols underneath.
-2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report-derived
-   pillars (`metalworks research position|competitor-map|surface|site|launch|content-plan`,
+2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report
+   commands (`metalworks research position|competitor-map|surface|site|launch|content-plan`,
    `metalworks build init`),
    `metalworks quickstart`, `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
@@ -160,20 +167,18 @@ def test_my_backend():
     check_all_repos(MyBackend())   # includes the >1000-row pagination case
 ```
 
-See [docs/how-to-custom-chatmodel.md](docs/how-to-custom-chatmodel.md) and
-[docs/how-to-custom-store.md](docs/how-to-custom-store.md).
+See [docs/custom-chatmodel.md](docs/custom-chatmodel.md) and
+[docs/custom-store.md](docs/custom-store.md).
 
 ## Docs
 
-- [Quickstart](docs/quickstart.md) and [Core concepts](docs/concepts.md)
-- [Guide: demand research](docs/guide-demand-research.md)
-- [Guide: Reddit engagement](docs/guide-reddit-engagement.md)
-- [Guide: build your own](docs/build-your-own.md)
-- [Model configuration](docs/model-configuration.md) (provider/model refs, OpenAI-compatible endpoints)
-- [Building blocks](docs/building-blocks.md) and the [Metalworks client](docs/reference-client.md)
-- [Reference: protocols](docs/reference-protocols.md)
-- [Explanation: structural provenance](docs/explanation-provenance.md)
-- Agents: [for coding agents](docs/for-coding-agents.md) and [llms.txt](llms.txt).
+Full docs: **[metalworks.lab2a.ai](https://metalworks.lab2a.ai)**
+
+- [Installation](docs/installation.md) · [Quickstart](docs/quickstart.md) · [Build a startup, end to end](docs/walkthrough.md)
+- Capabilities: [demand research](docs/demand-research.md) · [positioning & competitors](docs/positioning.md) · [design & site](docs/design.md) · [build spec](docs/build-spec.md) · [launch](docs/launch.md) · [content & SEO](docs/content-seo.md) · [Reddit engagement](docs/reddit-engagement.md)
+- [Why you can trust the output](docs/how-it-works.md) · [Data model](docs/data-model.md)
+- Reference: [Python SDK](docs/python-sdk.md) · [CLI](docs/cli.md) · [MCP tools](docs/mcp-tools.md) · [Configuration](docs/configuration.md) · [Using with AI agents](docs/ai-agents.md)
+- Extending: [overview](docs/extending.md) · [protocols](docs/protocols.md) · [custom model/corpus/store](docs/custom-chatmodel.md)
 
 ## Project
 

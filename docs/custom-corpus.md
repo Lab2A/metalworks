@@ -3,10 +3,11 @@ title: "Use your own corpus (no Arctic Shift)"
 description: "Run research over any Reddit data — local parquet, a database, a cache — by implementing CorpusReader and CommentSource."
 ---
 
-Arctic Shift is the default Reddit-data path, not a requirement. The research
-pipeline reads submissions through a `CorpusReader` and comments through a
-`CommentSource`. Implement those two small protocols and you can feed research
-from anything: local parquet, your own database, an internal API, or a cache.
+Run research over any Reddit data in three steps: implement `CorpusReader` for
+submissions, implement `CommentSource` for comments, and wire them in. Arctic
+Shift is the default path, not a requirement — once those two small protocols are
+satisfied, you can feed research from anything: local parquet, your own database,
+an internal API, or a cache.
 
 ## The protocols
 
