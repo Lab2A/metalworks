@@ -550,6 +550,51 @@ export interface ContentPlan {
   citation_strategy: CitationStrategy;
 }
 
+export interface FeatureSpec {
+  /** Stable slug for the feature (e.g. 'fade-tracker'). */
+  feature_id: string;
+  /** The feature, in a few words. */
+  title: string;
+  /** Why this feature — what consumer pain it serves. */
+  rationale: string;
+  /** ≥1 resolvable ref backing the feature. Empty → dropped at assembly. */
+  evidence?: EvidenceRef[];
+}
+
+export interface BuildPersona {
+  /** Short persona label. */
+  name: string;
+  /** Who they are + what they want, one or two lines. */
+  description: string;
+  evidence?: EvidenceRef[];
+}
+
+export interface PricingTier {
+  /** Tier name (e.g. 'Starter'). */
+  name: string;
+  /** Monthly price; None when unpriced. */
+  price?: number | null;
+  currency?: string;
+  /** What the tier includes / why this price. */
+  rationale: string;
+  evidence?: EvidenceRef[];
+}
+
+export interface BuildSpec {
+  /** Stable id for this spec (derived from report_id). */
+  spec_id: string;
+  report_id: string;
+  /** The surface this build targets. */
+  surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
+  /** The chosen starter/stack hint (e.g. 'next-shipfast', 'empty'). */
+  stack: string;
+  features?: FeatureSpec[];
+  personas?: BuildPersona[];
+  pricing_tiers?: PricingTier[];
+  partial?: boolean;
+  caveat?: string | null;
+}
+
 export interface ComplianceVerdict {
   /** True if the reply is OK to post. */
   pass: boolean;
