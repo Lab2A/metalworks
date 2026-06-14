@@ -22,14 +22,15 @@ The headline is the offline demo: fake models on a bundled Reddit corpus, no
 keys, no network.
 
 ```bash
-pip install "metalworks[arctic]"
+pip install "metalworks[research]"
 ```
 
 ```python
 from metalworks import Metalworks
 
-report = Metalworks.demo().research("Is there demand for a focus supplement?",
-                                    subreddits=["Supplements"])
+research = Metalworks.demo().research("Is there demand for a focus supplement?",
+                                     subreddits=["Supplements"])
+report = research.demand   # .research() returns a Research bundle; the report is on .demand
 print(report.verdict)
 for cluster in report.ranked_clusters:
     print(cluster.signal, cluster.distinct_author_count, cluster.claim)

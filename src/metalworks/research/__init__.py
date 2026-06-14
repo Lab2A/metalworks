@@ -16,6 +16,7 @@ from metalworks.research.marketing import content_plan_from_report
 from metalworks.research.pipeline import run_research
 from metalworks.research.site import build_marketing_site, render_site_html
 from metalworks.research.surface import build_ux_skeleton, decide_surface
+from metalworks.research.synthesis import build_positioning_brief
 
 # Public surface: the entry point (`run_research`), the dependency bundle
 # (`ResearchDeps`), and the two injection protocols a caller implements to swap
@@ -29,6 +30,7 @@ __all__ = [
     "ResearchDeps",
     "build_launch_assets",
     "build_marketing_site",
+    "build_positioning_brief",
     "build_ux_skeleton",
     "content_plan_from_report",
     "decide_surface",

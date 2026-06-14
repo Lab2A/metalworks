@@ -150,10 +150,19 @@ def init(
 @app.command()
 def quickstart() -> None:
     """Run an OFFLINE demo report (zero keys, zero network) over a local corpus."""
-    if not _module_available("duckdb"):
+    # The offline demo runs the full triage→synthesis pipeline, so it needs the
+    # `[research]` extra (duckdb for the local corpus + rank-bm25/numpy for
+    # triage), not just `[arctic]`. Check the binding constraint (rank_bm25) and
+    # name the right extra, so a partial install fails with guidance, not a
+    # raw MissingExtraError traceback.
+    missing = [m for m in ("duckdb", "rank_bm25", "numpy") if not _module_available(m)]
+    if missing:
+        gap = ", ".join(missing)
+        # Escape the literal brackets — Rich would otherwise parse `[research]`
+        # as a style tag and silently drop it from both the prose and the command.
         console.print(
-            "[yellow]quickstart needs the [arctic] extra (duckdb) for the local corpus.[/yellow]\n"
-            'Install it with: pip install "metalworks[arctic]"'
+            rf"[yellow]quickstart needs the \[research] extra (missing: {gap}).[/yellow]"
+            '\nInstall it with: pip install "metalworks\\[research]"'
         )
         raise typer.Exit(code=0)
 
@@ -371,6 +380,30 @@ def research_run(
         out.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"[green]Wrote report[/green] {out}")
     _print_report(report)
+
+
+@research_app.command("list")
+def research_list(
+    limit: Annotated[int, typer.Option("--limit", help="Max runs to show.")] = 20,
+) -> None:
+    """List stored research runs (report ids the pillar commands take)."""
+    runs = config.default_store().list_runs(limit=limit)
+    if not runs:
+        console.print(
+            "[dim]No stored runs.[/dim] Run "
+            '[bold]metalworks research run --question "..."[/bold] first.'
+        )
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("report_id")
+    table.add_column("query")
+    table.add_column("authors", justify="right")
+    table.add_column("generated")
+    for r in runs:
+        when = r.generated_at.strftime("%Y-%m-%d %H:%M") if r.generated_at else "—"
+        query = r.query if len(r.query) <= 50 else r.query[:47] + "…"
+        table.add_row(r.report_id, query, str(r.total_distinct_authors), when)
+    console.print(table)
 
 
 def _print_positioning(brief: object) -> None:

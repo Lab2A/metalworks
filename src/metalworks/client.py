@@ -16,19 +16,32 @@ top level — every such symbol is imported inside the method that needs it, so
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from metalworks.contract import (
+        BuildSpec,
+        ChannelPlan,
+        CompetitorMap,
+        ContentPlan,
+        DemandReport,
         DiscoveryContext,
         InboxItem,
+        LaunchAsset,
+        MarketingSite,
         Opportunity,
         Persona,
+        PositioningBrief,
         RedditComment,
         RedditPost,
         Research,
         ResearchBrief,
         SubredditIntel,
+        SurfaceKind,
+        SurfaceRecommendation,
+        UxSkeleton,
     )
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
@@ -40,6 +53,12 @@ if TYPE_CHECKING:
     from metalworks.stores import MemoryStores, SqliteStores
 
     Store = MemoryStores | SqliteStores
+
+
+def _demand(research: Research | DemandReport) -> DemandReport:
+    """Accept the `Research` bundle (what `.research()` returns) or a bare
+    `DemandReport`, and return the `DemandReport` the pillars run on."""
+    return cast("DemandReport", getattr(research, "demand", research))
 
 
 class _Resolver:
@@ -313,6 +332,113 @@ class Metalworks:
         from metalworks.research.planner import plan_brief
 
         return plan_brief(self._r.research_deps(), prompt)
+
+    # ── the pillar arc (each runs on a finished `research()` bundle) ──────────
+
+    @property
+    def deps(self) -> ResearchDeps:
+        """The resolved :class:`~metalworks.research.ResearchDeps` this client
+        threads through every pillar — the escape hatch for composing the raw
+        pillar functions yourself without rebuilding chat / embeddings / corpus /
+        reader by hand."""
+        return self._r.research_deps()
+
+    def positioning(self, research: Research | DemandReport) -> PositioningBrief:
+        """Pillar B — a grounded Dunford positioning wedge + price hypothesis."""
+        from metalworks.research import build_positioning_brief
+
+        return build_positioning_brief(self.deps, _demand(research))
+
+    def competitors(self, research: Research | DemandReport) -> CompetitorMap:
+        """Pillar A — direct / adjacent / status-quo rivals, each gap cited."""
+        from metalworks.research import run_competitor_map
+
+        return run_competitor_map(self.deps, _demand(research))
+
+    def surface(
+        self, research: Research | DemandReport, positioning: PositioningBrief
+    ) -> SurfaceRecommendation:
+        """Pillar C — the grounded surface recommendation (sdk/web/mobile/...)."""
+        from metalworks.research import decide_surface
+
+        return decide_surface(self.deps, _demand(research), positioning)
+
+    def ux(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief,
+        surface: SurfaceKind,
+    ) -> UxSkeleton:
+        """Pillar C — a 3-5 screen UX skeleton for the chosen ``surface``."""
+        from metalworks.research import build_ux_skeleton
+
+        return build_ux_skeleton(self.deps, _demand(research), positioning, surface)
+
+    def site(
+        self, research: Research | DemandReport, positioning: PositioningBrief | None = None
+    ) -> MarketingSite:
+        """Pillar E — a grounded marketing site (verbatim, cited copy)."""
+        from metalworks.research import build_marketing_site
+
+        return build_marketing_site(self.deps, _demand(research), positioning)
+
+    def render_site(
+        self, site: MarketingSite, research: Research | DemandReport | None = None
+    ) -> str:
+        """Render a :class:`MarketingSite` to a self-contained ``index.html``."""
+        from metalworks.research import render_site_html
+
+        return render_site_html(site, _demand(research) if research is not None else None)
+
+    def build_spec(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+        surface: SurfaceKind = "web",
+        *,
+        stack: str = "empty",
+    ) -> BuildSpec:
+        """Pillar D — an evidence-grounded :class:`BuildSpec` for a coding agent."""
+        from metalworks.build import build_spec_from_report
+
+        return build_spec_from_report(
+            self.deps, _demand(research), positioning, surface, stack=stack
+        )
+
+    def scaffold(
+        self,
+        spec: BuildSpec,
+        research: Research | DemandReport,
+        dest: Path,
+        *,
+        base: str = "empty",
+    ) -> list[Path]:
+        """Pillar D — write the cite-or-die build harness under ``dest``."""
+        from metalworks.build import scaffold
+
+        return scaffold(spec, _demand(research), dest, base=base)
+
+    def launch(
+        self, research: Research | DemandReport, positioning: PositioningBrief | None = None
+    ) -> list[LaunchAsset]:
+        """Pillar F — channel-native cited launch drafts (drafting only, never posts)."""
+        from metalworks.research import build_launch_assets
+
+        return build_launch_assets(self.deps, _demand(research), positioning)
+
+    def channel_plan(
+        self, research: Research | DemandReport, surfaces: list[str] | None = None
+    ) -> ChannelPlan:
+        """Pillar F — a deterministic, human-executed launch sequence."""
+        from metalworks.research import plan_channels
+
+        return plan_channels(_demand(research), surfaces)
+
+    def content_plan(self, research: Research | DemandReport) -> ContentPlan:
+        """Pillar G — a deterministic, zero-key content/SEO plan."""
+        from metalworks.research import content_plan_from_report
+
+        return content_plan_from_report(_demand(research))
 
     # ── namespaces ──────────────────────────────────────────────────────────
 

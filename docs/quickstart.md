@@ -15,16 +15,17 @@ SDK or duckdb lives behind an extra, so you install only what you use.
 ## 1. The offline demo (no keys, no network)
 
 ```bash
-pip install "metalworks[arctic]"      # duckdb, for the bundled local corpus
+pip install "metalworks[research]"    # duckdb + triage (bundled local corpus)
 ```
 
 ```python
 from metalworks import Metalworks
 
-report = Metalworks.demo().research(
+research = Metalworks.demo().research(
     "Is there demand for a focus supplement?",
     subreddits=["Supplements"],
 )
+report = research.demand   # .research() returns a Research bundle; the report is on .demand
 print(report.verdict)      # the synthesized go / no-go summary (or None)
 for cluster in report.ranked_clusters:
     print(cluster.signal, cluster.distinct_author_count, cluster.claim)

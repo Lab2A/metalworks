@@ -171,3 +171,19 @@ def test_research_run_rejects_both_question_and_brief(tmp_path: Path) -> None:
         app, ["research", "run", "--question", "q", "--brief", str(tmp_path / "b.json")]
     )
     assert result.exit_code == 2
+
+
+def test_research_list_runs_with_empty_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The command 8 help strings promise must exist and not crash on an empty store.
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["research", "list"])
+    assert result.exit_code == 0
+    assert "No stored runs" in result.output
+
+
+def test_research_list_is_in_help() -> None:
+    result = runner.invoke(app, ["research", "--help"])
+    assert result.exit_code == 0
+    assert "list" in result.output
