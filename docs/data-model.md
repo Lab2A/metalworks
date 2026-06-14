@@ -87,5 +87,3 @@ Both sets of objects run on the same swappable protocols — `ChatModel`, `Embed
 `SearchProvider`, `CorpusReader`, and the typed storage repos. See [Extending
 metalworks](/docs/extending) for the protocols, and the [Protocols
 reference](/docs/protocols) for their exact shapes.
-</content>
-</invoke>
