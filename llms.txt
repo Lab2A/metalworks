@@ -27,6 +27,13 @@ provider modules. Install only what matches the API key you have:
   research vertical underneath the facade. Quotes are exact-matched to stored
   Reddit comments; web findings carry source URLs from grounding metadata, never
   model prose.
+- `metalworks.research` pillars on a finished `DemandReport`, each grounded to its
+  real evidence: `build_positioning_brief`, `run_competitor_map`,
+  `decide_surface` / `build_ux_skeleton`, `build_marketing_site` /
+  `render_site_html`, `build_launch_assets` / `plan_channels`,
+  `content_plan_from_report` (deterministic, zero-key). Surfaced as CLI
+  `metalworks research position|competitor-map|surface|site|launch|content-plan`
+  and the matching synchronous MCP tools.
 - `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
   `draft_reply` building blocks.
 - `metalworks.reddit`: `RedditSearch`, `RedditOAuth`, `RedditMetrics`,

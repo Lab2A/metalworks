@@ -46,6 +46,21 @@ public functions you can wire into your own flow.
 - `triangulate(deps, ...)` — link Reddit clusters to web findings.
 - `run_research(deps, brief=...)` — the whole thing, if you want it.
 
+**Pillars on a finished report** (`metalworks.research`) — each takes a
+`DemandReport` and traces its output back to the report's real evidence:
+
+- `build_positioning_brief(deps, report)` — a grounded Dunford wedge + price
+  hypothesis (`metalworks.research.synthesis`).
+- `run_competitor_map(deps, report)` — direct / adjacent / status-quo rivals,
+  each with an evidenced exploitable gap.
+- `decide_surface(deps, report, positioning)` / `build_ux_skeleton(...)` — a
+  surface recommendation and a 3-5 screen UX skeleton.
+- `build_marketing_site(deps, report, positioning=None)` / `render_site_html(site, report)`
+  — a verbatim-grounded marketing site + self-contained `index.html`.
+- `build_launch_assets(deps, report, positioning)` / `plan_channels(report)` —
+  drafting-only launch copy (never posts) + a human-executed channel plan.
+- `content_plan_from_report(report)` — a deterministic, zero-key content/SEO plan.
+
 **Reddit + discovery** (`metalworks.reddit`, `metalworks.discovery`):
 
 - `RedditSearch` — search, comments, subreddit rules. No OAuth needed.
