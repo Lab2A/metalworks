@@ -8,9 +8,11 @@ Two responsibilities:
    are lazy-imported so importing this module costs nothing and works on a
    bare install with no extras.
 
-2. **Non-secret config** — a small ``metalworks.toml`` (provider id, model id,
-   store path) discovered in the cwd, then ``~/.config/metalworks/``. Precedence
-   for any setting is: **explicit argument > environment variable > config.toml**.
+2. **Non-secret config** — a small TOML (provider id, model id, store path).
+   Discovered, highest precedence first, in the active project's
+   ``.metalworks/config.toml``, then a legacy cwd ``metalworks.toml``, then
+   ``~/.config/metalworks/``. Precedence for any setting is: **explicit
+   argument > environment variable > config file**.
 
 Nothing here imports a provider SDK, ``duckdb``, or ``mcp`` at module top.
 """
@@ -22,7 +24,9 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from metalworks._genai_client import vertex_enabled
 from metalworks.errors import MissingKeyError
+from metalworks.project import Project
 
 if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
@@ -58,12 +62,16 @@ _DEFAULT_STORE_PATH = Path.home() / ".metalworks" / "store.db"
 
 
 def config_search_paths() -> list[Path]:
-    """Where ``load_config`` looks, highest precedence first: cwd, then
-    ``~/.config/metalworks/``."""
-    return [
-        Path.cwd() / _CONFIG_FILENAME,
-        Path.home() / ".config" / "metalworks" / _CONFIG_FILENAME,
-    ]
+    """Where ``load_config`` looks, highest precedence first: the active
+    project's ``.metalworks/config.toml``, then a legacy cwd ``metalworks.toml``,
+    then ``~/.config/metalworks/``."""
+    paths: list[Path] = []
+    project = Project.find()
+    if project is not None:
+        paths.append(project.config_path)
+    paths.append(Path.cwd() / _CONFIG_FILENAME)
+    paths.append(Path.home() / ".config" / "metalworks" / _CONFIG_FILENAME)
+    return paths
 
 
 def load_config() -> dict[str, Any]:
@@ -84,8 +92,11 @@ def load_config() -> dict[str, Any]:
 
 
 def default_config_path() -> Path:
-    """The path ``save_config`` / ``init`` write to (the cwd file)."""
-    return Path.cwd() / _CONFIG_FILENAME
+    """The path ``save_config`` / ``init`` write to: the active project's
+    ``.metalworks/config.toml`` if a project exists, else a cwd ``metalworks.toml``
+    (legacy / non-project use)."""
+    project = Project.find()
+    return project.config_path if project is not None else Path.cwd() / _CONFIG_FILENAME
 
 
 def _toml_scalar(value: Any) -> str:
@@ -151,6 +162,10 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     for provider, env_var in _CHAT_KEY_ORDER:
         if os.environ.get(env_var):
             return provider, model
+    # Vertex AI uses ADC (a service account), not a chat API key — so the key
+    # loop above misses it. When Vertex mode is on, route to the Google adapter.
+    if vertex_enabled():
+        return "google", model
     raise MissingKeyError(_ALL_CHAT_KEYS, provider="chat model")
 
 
@@ -223,7 +238,7 @@ def resolve_embeddings() -> EmbeddingProvider:
     Google (``GOOGLE_API_KEY`` / ``GEMINI_API_KEY``) is preferred, then OpenAI.
     Raises :class:`~metalworks.errors.MissingKeyError` when neither is set.
     """
-    if os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+    if vertex_enabled() or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         from metalworks.embeddings.adapters.google import GoogleEmbedding
 
         return GoogleEmbedding()
@@ -258,14 +273,18 @@ def resolve_search() -> SearchProvider | None:
 
 
 def default_store(path: str | None = None) -> MemoryStores | SqliteStores:
-    """The local store backend.
+    """The local store backend for explicit CLI invocations.
 
     ``":memory:"`` → :class:`~metalworks.stores.MemoryStores` (ephemeral, for
-    tests and one-shot runs). Any other ``path`` (or the
-    ``~/.metalworks/store.db`` default) → :class:`~metalworks.stores.SqliteStores`.
-    Resolution order: explicit ``path`` > config ``store`` > default.
+    tests and one-shot runs). Otherwise a :class:`~metalworks.stores.SqliteStores`
+    at the resolved path. Resolution order: explicit ``path`` > config ``store`` >
+    the active project's ``corpus.db`` > the ``~/.metalworks/store.db`` default.
+    (For the library facade's *no-footprint* behaviour, see :func:`auto_store`.)
     """
-    resolved = path or setting("store") or str(_DEFAULT_STORE_PATH)
+    resolved = path or setting("store")
+    if resolved is None:
+        project = Project.find()
+        resolved = str(project.corpus_db) if project is not None else str(_DEFAULT_STORE_PATH)
     if resolved == ":memory:":
         from metalworks.stores import MemoryStores
 
@@ -277,7 +296,30 @@ def default_store(path: str | None = None) -> MemoryStores | SqliteStores:
     return SqliteStores(store_path)
 
 
+def auto_store() -> MemoryStores | SqliteStores:
+    """The library facade's no-footprint store.
+
+    Inside a ``.metalworks/`` project → a :class:`~metalworks.stores.SqliteStores`
+    on the project's ``corpus.db`` (the memory accumulates across runs). With no
+    project → a :class:`~metalworks.stores.MemoryStores` that persists nothing, so
+    a casual ``metalworks.research("idea")`` leaves zero footprint, like git
+    before ``git init``. Reads no config ``store`` setting — that is a CLI concern
+    (see :func:`default_store`).
+    """
+    project = Project.find()
+    if project is None:
+        from metalworks.stores import MemoryStores
+
+        return MemoryStores()
+    from metalworks.stores import SqliteStores
+
+    # project.root necessarily exists: find() only returns a project when its
+    # project.json is present. SqliteStores creates corpus.db + parent as needed.
+    return SqliteStores(project.corpus_db)
+
+
 __all__ = [
+    "auto_store",
     "config_search_paths",
     "default_config_path",
     "default_store",

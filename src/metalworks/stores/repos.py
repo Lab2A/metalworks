@@ -3,14 +3,16 @@
 Design decision (from plan review, do not regress): the typed repos ARE the
 protocol. There is no public generic doc-store — real production tables
 are columnar, and a generic put/get cannot bind to them. Each backend
-(memory, sqlite, supabase) implements these protocols directly; the Supabase
-backend additionally takes a table_map + column codecs so it can bind to
-pre-existing schemas at migration time.
+implements these protocols directly. The OSS core ships two zero-infra
+backends (memory, sqlite); a hosted backend (e.g. Postgres for a SaaS
+deployment) lives downstream and binds to pre-existing columnar schemas via
+its own table_map + column codecs — the protocol seam is what makes that
+downstream impl possible without changing the core.
 
 Backends own their own query semantics:
-- ID-chunk size for IN-style queries is per-backend (PostgREST ~200,
-  SQLite parameter ceiling differs).
-- Supabase implementations MUST paginate to exhaustion (PostgREST silently
+- ID-chunk size for IN-style queries is per-backend (a PostgREST-backed impl
+  caps ~200; SQLite's parameter ceiling differs).
+- A hosted/PostgREST impl MUST paginate to exhaustion (PostgREST silently
   truncates at max-rows with HTTP 200).
 - SQLite implementations MUST be safe under the pipeline's thread model
   (synthesis + web research run in a ThreadPoolExecutor).
@@ -21,7 +23,8 @@ typing means `MemoryStores()` satisfies every repo parameter.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +39,11 @@ from metalworks.contract import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+
+    from metalworks.embeddings import IndexIdentity
+
+_M = TypeVar("_M", bound=BaseModel)
 
 PROTOCOL_VERSION = "1.0"
 
@@ -116,6 +123,35 @@ class CorpusRepo(Protocol):
         silent truncation here corrupts every downstream count."""
         ...
 
+    def upsert_embeddings(
+        self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
+    ) -> None:
+        """Idempotently store ``comment_id -> embedding vector``, tagged with the
+        embedding model ``identity``. Upserting under a different identity than the
+        stored one replaces the index — vectors from different models are
+        geometrically incompatible and must not be mixed."""
+        ...
+
+    def search_embeddings(
+        self, query: Sequence[float], *, k: int, identity: IndexIdentity
+    ) -> list[tuple[str, float]]:
+        """Brute-force cosine over the stored vectors → the ``k`` nearest
+        ``(comment_id, score)`` pairs, score descending. Empty index → ``[]``.
+        Raises :class:`~metalworks.errors.EmbeddingModelMismatch` when the stored
+        index was built with a different model than ``identity``. Needs the
+        ``[research]`` extra (numpy) for the cosine math."""
+        ...
+
+    def get_embeddings(
+        self, ids: Sequence[str], *, identity: IndexIdentity
+    ) -> dict[str, list[float]]:
+        """Return the stored vectors for ``ids`` that were embedded under
+        ``identity``, as ``{id: vector}``. Ids with no stored vector — or any when
+        the index was built with a different model — are omitted, so the caller
+        re-embeds the misses. This is the embedding-cache read path; no numpy
+        needed (a plain lookup, not cosine)."""
+        ...
+
 
 @runtime_checkable
 class AccountRepo(Protocol):
@@ -153,3 +189,50 @@ class InboxRepo(Protocol):
     ) -> list[InboxItem]: ...
 
     def mark_inbox_read(self, message_id: str) -> None: ...
+
+
+class StoredArtifact(BaseModel):
+    """A persisted Tier-2 pillar output + its provenance stamp.
+
+    The artifact itself is any contract model (PositioningBrief, MarketingSite,
+    ContentPlan, …) serialized into ``payload_json``. The stamp — ``report_id`` +
+    ``generated_at`` — is what makes staleness detectable: when research re-runs
+    and mints a new ``report_id``, a snapshot whose ``report_id`` no longer matches
+    the project's latest run is flagged stale (per Decision §9.1). ``parse`` rebuilds
+    the typed artifact.
+    """
+
+    project_id: str
+    report_id: str
+    stage: str = Field(description="Arc stage: 'design' | 'launch' | 'growth' | ….")
+    kind: str = Field(description="Artifact kind, e.g. 'positioning' | 'site' | 'content_plan'.")
+    generated_at: datetime
+    payload_json: str = Field(description="The pillar artifact, serialized as JSON.")
+
+    def parse(self, model: type[_M]) -> _M:
+        """Rebuild the typed artifact from ``payload_json``."""
+        return model.model_validate_json(self.payload_json)
+
+
+@runtime_checkable
+class ArtifactStore(Protocol):
+    """Tier-2 derived-artifact persistence, keyed ``(project_id, report_id, stage,
+    kind)``. One small protocol that lets every downstream stage persist without a
+    shared container type — pillars stay pure functions.
+
+    Persist-only-latest: ``get_latest`` returns the most recent artifact of a kind;
+    history is the file/git layer, not this API. The default backend is a
+    :class:`~metalworks.stores.FileStore` (markdown+json on disk); hosted backends
+    bind to the same protocol downstream.
+    """
+
+    def save_artifact(
+        self, project_id: str, report_id: str, stage: str, kind: str, obj: BaseModel
+    ) -> StoredArtifact:
+        """Persist ``obj`` as the latest artifact of ``kind`` (overwriting any prior
+        latest) and return the stored envelope."""
+        ...
+
+    def get_latest(self, project_id: str, kind: str) -> StoredArtifact | None: ...
+
+    def list_artifacts(self, project_id: str) -> list[StoredArtifact]: ...

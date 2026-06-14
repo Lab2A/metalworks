@@ -330,7 +330,7 @@ def test_query_performance_orders_queries() -> None:
     assert search.queries == ["high", "low"]
 
 
-# ── Standalone seam tests (WS3: filter_post / generate_reply are public) ─────
+# ── Standalone seam tests (WS3: filter_post / draft_reply are public) ─────
 
 
 def test_filter_post_standalone_building_block() -> None:
@@ -356,18 +356,18 @@ def test_filter_post_reports_errors_via_callback() -> None:
     assert errors and errors[0].startswith("filter-error:")
 
 
-def test_generate_reply_standalone_building_block() -> None:
-    from metalworks.discovery import ReplyGenerationV2, generate_reply
+def test_draft_reply_standalone_building_block() -> None:
+    from metalworks.discovery import ReplyGenerationV2, draft_reply
 
     chat = FakeChatModel()
     chat.script(ReplyGenerationV2, _reply())
-    reply = generate_reply(chat, _post(), Persona(), "expert", DiscoveryContext())
+    reply = draft_reply(chat, _post(), Persona(), "expert", DiscoveryContext())
     assert reply is not None
     assert reply.reply_text.strip()
 
 
-def test_generate_reply_retries_on_fast_chat_when_capable_returns_empty() -> None:
-    from metalworks.discovery import ReplyGenerationV2, generate_reply
+def test_draft_reply_retries_on_fast_chat_when_capable_returns_empty() -> None:
+    from metalworks.discovery import ReplyGenerationV2, draft_reply
 
     capable = FakeChatModel()
     capable.script(ReplyGenerationV2, _reply(text="   "))  # empty → triggers pro→flash retry
@@ -375,7 +375,7 @@ def test_generate_reply_retries_on_fast_chat_when_capable_returns_empty() -> Non
     fast.script(ReplyGenerationV2, _reply(text="recovered budget log aggregation reply text"))
 
     events: list[str] = []
-    reply = generate_reply(
+    reply = draft_reply(
         capable,
         _post(),
         Persona(),

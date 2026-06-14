@@ -109,14 +109,34 @@ def doctor() -> None:
 
 
 @app.command()
-def init() -> None:
-    """Scaffold a metalworks.toml and a .env.example in the current directory."""
-    cfg_path = config.default_config_path()
-    if cfg_path.exists():
-        console.print(f"[yellow]{cfg_path.name} already exists; leaving it untouched.[/yellow]")
+def init(
+    idea: Annotated[
+        str | None,
+        typer.Option("--idea", help="One line on what you're building (seeds the project slug)."),
+    ] = None,
+) -> None:
+    """Create a ``.metalworks/`` project in the current directory, like ``git init``.
+
+    Writes ``.metalworks/`` (a ``project.json`` manifest, a ``config.toml`` for
+    non-secret settings, and a gitignored ``corpus.db`` cache) plus a
+    ``.env.example``. Idempotent — an existing project is left untouched.
+    """
+    from metalworks.project import DIRNAME, Project
+
+    existed = (Path.cwd() / DIRNAME / "project.json").is_file()
+    project = Project.init(Path.cwd(), idea=idea)
+    if existed:
+        console.print(f"[yellow]{DIRNAME}/ already exists; leaving it untouched.[/yellow]")
     else:
-        config.save_config({"provider": "anthropic", "store": "~/.metalworks/store.db"})
-        console.print(f"[green]Wrote[/green] {cfg_path}")
+        console.print(f"[green]Created[/green] {DIRNAME}/ (project '{project.slug}')")
+
+    if project.config_path.exists():
+        console.print(
+            f"[yellow]{project.config_path.name} already exists; leaving it untouched.[/yellow]"
+        )
+    else:
+        config.save_config({"provider": "anthropic"}, path=project.config_path)
+        console.print(f"[green]Wrote[/green] {project.config_path}")
 
     env_path = Path.cwd() / ".env.example"
     if env_path.exists():
@@ -284,26 +304,35 @@ def research_plan(
 
 @research_app.command("run")
 def research_run(
-    brief: Annotated[Path, typer.Option("--brief", help="Path to a brief.json.")],
+    question: Annotated[
+        str | None,
+        typer.Option("--question", "-q", help="Research question; skips the brief.json step."),
+    ] = None,
+    brief: Annotated[
+        Path | None,
+        typer.Option("--brief", help="Path to a brief.json (alternative to --question)."),
+    ] = None,
+    subreddit: Annotated[
+        list[str] | None,
+        typer.Option("--subreddit", help="Subreddit to cover, repeatable; else auto."),
+    ] = None,
     months: Annotated[
-        int | None, typer.Option("--months", help="Override the time window.")
+        int | None, typer.Option("--months", help="Corpus time window in months (default 12).")
     ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
     ] = None,
 ) -> None:
-    """Run the research pipeline against a brief.json and print/save the report."""
+    """Run the research pipeline from a --question (no brief.json needed) or a --brief file."""
     from metalworks.contract import ResearchBrief
     from metalworks.research import run_research
     from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
+    from metalworks.research.planner import brief_from_question
 
-    if not brief.is_file():
-        err_console.print(f"[red]No such brief file: {brief}[/red]")
-        raise typer.Exit(code=1)
-    research_brief = ResearchBrief.model_validate_json(brief.read_text(encoding="utf-8"))
-    if months is not None:
-        research_brief = research_brief.model_copy(update={"time_window_months": months})
+    if (question is None) == (brief is None):
+        err_console.print("[red]Pass exactly one of --question or --brief.[/red]")
+        raise typer.Exit(code=2)
 
     chat = _resolve_chat_or_exit()
     embeddings = config.resolve_embeddings()
@@ -317,6 +346,20 @@ def research_run(
         search=config.resolve_search(),
         comments=ArcticShiftApiClient(),
     )
+
+    if brief is not None:
+        if not brief.is_file():
+            err_console.print(f"[red]No such brief file: {brief}[/red]")
+            raise typer.Exit(code=1)
+        research_brief = ResearchBrief.model_validate_json(brief.read_text(encoding="utf-8"))
+        if months is not None:
+            research_brief = research_brief.model_copy(update={"time_window_months": months})
+    else:
+        assert question is not None  # guaranteed by the exactly-one check above
+        research_brief = brief_from_question(
+            deps, question, subreddits=subreddit, time_window_months=months or 12
+        )
+
     console.print(f"[bold]Running research[/bold] for: {research_brief.question}")
     try:
         report = run_research(deps, brief=research_brief)
@@ -682,7 +725,7 @@ def discovery_run(
     """Search Reddit, draft replies, and gate each through the compliance check.
 
     Produces draft opportunities only. It never posts. Review the drafts, then
-    post a chosen one with `metalworks reddit post comment <url> --text ...`.
+    post a chosen one with `metalworks reddit post <url> --text ...`.
     """
     from metalworks.contract import DiscoveryContext
     from metalworks.discovery import DiscoveryDeps, run_discovery
@@ -710,7 +753,7 @@ def discovery_run(
         console.print(f"  [dim]draft:[/dim] {opp.draft_reply[:240]}")
     console.print(
         f"\n[dim]{len(opportunities)} draft(s). Nothing was posted. "
-        "Post a chosen one with: metalworks reddit post comment <url> --text ...[/dim]"
+        "Post a chosen one with: metalworks reddit post <url> --text ...[/dim]"
     )
 
 

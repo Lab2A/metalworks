@@ -368,7 +368,7 @@ def generate_reply(thread_url: str, *, voice: str | None = None) -> ToolResult:
     it passes — a ``confirm_token`` usable with ``reddit_post_comment``."""
     from metalworks import config
     from metalworks.contract import DiscoveryContext, Persona
-    from metalworks.discovery import generate_reply as draft_reply
+    from metalworks.discovery import draft_reply
     from metalworks.reddit import RedditSearch, heuristic_check
 
     chat = config.resolve_chat()

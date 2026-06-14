@@ -40,6 +40,7 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 from metalworks.contract import ResearchBrief, SlotPlan, SourceMapEntry
+from metalworks.research.embedding_cache import cached_embed
 from metalworks.research.synthesis import (
     audience as audience_mod,
 )
@@ -52,7 +53,7 @@ from metalworks.research.synthesis import (
     segments,
     verdict,
 )
-from metalworks.research.types import LoadedPost, SynthesisOutput
+from metalworks.research.types import LoadedComment, LoadedPost, SynthesisOutput
 
 if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
@@ -145,9 +146,13 @@ def synthesize(
             n_synthesized=0,
         )
 
-    # 2. Embed-group dedup.
-    def _embed(t: str) -> list[float] | None:
-        return deps.embeddings.embed([t], task="document")[0]
+    # 2. Embed-group dedup. Vectors come from the cache (reused across runs when a
+    # project corpus.db is present), keyed on comment_id; misses are embedded once
+    # and persisted.
+    vectors = cached_embed(deps, [(c.comment_id, c.body) for c in comments], task="document")
+
+    def _embed(c: LoadedComment) -> list[float] | None:
+        return vectors.get(c.comment_id)
 
     groups = embed_group.embed_group(comments, _embed)
     representatives = [comments[g[0]] for g in groups]  # one per near-dup group

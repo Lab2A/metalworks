@@ -1,8 +1,8 @@
 """Repo conformance suite — every backend must behave identically.
 
 Includes the two review-mandated cases:
-- >1000 rows behind one filter (the PostgREST silent-truncation killer; the
-  same parametrized test will run against the Supabase backend when it lands)
+- >1000 rows behind one filter (the PostgREST silent-truncation killer; a
+  downstream hosted/PostgREST backend reuses this same parametrized suite)
 - concurrent writes + reads on SQLite under a thread pool (the pipeline's
   actual access pattern)
 """

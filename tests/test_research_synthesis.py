@@ -154,8 +154,8 @@ def test_loader_maps_post_url_to_permalink() -> None:
 def test_embed_group_dedups_identical_bodies() -> None:
     embed = FakeEmbedding()
 
-    def _e(t: str) -> list[float] | None:
-        return embed.embed([t], task="document")[0]
+    def _e(c: LoadedComment) -> list[float] | None:
+        return embed.embed([c.body], task="document")[0]
 
     comments = [
         _loaded("c1", "same body"),
@@ -173,7 +173,7 @@ def test_embed_group_dedups_identical_bodies() -> None:
 
 
 def test_embed_group_failed_embed_is_singleton() -> None:
-    def _e(t: str) -> list[float] | None:
+    def _e(c: LoadedComment) -> list[float] | None:
         return None  # every embed fails
 
     comments = [_loaded("c1", "a"), _loaded("c2", "a")]

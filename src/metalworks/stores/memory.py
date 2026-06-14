@@ -17,10 +17,13 @@ from metalworks.contract import (
     ResearchBrief,
     RunSummary,
 )
+from metalworks.embeddings import IndexIdentity
+from metalworks.errors import EmbeddingModelMismatch
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
+from metalworks.stores.vectors import check_dims, cosine_topk
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 class MemoryStores:
@@ -36,6 +39,8 @@ class MemoryStores:
         self._accounts: dict[str, StoredRedditAccount] = {}
         self._opportunities: dict[str, Opportunity] = {}
         self._inbox: dict[str, InboxItem] = {}
+        self._embeddings: dict[str, list[float]] = {}
+        self._embedding_identity: IndexIdentity | None = None
 
     # ── BriefRepo ──
 
@@ -95,6 +100,36 @@ class MemoryStores:
     def get_comments_for_posts(self, post_ids: Sequence[str]) -> list[RedditComment]:
         wanted = set(post_ids)
         return [c.model_copy(deep=True) for c in self._comments.values() if c.post_id in wanted]
+
+    def upsert_embeddings(
+        self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
+    ) -> None:
+        check_dims(vectors, identity.dim)
+        if self._embedding_identity != identity:
+            self._embeddings.clear()  # model changed → rebuild the index
+            self._embedding_identity = identity
+        for corpus_id, vector in vectors.items():
+            self._embeddings[corpus_id] = list(vector)
+
+    def search_embeddings(
+        self, query: Sequence[float], *, k: int, identity: IndexIdentity
+    ) -> list[tuple[str, float]]:
+        if self._embedding_identity is None:
+            return []
+        if self._embedding_identity != identity:
+            raise EmbeddingModelMismatch(
+                index_model=f"{self._embedding_identity.embedding_model_id} "
+                f"(dim={self._embedding_identity.dim})",
+                current_model=f"{identity.embedding_model_id} (dim={identity.dim})",
+            )
+        return cosine_topk(query, self._embeddings, k)
+
+    def get_embeddings(
+        self, ids: Sequence[str], *, identity: IndexIdentity
+    ) -> dict[str, list[float]]:
+        if self._embedding_identity != identity:
+            return {}  # index built with a different model → all misses
+        return {cid: list(self._embeddings[cid]) for cid in ids if cid in self._embeddings}
 
     # ── AccountRepo ──
 

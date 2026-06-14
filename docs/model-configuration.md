@@ -23,7 +23,7 @@ Metalworks(model="google/gemini-3-pro")
 | --- | --- | --- |
 | `anthropic/<id>` | native Anthropic SDK | `ANTHROPIC_API_KEY` |
 | `openai/<id>` | native OpenAI SDK | `OPENAI_API_KEY` |
-| `google/<id>` (or `gemini/<id>`) | native Google SDK | `GOOGLE_API_KEY` / `GEMINI_API_KEY` |
+| `google/<id>` (or `gemini/<id>`) | native Google SDK | `GOOGLE_API_KEY` / `GEMINI_API_KEY`, or Vertex AI (below) |
 | `openrouter/<vendor/model>` | OpenRouter | `OPENROUTER_API_KEY` |
 | `openai-compatible/<id>` | your `OPENAI_BASE_URL` endpoint | `OPENAI_API_KEY` + `OPENAI_BASE_URL` |
 | `meta-llama/llama-3-70b` (any unknown vendor) | OpenRouter (the whole ref is the id) | `OPENROUTER_API_KEY` |
@@ -43,6 +43,23 @@ model = "claude-opus-4-6"
 ```
 
 Precedence: explicit `model=` ref > config file > first present key.
+
+## Google via Vertex AI
+
+The Google chat and embedding adapters can authenticate through Vertex AI
+(Application Default Credentials, e.g. a service account) instead of an API key.
+Set `GOOGLE_GENAI_USE_VERTEXAI=true` and provide a project and location:
+
+```bash
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export VERTEX_PROJECT_ID=...        # or GOOGLE_CLOUD_PROJECT
+export VERTEX_LOCATION=us-central1  # or GOOGLE_CLOUD_LOCATION (default us-central1)
+# credentials: GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json, or ambient gcloud ADC
+```
+
+With Vertex mode on, provider inference routes to Google even when no
+`GOOGLE_API_KEY` is set. The project is required (`VERTEX_PROJECT_ID` or
+`GOOGLE_CLOUD_PROJECT`); the location defaults to `us-central1`.
 
 ## Any OpenAI-compatible endpoint
 

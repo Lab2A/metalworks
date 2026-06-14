@@ -33,15 +33,19 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 def embed_group(
     comments: list[LoadedComment],
-    embed: Callable[[str], list[float] | None],
+    embed: Callable[[LoadedComment], list[float] | None],
     *,
     threshold: float = DEDUP_COSINE_THRESHOLD,
 ) -> list[list[int]]:
     """Return groups of indices into `comments`. Each comment is in exactly one
-    group. Empty `comments` → empty list."""
+    group. Empty `comments` → empty list.
+
+    `embed` receives the whole `LoadedComment` (not just its body) so the caller
+    can key a vector cache on `comment_id`. A comment whose embed returns None
+    becomes its own singleton."""
     if not comments:
         return []
-    vectors: list[list[float] | None] = [embed(c.body) for c in comments]
+    vectors: list[list[float] | None] = [embed(c) for c in comments]
     groups: list[list[int]] = []
     centroids: list[list[float]] = []
     for i, vec in enumerate(vectors):
