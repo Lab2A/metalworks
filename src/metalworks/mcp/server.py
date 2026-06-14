@@ -110,6 +110,26 @@ async def ux_skeleton_build(
     return tools.ux_skeleton_build(report_id, surface, store_path)
 
 
+async def site_render(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Build a grounded marketing site (+ index.html) for a stored report (chat + emb)."""
+    return tools.site_render(report_id, store_path)
+
+
+async def launch_assets_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Draft grounded, channel-native launch assets for a stored report (chat key)."""
+    return tools.launch_assets_build(report_id, store_path)
+
+
+async def channel_plan_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 1. Deterministic, human-executed launch channel plan for a stored report (zero-key)."""
+    return tools.channel_plan_build(report_id, store_path)
+
+
+async def content_plan_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 1. Project a stored report into a deterministic content/SEO plan (zero-key)."""
+    return tools.content_plan_from_report(report_id, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -172,6 +192,10 @@ _TOOL_WRAPPERS = (
     competitor_map_from_report,
     surface_recommend,
     ux_skeleton_build,
+    site_render,
+    launch_assets_build,
+    channel_plan_build,
+    content_plan_from_report,
     research_start,
     research_status,
     research_result,

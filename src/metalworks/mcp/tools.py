@@ -407,6 +407,60 @@ def ux_skeleton_build(report_id: str, surface: str, store_path: str | None = Non
 
 
 @guard
+def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Build a grounded marketing site for a stored
+    report and return the MarketingSite plus a self-contained index.html."""
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+    return {"site": site.model_dump(mode="json"), "html": render_site_html(site, report)}
+
+
+@guard
+def launch_assets_build(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Draft grounded, channel-native launch assets for a stored
+    report — one LLM call per surface. Returns [] on a no-go report. DRAFTING ONLY."""
+    from metalworks.research import build_launch_assets
+    from metalworks.research.synthesis import build_positioning_brief
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    assets = build_launch_assets(deps, report, build_positioning_brief(deps, report))
+    return {"launch_assets": [a.model_dump(mode="json") for a in assets]}
+
+
+@guard
+def channel_plan_build(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 1. Deterministic, human-executed launch channel plan for a stored report.
+    Every step requires_human + posting_gated; the library never posts. No LLM."""
+    from metalworks.research import plan_channels
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    return {"channel_plan": plan_channels(report).model_dump(mode="json")}
+
+
+@guard
+def content_plan_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 1. Project a stored report into a deterministic content/SEO plan —
+    pure, zero-key, synchronous (no LLM, no embeddings)."""
+    from metalworks.research import content_plan_from_report as _plan
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    return {"content_plan": _plan(report).model_dump(mode="json")}
+
+
+@guard
 def research_start(
     brief: dict[str, Any],
     *,

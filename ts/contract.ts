@@ -444,6 +444,112 @@ export interface DesignBrief {
   note?: string;
 }
 
+export interface SiteSection {
+  /** Section job on the page: hero/feature/objection/pricing/social_proof/cta. */
+  role: string;
+  /** Rendered section text (contains a verbatim fragment if claimed). */
+  copy: string;
+  /** Refs backing the section — one quote ref for verbatim, empty for connective. */
+  evidence_refs?: EvidenceRef[];
+  /** verbatim = exact-matched quote fragment; connective = claim-free glue. */
+  provenance: "verbatim" | "derived" | "connective";
+}
+
+export interface MarketingSite {
+  /** Stable id for this generated site. */
+  site_id: string;
+  /** The DemandReport this site was derived from. */
+  report_id: string;
+  /** Ordered sections; verbatim sections carry quote refs, connective ones none. */
+  sections?: SiteSection[];
+  /** True when synthesis was unavailable and the site is empty. */
+  partial?: boolean;
+  /** Why the site is partial / what to treat as unbuilt. */
+  caveat?: string | null;
+}
+
+export interface ClaimCitation {
+  /** The exact claim substring as it appears in the asset body. */
+  claim_text: string;
+  /** 0-based char offset of claim_text in body. */
+  span_start: number;
+  /** Exclusive char offset; body[span_start:span_end]==claim_text. */
+  span_end: number;
+  /** Ref to the supporting quote — resolves against the report's evidence by id. */
+  evidence_ref: EvidenceRef;
+}
+
+export interface LaunchAsset {
+  /** Channel id: 'product_hunt' | 'show_hn' | 'x_thread' | ... */
+  surface: string;
+  /** The headline / title / first-tweet hook for this surface. */
+  title: string;
+  /** The channel-native body copy. ClaimCitation spans index into it. */
+  body: string;
+  /** Alternate hooks/headlines a human can choose from. */
+  variants?: string[];
+  /** Grounded claims; each span indexes body and each ref resolves in the report. */
+  claim_citations?: ClaimCitation[];
+}
+
+export interface ChannelStep {
+  /** Channel id this step acts on. */
+  surface: string;
+  /** What the human does (e.g. 'Submit the Product Hunt draft'). */
+  action: string;
+  /** Relative schedule, e.g. 'T+0h', 'T+2h'. */
+  scheduled_offset: string;
+  /** Always true — a person executes this step, never the library. */
+  requires_human?: boolean;
+  /** Always true — posting is gated behind explicit human action. */
+  posting_gated?: boolean;
+}
+
+export interface ChannelPlan {
+  /** The DemandReport this plan was derived from. */
+  report_id: string;
+  /** One step per launch surface, in execution order. */
+  steps?: ChannelStep[];
+}
+
+export interface FaqItem {
+  /** The sub-question, copied verbatim from brief.must_address. */
+  question: string;
+  /** Always '' at plan time — the answer is authored later, never invented here. */
+  answer_hint?: string;
+}
+
+export interface ContentPage {
+  /** Normalized cluster claim (lowercased, collapsed whitespace). Not invented. */
+  target_phrase: string;
+  /** Deterministic heuristic: 'comparison' | 'guide' | 'answer'. */
+  page_kind: string;
+  /** 1-based InsightCluster.rank this page is projected from. */
+  source_cluster_rank: number;
+  /** FAQ items, built verbatim from brief.must_address (empty when no brief). */
+  faq?: FaqItem[];
+  /** Real counts: {'distinct_authors': ..., 'mentions': ...} from the cluster. */
+  stat_anchors?: Record<string, number>;
+  /** Deterministic markdown section headings for answer-first formatting. */
+  outline?: string[];
+}
+
+export interface CitationStrategy {
+  /** Example LLM prompts derived from target_phrases (for citability checks). */
+  prompt_set?: string[];
+  /** Deduped, disclosed quote permalinks to cite — real sources, not placeholders. */
+  reddit_targets?: string[];
+}
+
+export interface ContentPlan {
+  /** The DemandReport this plan was projected from. */
+  report_id: string;
+  /** One page per ranked InsightCluster, in rank order. */
+  pages?: ContentPage[];
+  /** LLM-citability play: prompt set + disclosed Reddit permalink targets. */
+  citation_strategy: CitationStrategy;
+}
+
 export interface ComplianceVerdict {
   /** True if the reply is OK to post. */
   pass: boolean;

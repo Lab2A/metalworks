@@ -20,6 +20,18 @@ from metalworks.contract.landscape import (
     GapClaim,
     StrengthClaim,
 )
+from metalworks.contract.launch import (
+    ChannelPlan,
+    ChannelStep,
+    ClaimCitation,
+    LaunchAsset,
+)
+from metalworks.contract.marketing import (
+    CitationStrategy,
+    ContentPage,
+    ContentPlan,
+    FaqItem,
+)
 from metalworks.contract.positioning import (
     PositioningBrief,
     PriceHypothesis,
@@ -61,6 +73,10 @@ from metalworks.contract.research import (
     TargetSubreddit,
     TriageThresholds,
     WebFinding,
+)
+from metalworks.contract.site import (
+    MarketingSite,
+    SiteSection,
 )
 from metalworks.contract.surface import (
     DesignBrief,
@@ -115,6 +131,19 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "SurfaceRecommendation",
     "TradeOff",
     "UxSkeleton",
+    # Site stage (Pillar E) — the grounded marketing site + its sections.
+    "MarketingSite",
+    "SiteSection",
+    # Launch stage (Pillar F) — channel-native cited assets + human-executed plan.
+    "ChannelPlan",
+    "ChannelStep",
+    "ClaimCitation",
+    "LaunchAsset",
+    # Content/SEO stage (Pillar G) — the deterministic content plan + citation strategy.
+    "CitationStrategy",
+    "ContentPage",
+    "ContentPlan",
+    "FaqItem",
     # Reddit + discovery — engagement surfaces and the compliance gate.
     "ComplianceVerdict",
     "DiscoveryContext",

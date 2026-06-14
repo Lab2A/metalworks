@@ -59,6 +59,41 @@ Pre-release foundations. Nothing here is stable yet.
   (`VERTEX_PROJECT_ID`/`GOOGLE_CLOUD_PROJECT` + `VERTEX_LOCATION`), not just an
   API key — `build_genai_client` in `metalworks._genai_client`; provider
   resolution routes to Google under Vertex even with no `GOOGLE_API_KEY`.
+- **Marketing site (Pillar E)**: `build_marketing_site(deps, report, positioning=None)
+  -> MarketingSite` + `render_site_html(site, report)` (`metalworks.research.site`).
+  Top 3 clusters by demand_score; one constrained LLM call assigns each a
+  SiteSection role and picks a VERBATIM fragment; the builder re-runs exact-match
+  against the cluster's real `QuoteCitation.text` and DROPS any section that
+  isn't a verbatim substring (no-quote-no-section). Connective copy ships
+  `provenance="connective"` with no refs and is gated claim-free. Hero = the
+  highest-distinct-author cluster. `render_site_html` emits one self-contained
+  `index.html` with a permalink footnote (+ `data-evidence`) per verbatim
+  section. New contract `metalworks.contract.site` (`MarketingSite` /
+  `SiteSection`). CLI `metalworks research site`, MCP Tier-2 `site_render`, skill
+  `generate-site`.
+- **Launch (Pillar F)**: `build_launch_assets(deps, report, positioning) ->
+  list[LaunchAsset]` + `plan_channels(report) -> ChannelPlan`
+  (`metalworks.research.launch`). Refuses (returns []) on a no-go report
+  (negative verdict or no cluster ≥2 distinct authors). One LLM call per surface
+  (Product Hunt / Show HN / X thread) → title + body + variants + claims; each
+  claim is grounded to a real quote and carries a `ClaimCitation` with char-offset
+  spans into the body (`body[span_start:span_end] == claim_text`) — unresolvable
+  claims are dropped. Bodies run through the compliance gate best-effort.
+  Drafting-only: `plan_channels` marks every `ChannelStep` `requires_human` +
+  `posting_gated`; the library never posts. New contract
+  `metalworks.contract.launch` (`LaunchAsset` / `ClaimCitation` / `ChannelPlan` /
+  `ChannelStep`). CLI `metalworks research launch`, MCP Tier-2 `launch_assets_build`
+  + Tier-1 `channel_plan_build`, skill `launch-kit`.
+- **Content/SEO (Pillar G)**: `content_plan_from_report(report) -> ContentPlan`
+  (`metalworks.research.marketing`) — PURE deterministic, zero-key, no LLM. One
+  `ContentPage` per cluster (normalized target_phrase, heuristic page_kind,
+  real-count `stat_anchors`, FAQ from `ResearchBrief.must_address` verbatim) plus
+  a `CitationStrategy` whose `reddit_targets` are real quote permalinks.
+  `render_content_markdown` + `render_faq_jsonld` (a mechanical FAQPage stub).
+  Makes no ranking promises; never invents a keyword or quote. New contract
+  `metalworks.contract.marketing` (`ContentPlan` / `ContentPage` / `FaqItem` /
+  `CitationStrategy`). CLI `metalworks research content-plan`, MCP **Tier-1**
+  (zero-key) `content_plan_from_report`, skill `content-plan`.
 - **Surface + UX (Pillar C, Design stage)**: `decide_surface(deps, report,
   positioning) -> SurfaceRecommendation` + `build_ux_skeleton(deps, report,
   positioning, surface) -> UxSkeleton` (`metalworks.research.surface`). A FIXED

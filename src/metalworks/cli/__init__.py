@@ -549,6 +549,126 @@ def research_surface(
     _print_surface(rec, skeleton)
 
 
+@research_app.command("site")
+def research_site(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the rendered index.html here.")
+    ] = None,
+    json_out: Annotated[
+        Path | None, typer.Option("--json", help="Write the MarketingSite JSON here.")
+    ] = None,
+) -> None:
+    """Build a grounded marketing site from a stored report (verbatim, cited copy)."""
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Building site[/bold] for report {report_id}...")
+    try:
+        site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+    finally:
+        reader.close()
+    if json_out is not None:
+        json_out.write_text(site.model_dump_json(indent=2), encoding="utf-8")
+    if out is not None:
+        out.write_text(render_site_html(site, report), encoding="utf-8")
+        console.print(f"[green]Wrote site[/green] {out}")
+    if site.partial:
+        console.print(f"  [yellow]partial:[/yellow] {site.caveat}")
+    for s in site.sections:
+        console.print(f"  [bold]{s.role}[/bold] [{s.provenance}]: {s.copy[:70]}")
+
+
+@research_app.command("launch")
+def research_launch(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the launch assets JSON here.")
+    ] = None,
+) -> None:
+    """Draft grounded, channel-native launch assets + a human-run channel plan (never posts)."""
+    from metalworks.research import build_launch_assets, plan_channels
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Drafting launch assets[/bold] for report {report_id}...")
+    try:
+        assets = build_launch_assets(deps, report, build_positioning_brief(deps, report))
+    finally:
+        reader.close()
+    plan = plan_channels(report)
+    if not assets:
+        console.print("[yellow]No-go:[/yellow] demand is too thin to draft launch assets.")
+    for a in assets:
+        console.print(f"\n[bold]{a.surface}[/bold]: {a.title}")
+        console.print(f"  {a.body[:200]}")
+        for c in a.claim_citations:
+            console.print(f"  [dim]cited:[/dim] {c.claim_text[:50]}")
+    console.print("\n[bold]Channel plan[/bold] (every step human-gated):")
+    for step in plan.steps:
+        console.print(f"  {step.scheduled_offset} {step.surface}: {step.action}")
+    if out is not None:
+        out.write_text(
+            json.dumps([a.model_dump(mode="json") for a in assets], indent=2), encoding="utf-8"
+        )
+        console.print(f"[green]Wrote launch assets[/green] {out}")
+
+
+@research_app.command("content-plan")
+def research_content_plan(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the content plan JSON here.")
+    ] = None,
+) -> None:
+    """Project a stored report into a deterministic content/SEO plan (no LLM, zero-key)."""
+    from metalworks.research import content_plan_from_report
+    from metalworks.research.marketing import render_content_markdown
+
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    plan = content_plan_from_report(report)
+    if out is not None:
+        out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote content plan[/green] {out}")
+    console.print(render_content_markdown(plan))
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
