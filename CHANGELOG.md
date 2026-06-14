@@ -94,6 +94,23 @@ Pre-release foundations. Nothing here is stable yet.
   `metalworks.contract.marketing` (`ContentPlan` / `ContentPage` / `FaqItem` /
   `CitationStrategy`). CLI `metalworks research content-plan`, MCP **Tier-1**
   (zero-key) `content_plan_from_report`, skill `content-plan`.
+- **Build (Pillar D)**: `build_spec_from_report(deps, report, positioning=None,
+  surface="web", *, stack="empty") -> BuildSpec` + `scaffold(spec, report, dest,
+  *, base) -> list[Path]` (`metalworks.build`). One LLM call maps demand clusters
+  to candidate features; grounding is DETERMINISTIC — each feature is attached to
+  its `source_cluster_rank`'s verbatim quotes and DROPPED if that cluster is
+  invalid or quote-less (no-cite-no-feature), so the model cannot smuggle in an
+  un-grounded feature. Personas derive from the report's audience segments;
+  pricing tiers copy through from the report's price evidence (never recomputed).
+  An infra error (404/auth) propagates rather than being relabelled a thin-demand
+  `partial`. `scaffold` writes a deterministic build harness for the user's OWN
+  coding agent — `CLAUDE.md` (cite-or-die Rule 0), `docs/SPEC.md`, a frozen
+  `docs/EVIDENCE.md` quote+permalink table, a build-pack of skills
+  (`scaffold-startup` / `spec-from-report` / `cite-or-die`), a `cite_or_die.py`
+  PostToolUse lint, and `.mcp.json` — but writes NO product code (`--base` is a
+  stack hint, not vendored boilerplate). New contract `metalworks.contract.build`
+  (`BuildSpec` / `FeatureSpec` / `BuildPersona` / `PricingTier`). CLI `metalworks
+  build init`, MCP **Tier-2** `build_spec`, skill `build-spec`.
 - **Surface + UX (Pillar C, Design stage)**: `decide_surface(deps, report,
   positioning) -> SurfaceRecommendation` + `build_ux_skeleton(deps, report,
   positioning, surface) -> UxSkeleton` (`metalworks.research.surface`). A FIXED
