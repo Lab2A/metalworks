@@ -1,8 +1,8 @@
 """Corpus vector memory — blob storage + brute-force cosine (offline).
 
-numpy is present in the dev/test env (the [research] extra), so the cosine
-search paths run here. The conformance suite separately guards search on numpy
-availability for the bare matrix.
+The cosine search paths need numpy (the [research] extra), so this whole module
+skips on the bare matrix; it runs in full on the all-extras env. The conformance
+suite separately guards search on numpy availability.
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("numpy")  # vector search needs the [research] extra (numpy)
 
 from metalworks.embeddings import IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch

@@ -151,9 +151,7 @@ class ArcticMirrorReader:
         url = os.environ.get("SUPABASE_URL")
         key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         if not url or not key:
-            raise RuntimeError(
-                "ArcticMirrorReader needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY"
-            )
+            raise RuntimeError("ArcticMirrorReader needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY")
         self._client = create_client(url, key)
         return self._client
 

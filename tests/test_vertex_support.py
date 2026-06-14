@@ -79,8 +79,15 @@ def _clear_google_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [("true", True), ("1", True), ("yes", True), ("ON", True), ("false", False),
-     ("0", False), ("", False)],
+    [
+        ("true", True),
+        ("1", True),
+        ("yes", True),
+        ("ON", True),
+        ("false", False),
+        ("0", False),
+        ("", False),
+    ],
 )
 def test_vertex_enabled_truthiness(
     monkeypatch: pytest.MonkeyPatch, value: str, expected: bool

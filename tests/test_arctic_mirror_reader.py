@@ -110,15 +110,39 @@ def mirror(tmp_path: Any) -> ArcticMirrorReader:
     _write_submissions(
         shard,
         [
-            {"id": "p1", "subreddit": "SkincareAddiction", "title": "azelaic acid",
-             "selftext": "fades PIE", "author": "a", "score": 10, "num_comments": 3,
-             "url": "u1", "created_utc": 200.0},
-            {"id": "p2", "subreddit": "SkincareAddiction", "title": "niacinamide",
-             "selftext": "barrier", "author": "b", "score": 5, "num_comments": 1,
-             "url": "u2", "created_utc": 300.0},
-            {"id": "x9", "subreddit": "OtherSub", "title": "noise",
-             "selftext": "", "author": "c", "score": 1, "num_comments": 0,
-             "url": "u3", "created_utc": 400.0},
+            {
+                "id": "p1",
+                "subreddit": "SkincareAddiction",
+                "title": "azelaic acid",
+                "selftext": "fades PIE",
+                "author": "a",
+                "score": 10,
+                "num_comments": 3,
+                "url": "u1",
+                "created_utc": 200.0,
+            },
+            {
+                "id": "p2",
+                "subreddit": "SkincareAddiction",
+                "title": "niacinamide",
+                "selftext": "barrier",
+                "author": "b",
+                "score": 5,
+                "num_comments": 1,
+                "url": "u2",
+                "created_utc": 300.0,
+            },
+            {
+                "id": "x9",
+                "subreddit": "OtherSub",
+                "title": "noise",
+                "selftext": "",
+                "author": "c",
+                "score": 1,
+                "num_comments": 0,
+                "url": "u3",
+                "created_utc": 400.0,
+            },
         ],
     )
     client = FakeSupabase(months=[{"year": 2026, "month": 2}], shard_path=shard)
@@ -194,9 +218,7 @@ def test_no_shards_raises() -> None:
 def test_sign_failure_raises_not_silent_subset() -> None:
     # A per-path sign failure (null signedURL + error) must raise, never inject
     # "None" into the SQL or silently query a subset.
-    client = FakeSupabase(
-        months=[{"year": 2026, "month": 2}], shard_path="x", sign_mode="error"
-    )
+    client = FakeSupabase(months=[{"year": 2026, "month": 2}], shard_path="x", sign_mode="error")
     with pytest.raises(RuntimeError, match="failed to sign"):
         list(
             ArcticMirrorReader(client=client).pull_subreddit(
@@ -239,8 +261,16 @@ def test_client_resolver_selects_mirror(monkeypatch: pytest.MonkeyPatch) -> None
     from metalworks.client import _Resolver
 
     resolver = _Resolver(
-        chat=None, fast_chat=None, embeddings=None, store=None, reader=None,
-        search=None, comments=None, model=None, fast_model=None, offline=False,
+        chat=None,
+        fast_chat=None,
+        embeddings=None,
+        store=None,
+        reader=None,
+        search=None,
+        comments=None,
+        model=None,
+        fast_model=None,
+        offline=False,
     )
     # Construct lazily; a bare ArcticMirrorReader needs no creds until a call.
     assert isinstance(resolver.reader(), ArcticMirrorReader)
