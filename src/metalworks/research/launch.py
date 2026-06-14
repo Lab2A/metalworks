@@ -119,9 +119,17 @@ class _AssetPhrasing(BaseModel):
 
 
 def _is_no_go(report: DemandReport) -> bool:
-    """True when the report says don't launch (negative verdict or thin evidence)."""
+    """True when the report says don't launch (negative verdict or thin evidence).
+
+    Only the DEMAND-strength segment of the verdict is judged — the leading part
+    before the first ``;``. The verdict appends market/price caveats (e.g.
+    ``"not enough price signal to recommend a price"``) whose wording collides
+    with the negative-demand phrases; a strong-demand report with thin PRICE
+    signal is still launch-worthy, so those caveats must not be read as no-go.
+    """
     verdict = (report.verdict or "").lower()
-    if verdict and any(signal in verdict for signal in _NEGATIVE_VERDICT):
+    demand_segment = verdict.split(";", 1)[0]
+    if demand_segment and any(signal in demand_segment for signal in _NEGATIVE_VERDICT):
         return True
     return not any(c.distinct_author_count >= _MIN_DISTINCT_AUTHORS for c in report.ranked_clusters)
 
