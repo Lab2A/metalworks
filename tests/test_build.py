@@ -474,5 +474,8 @@ def test_mcp_build_spec_rejects_unknown_surface() -> None:
     from metalworks.mcp import tools
 
     result = tools.build_spec("any-report", surface="extension")
-    assert result.get("error_code") == "invalid_argument"
-    assert "extension" in result["message"]
+    # Envelope must be nested under "error" like every other tool, so a host
+    # branching on `"error" in result` sees it as a failure, not a success.
+    assert "error" in result
+    assert result["error"]["error_code"] == "invalid_argument"
+    assert "extension" in result["error"]["message"]

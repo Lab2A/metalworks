@@ -480,10 +480,12 @@ def build_spec(
     valid = get_args(SurfaceKind)
     if surface not in valid:
         return {
-            "error_code": "invalid_argument",
-            "message": f"Unknown surface {surface!r}.",
-            "fix": f"Pass one of: {', '.join(valid)}.",
-            "docs_url": _DOCS_BASE,
+            "error": {
+                "error_code": "invalid_argument",
+                "message": f"Unknown surface {surface!r}.",
+                "fix": f"Pass one of: {', '.join(valid)}.",
+                "docs_url": _DOCS_BASE,
+            }
         }
     report = _report_or_not_found(report_id, store_path)
     if isinstance(report, dict):

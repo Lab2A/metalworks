@@ -127,3 +127,32 @@ def test_append_post_log_writes_a_json_line(tmp_path: Path) -> None:
     lines = log_path.read_text().splitlines()
     assert len(lines) == 2
     assert all("ts" in json.loads(line) for line in lines)
+
+
+def test_pillar_exports_are_importable_from_the_package() -> None:
+    # The keystone every downstream pillar needs, and the surface literal a typed
+    # caller must name, must both import from their stable package roots.
+    from metalworks.contract import SurfaceKind  # noqa: F401
+    from metalworks.research import build_positioning_brief  # noqa: F401
+
+
+def test_facade_runs_the_pillar_arc_offline(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The full arc threads ONE deps object through every pillar via the facade —
+    # no hand-built ResearchDeps, no reaching into private internals.
+    pytest.importorskip("duckdb")
+    pytest.importorskip("rank_bm25")
+    monkeypatch.chdir(tmp_path)
+    _clear_keys(monkeypatch)
+    from metalworks.cli._demo import DEMO_SUBREDDIT
+    from metalworks.contract import ChannelPlan, ContentPlan, PositioningBrief
+    from metalworks.research import ResearchDeps
+
+    mw = Metalworks.demo()
+    research = mw.research("Is there demand for a focus supplement?", subreddits=[DEMO_SUBREDDIT])
+
+    assert isinstance(mw.deps, ResearchDeps)  # public escape hatch
+    assert isinstance(mw.positioning(research), PositioningBrief)  # Pillar B via facade
+    assert isinstance(mw.content_plan(research), ContentPlan)  # Pillar G via facade
+    assert isinstance(mw.channel_plan(research), ChannelPlan)  # Pillar F (deterministic) via facade
