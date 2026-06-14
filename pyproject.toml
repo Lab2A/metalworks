@@ -9,7 +9,7 @@ description = "Open-source marketing research and Reddit engagement library — 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "Lab2A" }]
+authors = [{ name = "Lab2A", email = "hello@lab2a.dev" }]
 keywords = ["reddit", "marketing", "research", "demand", "mcp", "agents", "claude"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -30,8 +30,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Lab2A/metalworks"
+Homepage = "https://metalworks.lab2a.ai"
+Documentation = "https://metalworks.lab2a.ai/docs"
 Repository = "https://github.com/Lab2A/metalworks"
+Issues = "https://github.com/Lab2A/metalworks/issues"
 
 [project.scripts]
 metalworks = "metalworks.cli:app"
