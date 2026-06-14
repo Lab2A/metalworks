@@ -40,18 +40,16 @@ get a real report. See [Quickstart](/docs/quickstart).
 
 ## What you can do with it
 
-Run demand research once, then turn that one report into whatever you need next. Each is a
-single call:
+Run demand research once, then turn that one report into whatever you need next. The work
+falls into five stages — each step is a single call:
 
-| Capability | What you get |
+| Stage | What you get |
 | --- | --- |
-| [Demand research](/docs/demand-research) | A go/no-go verdict + the real needs people voiced, each backed by quotes |
-| [Positioning & competitors](/docs/positioning) | Your angle (who it's for, why it's different) + the rivals to beat |
-| [Design & marketing site](/docs/design) | What to build (surface + screens) + a marketing site with cited copy |
-| [Build spec](/docs/build-spec) | A build plan + a project scaffold your coding agent executes |
-| [Launch assets](/docs/launch) | Product Hunt / Show HN / X drafts, each line backed by a quote (never posts) |
-| [Content & SEO](/docs/content-seo) | A content plan that gets you cited by people and AI search |
-| [Reddit engagement](/docs/reddit-engagement) | Find threads to join + draft honest replies (you approve every post) |
+| **Research** | [Demand research](/docs/demand-research) — a go/no-go verdict + the real needs people voiced, each backed by quotes. Then [positioning & competitors](/docs/positioning) — your angle (who it's for, why it's different) and the rivals to beat. |
+| **Design** | [What to build and a marketing site](/docs/design) — the surface + screens to ship, plus a landing page whose every line is a real quote. |
+| **Build** | [A build spec](/docs/build-spec) — a feature plan mapped to real demand + a project scaffold your coding agent executes. |
+| **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
+| **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
 
 New here? Walk one idea from start to finish in the [end-to-end walkthrough](/docs/walkthrough).
 
@@ -66,10 +64,14 @@ output safe to act on. See [why you can trust the output](/docs/how-it-works).
 
 The same engine, whichever fits your workflow:
 
-- **Python library** — `from metalworks import Metalworks`. The full toolkit, embeddable.
-- **CLI** — `metalworks research run --question "..."`, then `metalworks build init`, etc.
-- **MCP server** — `metalworks mcp serve`. Drive it from any MCP-aware agent or app.
-- **Claude Code plugin** — `/demand-report`, `/build-spec`, and more as slash commands.
+- **Python library** — `from metalworks import Metalworks`. The full toolkit, embeddable. → [SDK reference](/docs/python-sdk)
+- **CLI** — `metalworks research run --question "..."`, then `metalworks build init`, etc. → [CLI](/docs/cli)
+- **MCP server** — `metalworks mcp serve`. Drive it from any MCP-aware agent or app. → [MCP tools](/docs/mcp-tools)
+- **Claude Code plugin** — `/demand-report`, `/build-spec`, and more as slash commands. → [Claude Code plugin](/docs/claude-code)
+
+The docs are split to match: **Documentation** (this section, the workflow end to end),
+**Claude Code & plugins** (the slash commands), and the **SDK reference** (the Python API and
+how to extend it).
 
 ## Install
 

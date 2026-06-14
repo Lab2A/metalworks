@@ -32,50 +32,78 @@
     { "source": "/docs/how-to-custom-store", "destination": "/docs/custom-store" }
   ],
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Get started",
-        "pages": ["docs/index", "docs/installation", "docs/quickstart"]
-      },
-      {
-        "group": "Build a startup",
-        "pages": ["docs/walkthrough"]
-      },
-      {
-        "group": "Capabilities",
-        "pages": [
-          "docs/demand-research",
-          "docs/positioning",
-          "docs/design",
-          "docs/build-spec",
-          "docs/launch",
-          "docs/content-seo",
-          "docs/reddit-engagement"
+        "tab": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["docs/index", "docs/installation", "docs/quickstart"]
+          },
+          {
+            "group": "Build a startup",
+            "pages": ["docs/walkthrough"]
+          },
+          {
+            "group": "Research",
+            "pages": ["docs/demand-research", "docs/positioning"]
+          },
+          {
+            "group": "Design",
+            "pages": ["docs/design"]
+          },
+          {
+            "group": "Build",
+            "pages": ["docs/build-spec"]
+          },
+          {
+            "group": "Launch",
+            "pages": ["docs/launch"]
+          },
+          {
+            "group": "Grow",
+            "pages": ["docs/content-seo", "docs/reddit-engagement"]
+          },
+          {
+            "group": "How it works",
+            "pages": ["docs/how-it-works", "docs/data-model"]
+          }
         ]
       },
       {
-        "group": "How it works",
-        "pages": ["docs/how-it-works", "docs/data-model"]
-      },
-      {
-        "group": "Reference",
-        "pages": [
-          "docs/python-sdk",
-          "docs/cli",
-          "docs/mcp-tools",
-          "docs/configuration",
-          "docs/ai-agents"
+        "tab": "Claude Code & plugins",
+        "icon": "plug",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["docs/claude-code"]
+          },
+          {
+            "group": "Reference",
+            "pages": ["docs/mcp-tools", "docs/ai-agents"]
+          }
         ]
       },
       {
-        "group": "Extending",
-        "pages": [
-          "docs/extending",
-          "docs/protocols",
-          "docs/custom-chatmodel",
-          "docs/custom-corpus",
-          "docs/custom-store",
-          "docs/build-your-own"
+        "tab": "SDK reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Python",
+            "pages": ["docs/python-sdk", "docs/cli", "docs/configuration"]
+          },
+          {
+            "group": "Extending",
+            "pages": [
+              "docs/protocols",
+              "docs/extending",
+              "docs/custom-chatmodel",
+              "docs/custom-corpus",
+              "docs/custom-store",
+              "docs/build-your-own"
+            ]
+          }
         ]
       }
     ]
