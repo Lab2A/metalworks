@@ -1,16 +1,17 @@
 ---
-title: "Build your own discovery loop"
+title: "Build your own loop"
 description: "Compose the building blocks into your own Reddit engagement product — your filter, your voice, your compliance rules, your storage."
 ---
 
-The discovery loop is one opinionated assembly. The point of metalworks is that
-you can build your own. Every step is a public function you can call, replace, or
-reorder.
+Build your own Reddit engagement loop. The discovery loop metalworks ships is one
+opinionated assembly — every step is a public function you can call, replace, or
+reorder, so you can wire your own filter, voice, compliance rules, and storage
+into your own product.
 
 <Note>
 This page is about composing the **Reddit engagement / discovery loop** yourself.
-For the **Build pillar** — turning a demand report into a build harness for your
-coding agent — see the [Build guide](/docs/guide-build).
+Turning a demand report into a build spec for your coding agent is a different
+capability — see [Build spec](/docs/build-spec).
 </Note>
 
 ## The loop, unbundled
@@ -54,7 +55,7 @@ and `mw.discovery.generate(...)`.
   extend it, or replace it with your own rules — then escalate to `llm_judge` only
   when you want a model's second opinion.
 - **Your own storage.** Persist `Opportunity` objects wherever you like via the
-  `OpportunityRepo` protocol (see [Bring your own store](/docs/how-to-custom-store)).
+  `OpportunityRepo` protocol (see [Bring your own store](/docs/custom-store)).
 - **Your own action.** metalworks never posts unless you call `RedditOAuth.post_comment`
   (or `mw.reddit.post`). Queue drafts for human review, post to Slack, write to a
   DB — the gate hands you a vetted draft and stops.
@@ -70,7 +71,7 @@ a memory system or a database:
   two LLM calls.
 
 Wire those to your store and you have the skeleton of a self-improving engagement
-product — the shovel, not the gold.
+product. metalworks gives you the building blocks; you compose them.
 
 ## Verify your custom pieces
 
@@ -79,5 +80,5 @@ from metalworks.testing import check_all_repos      # repos
 # ChatModel: assert isinstance(MyModel(), ChatModel)  — it's runtime_checkable
 ```
 
-See [Custom ChatModel](/docs/how-to-custom-chatmodel) and
-[Bring your own store](/docs/how-to-custom-store) for the conformance details.
+See [Custom ChatModel](/docs/custom-chatmodel) and
+[Bring your own store](/docs/custom-store) for the conformance details.

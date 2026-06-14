@@ -3,10 +3,11 @@ title: "Protocols"
 description: "The versioned ChatModel, SearchProvider, EmbeddingProvider, and storage-repo protocols metalworks owns."
 ---
 
-The protocols metalworks owns. They are versioned as a unit
-(`metalworks.PROTOCOLS_VERSION`); minor versions add keyword-only parameters
-with defaults, major versions break. Adapters declare which version they
-implement, and the conformance suites in `metalworks.testing` are the contract.
+These are the protocols you implement to bring your own model, search, embeddings,
+or storage. They are versioned as a unit (`metalworks.PROTOCOLS_VERSION`); minor
+versions add keyword-only parameters with defaults, major versions break. Your
+adapter declares which version it implements, and the conformance suites in
+`metalworks.testing` are the contract.
 
 ## ChatModel
 
@@ -87,7 +88,7 @@ class CorpusRepo(Protocol):
 `BriefRepo`, `RunRepo`, `AccountRepo`, `OpportunityRepo`, and `InboxRepo` follow
 the same shape. Backends shipped in core: `MemoryStores` and `SqliteStores`
 (WAL, serialized writer). Hosted backends (Postgres/PostgREST) are a custom
-store you implement downstream — see [how-to-custom-store](how-to-custom-store).
+store you implement downstream — see [Bring your own store](/docs/custom-store).
 Verify any backend with `metalworks.testing.check_all_repos`.
 
 ## Errors

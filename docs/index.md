@@ -1,104 +1,82 @@
 ---
 title: "metalworks"
-description: "Open-source, composable marketing research and Reddit engagement — a Python library, CLI, MCP server, and Claude Code plugin."
+description: "Go from a startup idea to launch, grounded in what people actually want. Validate demand, get positioning, a marketing site, a build plan, and launch copy — every claim backed by a real Reddit quote."
 ---
 
-metalworks turns real Reddit conversations into demand reports, and gives you the
-OAuth, search, and compliance primitives to act on them. It is MIT licensed and
-built to be **embedded**: every layer is a swappable protocol, so you can build
-your own product on top of it.
+**metalworks turns a startup idea into a launch plan, grounded in real demand.**
+
+Give it one sentence about what you want to build. It reads real Reddit conversations to
+tell you whether people actually want it, then turns that into the things you need to
+launch: your positioning, the competitors to beat, a marketing site, a build plan for your
+coding agent, and launch copy. **Every claim links back to a real comment you can click —
+nothing is invented.**
+
+It's a Python library you install (also a CLI, an MCP server, and a Claude Code plugin).
+
+## See it in 60 seconds
+
+No API key, no setup — run the bundled offline demo:
+
+```bash
+pip install "metalworks[research]"
+```
 
 ```python
 from metalworks import Metalworks
 
-# Zero keys, zero network — a real Research bundle from bundled data:
-research = Metalworks.demo().research("Is there demand for a focus supplement?",
-                                     subreddits=["Supplements"])
-report = research.demand   # .research() returns a Research bundle; the report is on .demand
+research = Metalworks.demo().research(
+    "an affordable, jitter-free focus supplement for developers",
+    subreddits=["Nootropics", "Supplements"],
+)
+report = research.demand           # .research() returns a report
+
+print(report.verdict)              # is there real demand? a one-line go / no-go
 for cluster in report.ranked_clusters:
-    print(cluster.signal, cluster.distinct_author_count, cluster.claim)
+    print(cluster.distinct_author_count, "people:", cluster.claim)
 ```
 
-<Note>
-Pre-release (0.0.1). The stable surface is the `Metalworks` facade,
-`metalworks.contract` models, and the MCP tool contracts — breaking changes to
-them go through a deprecation cycle. Everything else may change in any 0.x
-release. Some surfaces are marked "planned for 0.1" where not yet wired.
-</Note>
+Then add a provider key (Anthropic, OpenAI, or Google) and point it at your own idea to
+get a real report. See [Quickstart](/docs/quickstart).
 
-## Swap anything
+## What you can do with it
 
-metalworks is a **kit**, not a black box. Each capability is a small protocol with
-a default implementation you can replace:
+Run demand research once, then turn that one report into whatever you need next. Each is a
+single call:
 
-| Layer | Protocol | Ships with | Swap for |
-| --- | --- | --- | --- |
-| Chat model | `ChatModel` | Anthropic, OpenAI, Google, **any OpenAI-compatible endpoint** | OpenRouter, vLLM, LM Studio, your own |
-| Embeddings | `EmbeddingProvider` | Google, OpenAI | any vector model |
-| Web search | `SearchProvider` | Exa, Tavily | any search API |
-| Reddit data | `CorpusReader` / `CommentSource` | Arctic Shift (HF + live API) | your own parquet, DB, or corpus |
-| Storage | typed repos | in-memory, SQLite | Supabase, Postgres, anything |
+| Capability | What you get |
+| --- | --- |
+| [Demand research](/docs/demand-research) | A go/no-go verdict + the real needs people voiced, each backed by quotes |
+| [Positioning & competitors](/docs/positioning) | Your angle (who it's for, why it's different) + the rivals to beat |
+| [Design & marketing site](/docs/design) | What to build (surface + screens) + a marketing site with cited copy |
+| [Build spec](/docs/build-spec) | A build plan + a project scaffold your coding agent executes |
+| [Launch assets](/docs/launch) | Product Hunt / Show HN / X drafts, each line backed by a quote (never posts) |
+| [Content & SEO](/docs/content-seo) | A content plan that gets you cited by people and AI search |
+| [Reddit engagement](/docs/reddit-engagement) | Find threads to join + draft honest replies (you approve every post) |
 
-No Arctic Shift? Bring your own `CorpusReader`. Don't want the research vertical?
-Use just the Reddit client and the compliance gate. The point is to **sell the
-shovel**: assemble exactly the product you want.
+New here? Walk one idea from start to finish in the [end-to-end walkthrough](/docs/walkthrough).
 
-## What you can do
+## Why it's not just another AI tool
 
-- **Demand reports** — a research brief becomes a clustered report whose quotes
-  are exact-matched to real Reddit comments and whose web findings carry source
-  URLs from grounding metadata, never model prose.
-- **Reddit engagement** — search, subreddit intel, inbox, rate-limited OAuth and
-  posting, and a deterministic compliance gate.
-- **Discovery + reply generation** — find threads worth engaging and draft replies
-  in your own voice, with the filter, generation, and compliance steps each a
-  standalone building block.
-- **Seven pillars on a report** — turn a finished demand report into a grounded
-  positioning wedge, competitive landscape, surface + UX recommendation,
-  marketing site, a cite-or-die build harness for your coding agent, launch kit,
-  or content/SEO plan. Every claim traces back to a real Reddit quote by
-  permalink; the library never invents one. See [the arc](/docs/the-arc) for the
-  full idea-to-company chain.
-- **Four form factors** — a Python library, a CLI, an MCP server, and a Claude
-  Code plugin that share one typed contract. Non-Python? Drive it from the MCP
-  server or the CLI.
+Most "AI market research" makes up plausible-sounding answers. metalworks doesn't. It reads
+real Reddit threads, and **anything it can't back with an actual quote, it drops.** When the
+demand isn't there, it tells you — instead of inventing an opportunity. That's what makes the
+output safe to act on. See [why you can trust the output](/docs/how-it-works).
 
-## Common patterns
+## Four ways to use it
 
-<CardGroup cols={2}>
-  <Card title="A demand report" href="/docs/guide-demand-research">
-    `Metalworks().research("...", subreddits=[...])` → a clustered demand report (on `.demand`).
-  </Card>
-  <Card title="Find threads" href="/docs/guide-reddit-engagement">
-    `mw.reddit.search("...")` and `mw.reddit.subreddit("...")` for live intel.
-  </Card>
-  <Card title="Draft + gate a reply" href="/docs/build-your-own">
-    `mw.discovery.generate(post, persona=...)` then the compliance gate.
-  </Card>
-  <Card title="Build your own product" href="/docs/build-your-own">
-    Compose the building blocks into your own discovery product.
-  </Card>
-</CardGroup>
+The same engine, whichever fits your workflow:
 
-## Where to start
+- **Python library** — `from metalworks import Metalworks`. The full toolkit, embeddable.
+- **CLI** — `metalworks research run --question "..."`, then `metalworks build init`, etc.
+- **MCP server** — `metalworks mcp serve`. Drive it from any MCP-aware agent or app.
+- **Claude Code plugin** — `/demand-report`, `/build-spec`, and more as slash commands.
 
-<CardGroup cols={2}>
-  <Card title="Quickstart" href="/docs/quickstart">
-    The 4-line offline demo, then a real report with a provider key.
-  </Card>
-  <Card title="Core concepts" href="/docs/concepts">
-    The object model: briefs, reports, clusters, posts, opportunities.
-  </Card>
-  <Card title="Building blocks" href="/docs/building-blocks">
-    The swappable protocols and composable functions that make up the kit.
-  </Card>
-  <Card title="Model configuration" href="/docs/model-configuration">
-    Provider/model refs, fast vs main, and any OpenAI-compatible endpoint.
-  </Card>
-</CardGroup>
+## Install
 
-## Usage policy
+```bash
+pip install "metalworks[research]"     # the demand-research pipeline
+```
 
-For authentic, disclosed engagement only. No fake personas, no invented account
-backstories, no vote manipulation, no coordinated inauthentic behavior. See the
-[usage policy](https://github.com/Lab2A/metalworks/blob/main/USAGE_POLICY.md).
+Need only the data tools, or want to keep it lean? See [Installation](/docs/installation)
+for the full options. metalworks is open source (MIT) on
+[GitHub](https://github.com/Lab2A/metalworks).

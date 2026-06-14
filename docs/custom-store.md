@@ -3,9 +3,11 @@ title: "Bring your own store"
 description: "Storage is a protocol. In-memory and SQLite ship; back the typed repos with anything you like."
 ---
 
-metalworks does not prescribe a database. Storage is a set of typed repository
-protocols (`CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`, `OpportunityRepo`,
-`InboxRepo`). One backend object implements as many as it supports.
+Back the typed repos with any database in three steps: implement the repo methods
+you need, run the conformance check, and pass it as `store`. metalworks does not
+prescribe a database — storage is a set of typed repository protocols
+(`CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`, `OpportunityRepo`,
+`InboxRepo`), and one backend object implements as many as it supports.
 
 Two backends ship in core, with zero infrastructure:
 

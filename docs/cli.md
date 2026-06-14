@@ -26,8 +26,8 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 
 ## research
 
-Plan and run demand-research reports, then derive the report-grounded pillars. The
-pillar commands (`position`, `competitor-map`, `surface`, `site`, `launch`,
+Plan and run demand-research reports, then derive everything else from them. The
+report-grounded commands (`position`, `competitor-map`, `surface`, `site`, `launch`,
 `content-plan`) all take a **report id** from a prior `research run` (or
 `research list`).
 
@@ -35,8 +35,8 @@ pillar commands (`position`, `competitor-map`, `surface`, `site`, `launch`,
 | --- | --- | --- |
 | `metalworks research plan PROMPT` | Walk the D1-D8 planner over a prompt and write a `brief.json` (recommended option auto-selected, non-interactive). | chat key |
 | `metalworks research run` | Run the research pipeline from a `--question` (no brief needed) or a `--brief` file. Stores the report. | chat key |
-| `metalworks research list` | List stored research runs — the report ids the pillar commands take. | zero-key |
-| `metalworks research position REPORT_ID` | Derive a grounded positioning wedge from a stored report (one LLM call). | chat key |
+| `metalworks research list` | List stored research runs — the report ids the report-grounded commands take. | zero-key |
+| `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
 | `metalworks research competitor-map REPORT_ID` | Map the competitive landscape for a stored report — grounded names, cited gaps. | chat key |
 | `metalworks research surface REPORT_ID` | Recommend a product surface + UX skeleton for a stored report (grounded). | chat key |
 | `metalworks research site REPORT_ID` | Build a grounded marketing site (verbatim, cited copy) from a stored report. | chat key |
@@ -54,11 +54,11 @@ Options:
 ## build
 
 Scaffold an evidence-grounded build harness from a report (see the
-[Build guide](/docs/guide-build)).
+[Build spec](/docs/build-spec)).
 
 | Command | Description | Keys |
 | --- | --- | --- |
-| `metalworks build init REPORT` | Derive a grounded `BuildSpec` and scaffold a cite-or-die build harness (no product code). | chat key |
+| `metalworks build init REPORT` | Turn a stored report into a build plan and scaffold a project for your coding agent (no product code). | chat key |
 
 `REPORT` is a stored report id (from `research list`) **or** a path to a
 `report.json`. Options:
@@ -122,7 +122,7 @@ the environment.
 
 ## mcp
 
-Run the metalworks MCP server (see the [MCP tools reference](/docs/reference-mcp)).
+Run the metalworks MCP server (see the [MCP tools reference](/docs/mcp-tools)).
 
 | Command | Description |
 | --- | --- |

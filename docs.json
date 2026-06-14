@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "metalworks",
-  "description": "Open-source marketing research and Reddit engagement: demand reports from real conversations, as a library, CLI, MCP server, and Claude Code plugin.",
+  "description": "Go from a startup idea to launch, grounded in real demand. Run Reddit demand research, then get positioning, a marketing site, a build spec, and launch copy — every claim backed by a real quote. A Python library, CLI, MCP server, and Claude Code plugin.",
   "colors": {
     "primary": "#111111",
     "light": "#f5f5f5",
@@ -10,55 +10,73 @@
   },
   "favicon": "/favicon.svg",
   "redirects": [
-    {
-      "source": "/",
-      "destination": "/docs"
-    }
+    { "source": "/", "destination": "/docs" },
+    { "source": "/docs/the-arc", "destination": "/docs/walkthrough" },
+    { "source": "/docs/guide-demand-research", "destination": "/docs/demand-research" },
+    { "source": "/docs/guide-positioning-landscape", "destination": "/docs/positioning" },
+    { "source": "/docs/guide-design", "destination": "/docs/design" },
+    { "source": "/docs/guide-build", "destination": "/docs/build-spec" },
+    { "source": "/docs/guide-launch-growth", "destination": "/docs/launch" },
+    { "source": "/docs/guide-reddit-engagement", "destination": "/docs/reddit-engagement" },
+    { "source": "/docs/explanation-provenance", "destination": "/docs/how-it-works" },
+    { "source": "/docs/concepts", "destination": "/docs/data-model" },
+    { "source": "/docs/reference-client", "destination": "/docs/python-sdk" },
+    { "source": "/docs/for-coding-agents", "destination": "/docs/ai-agents" },
+    { "source": "/docs/building-blocks", "destination": "/docs/extending" },
+    { "source": "/docs/reference-cli", "destination": "/docs/cli" },
+    { "source": "/docs/reference-mcp", "destination": "/docs/mcp-tools" },
+    { "source": "/docs/reference-protocols", "destination": "/docs/protocols" },
+    { "source": "/docs/model-configuration", "destination": "/docs/configuration" },
+    { "source": "/docs/how-to-custom-chatmodel", "destination": "/docs/custom-chatmodel" },
+    { "source": "/docs/how-to-custom-corpus", "destination": "/docs/custom-corpus" },
+    { "source": "/docs/how-to-custom-store", "destination": "/docs/custom-store" }
   ],
   "navigation": {
     "groups": [
       {
         "group": "Get started",
-        "pages": ["docs/index", "docs/quickstart", "docs/concepts"]
+        "pages": ["docs/index", "docs/installation", "docs/quickstart"]
       },
       {
-        "group": "The full arc",
-        "pages": ["docs/the-arc"]
+        "group": "Build a startup",
+        "pages": ["docs/walkthrough"]
       },
       {
-        "group": "Guides",
+        "group": "Capabilities",
         "pages": [
-          "docs/guide-demand-research",
-          "docs/guide-positioning-landscape",
-          "docs/guide-design",
-          "docs/guide-build",
-          "docs/guide-launch-growth",
-          "docs/guide-reddit-engagement",
-          "docs/build-your-own"
+          "docs/demand-research",
+          "docs/positioning",
+          "docs/design",
+          "docs/build-spec",
+          "docs/launch",
+          "docs/content-seo",
+          "docs/reddit-engagement"
         ]
       },
       {
-        "group": "How-to guides",
-        "pages": [
-          "docs/model-configuration",
-          "docs/how-to-custom-chatmodel",
-          "docs/how-to-custom-corpus",
-          "docs/how-to-custom-store"
-        ]
+        "group": "How it works",
+        "pages": ["docs/how-it-works", "docs/data-model"]
       },
       {
         "group": "Reference",
         "pages": [
-          "docs/building-blocks",
-          "docs/reference-client",
-          "docs/reference-cli",
-          "docs/reference-mcp",
-          "docs/reference-protocols"
+          "docs/python-sdk",
+          "docs/cli",
+          "docs/mcp-tools",
+          "docs/configuration",
+          "docs/ai-agents"
         ]
       },
       {
-        "group": "Explanation",
-        "pages": ["docs/explanation-provenance", "docs/for-coding-agents"]
+        "group": "Extending",
+        "pages": [
+          "docs/extending",
+          "docs/protocols",
+          "docs/custom-chatmodel",
+          "docs/custom-corpus",
+          "docs/custom-store",
+          "docs/build-your-own"
+        ]
       }
     ]
   },

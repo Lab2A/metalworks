@@ -1,102 +1,87 @@
 ---
 title: "Quickstart"
-description: "Run the zero-key offline demo, then a real report with a provider key, then the same thing from the CLI or MCP server."
+description: "Run the offline demo with zero keys, then point metalworks at your own idea with one provider key. Five minutes from install to a real demand report."
 ---
 
-## Install
+## 1. Install + run the offline demo
 
 ```bash
-pip install metalworks
-```
-
-Core stays lean (pydantic, httpx, typer, rich). Everything that pulls a provider
-SDK or duckdb lives behind an extra, so you install only what you use.
-
-## 1. The offline demo (no keys, no network)
-
-```bash
-pip install "metalworks[research]"    # duckdb + triage (bundled local corpus)
+pip install "metalworks[research]"
 ```
 
 ```python
 from metalworks import Metalworks
 
 research = Metalworks.demo().research(
-    "Is there demand for a focus supplement?",
-    subreddits=["Supplements"],
+    "an affordable, jitter-free focus supplement for developers",
+    subreddits=["Nootropics", "Supplements"],
 )
-report = research.demand   # .research() returns a Research bundle; the report is on .demand
-print(report.verdict)      # the synthesized go / no-go summary (or None)
+report = research.demand           # .research() returns a report
+
+print(report.verdict)              # the go / no-go summary
 for cluster in report.ranked_clusters:
-    print(cluster.signal, cluster.distinct_author_count, cluster.claim)
+    print(cluster.distinct_author_count, "people:", cluster.claim)
 ```
 
-`Metalworks.demo()` wires fake models and a small bundled Reddit corpus, so the
-whole pipeline runs in seconds with **zero API keys and zero network**. It shows
-you the output shape before you plug in a provider.
+`Metalworks.demo()` wires fake models and a small bundled Reddit corpus, so the whole
+pipeline runs in seconds with **zero API keys and zero network**. It's just to show you the
+output shape. (Same thing on the CLI: `metalworks quickstart`.)
 
-## 2. A real report
+## 2. A real report on your own idea
 
-Set one provider key — metalworks infers the provider from whichever key is
-present:
+Set one provider key — metalworks picks the provider from whichever key is present:
 
 ```bash
-pip install "metalworks[google,research]"
-export GOOGLE_API_KEY=...      # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY / GOOGLE_API_KEY
 ```
 
 ```python
 from metalworks import Metalworks
 
-mw = Metalworks()                       # provider inferred from the env key
-report = mw.research(
-    "Is there demand for a focus supplement aimed at developers?",
-    subreddits=["Nootropics", "Supplements"],
+mw = Metalworks()                  # provider inferred from the env key
+research = mw.research(
+    "an affordable, jitter-free focus supplement for developers",
+    subreddits=["Nootropics", "Supplements"],   # omit to let it pick
 )
+report = research.demand
+
 for cluster in report.ranked_clusters:
-    print(cluster.claim, "—", cluster.distinct_author_count, "distinct authors")
-    for quote in cluster.quotes:
+    print(cluster.claim, "—", cluster.distinct_author_count, "people")
+    for quote in cluster.quotes:                # the real comments behind it
         print("  ", quote.permalink, "→", quote.text[:80])
 ```
 
-Submissions come from the Hugging Face Arctic mirror; comments come from the live
-Arctic Shift API. Set `HF_TOKEN` for windows longer than a few months. See
-[Use your own corpus](/docs/how-to-custom-corpus) to run without Arctic Shift.
+That report is the input to everything else — positioning, a marketing site, a build spec,
+launch copy. See the [end-to-end walkthrough](/docs/walkthrough).
 
-## 3. The same thing, language-agnostic
+## 3. Or use the CLI / MCP / plugin
 
-Not in Python? Every surface is also a CLI command and an MCP tool.
-
-**CLI:**
+The same engine, language-agnostic:
 
 ```bash
-metalworks quickstart                       # the offline demo
-metalworks reddit search "focus supplement" --subreddit Supplements
-metalworks research run brief.json
+# CLI
+metalworks research run --question "an affordable focus supplement for developers"
+metalworks research list                     # the report id every other command takes
+metalworks build init <report-id> --dest ./my-startup
+
+# MCP server (Claude Code, Cursor, any MCP host)
+metalworks mcp serve                         # stdio; zero-key tools need no keys
 ```
 
-**MCP server** (for Claude Code, Cursor, or any MCP host):
-
-```bash
-metalworks mcp serve                        # stdio; zero-key tools need no keys
-```
-
-Or install the Claude Code plugin and just ask:
+Or install the Claude Code plugin and ask in chat:
 
 ```
 /plugin marketplace add Lab2A/metalworks
 /plugin install metalworks@lab2a
 ```
 
-Then `/demand-report <your idea>`. The data tools run with no API key; the
-pipeline tools use whatever provider key is in your environment. Requires
-[uv](https://docs.astral.sh/uv/) on your PATH.
+Then `/demand-report <your idea>`. Requires [uv](https://docs.astral.sh/uv/) on your PATH.
 
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="Core concepts" href="/docs/concepts" />
-  <Card title="Building blocks" href="/docs/building-blocks" />
-  <Card title="Demand Research guide" href="/docs/guide-demand-research" />
-  <Card title="Model configuration" href="/docs/model-configuration" />
+  <Card title="Build a startup, end to end" href="/docs/walkthrough" />
+  <Card title="Demand research" href="/docs/demand-research" />
+  <Card title="Why you can trust the output" href="/docs/how-it-works" />
+  <Card title="Configuration" href="/docs/configuration" />
 </CardGroup>
