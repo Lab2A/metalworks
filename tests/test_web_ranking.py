@@ -82,6 +82,48 @@ def test_commentless_web_source_produces_clusters() -> None:
         assert q.source_url.startswith("https://")  # the page link is the provenance
         assert q.author_hash == ""  # authorless
 
+    # 4b: an authorless web cluster ranks on DOMAIN breadth, not author count.
+    assert cluster.breadth_unit == "domains"
+    assert cluster.breadth_count >= 2  # distinct domains among its members
+    assert cluster.distinct_author_count == 0  # honestly zero authors
+    assert cluster.demand_score > 0  # breadth keeps it off the floor
+
     # The web records persisted to the durable corpus (auto-ingest), comment-less.
     persisted = corpus.get_records([rid for rid, _, _ in _WEB])
     assert persisted and all(r.source == "web" for r in persisted)
+
+
+def _unit(*, author_hash: str = "", source_url: str = "", body: str = "x") -> object:
+    from metalworks.research.types import LoadedComment
+
+    return LoadedComment(
+        comment_id=f"{author_hash}{source_url}{body}",
+        post_id="p",
+        subreddit="",
+        body=body,
+        author_hash=author_hash,
+        source_url=source_url,
+    )
+
+
+def test_cluster_breadth_authored_web_and_mixed() -> None:
+    from metalworks.research.synthesis.cluster_ranker import cluster_breadth
+
+    # Authored only (Reddit): breadth == distinct authors, unit "authors".
+    authored = [_unit(author_hash="a1"), _unit(author_hash="a2"), _unit(author_hash="a1")]
+    assert cluster_breadth(authored) == (2, 2, "authors")
+
+    # Authorless web: breadth == distinct domains, unit "domains", 0 authors.
+    web = [
+        _unit(source_url="https://blog.acme.com/x"),
+        _unit(source_url="https://www.acme.com/y"),  # www. stripped → same domain as none above
+        _unit(source_url="https://news.example.org/z"),
+    ]
+    breadth, authors, unit = cluster_breadth(web)
+    assert authors == 0
+    assert unit == "domains"
+    assert breadth == 3  # blog.acme.com, acme.com, news.example.org
+
+    # Mixed: authors + domains, unit "voices".
+    mixed = [_unit(author_hash="a1"), _unit(source_url="https://acme.com/x")]
+    assert cluster_breadth(mixed) == (2, 1, "voices")
