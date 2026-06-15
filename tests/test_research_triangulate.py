@@ -11,8 +11,8 @@ import pytest
 from metalworks.contract import (
     CrossReference,
     InsightCluster,
-    QuoteCitation,
     ResearchBrief,
+    ResolvedCitation,
     SignalStrength,
     TargetSubreddit,
     WebFinding,
@@ -80,7 +80,9 @@ def _cluster(rank: int, signal: SignalStrength = SignalStrength.HIGH) -> Insight
         mention_count=20,
         signal=signal,
         quotes=[
-            QuoteCitation(text="t", permalink="p", subreddit="r/x", author_hash="a", upvotes=1)
+            ResolvedCitation(
+                text="t", source_url="p", source_name="r/x", author_hash="a", engagement=1
+            )
         ],
     )
 

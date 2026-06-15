@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from metalworks.contract import InsightCluster, QuoteCitation, SignalStrength
+from metalworks.contract import InsightCluster, ResolvedCitation, SignalStrength
 from metalworks.research.types import LoadedComment
 
 if TYPE_CHECKING:
@@ -173,25 +173,28 @@ def _build_cluster(
     quote_members = [comments[groups[g][0]] for g in quote_groups]
 
     member_bodies = [m.body for m in members]
-    quotes: list[QuoteCitation] = []
+    quotes: list[ResolvedCitation] = []
     for m in quote_members:
         if not _verify_quote(m.body, member_bodies):
             continue
-        # Read the source-neutral display fields; still populate the existing
-        # Reddit-named QuoteCitation columns (schema unchanged, additive). For
-        # the Reddit path source_label is "r/<sub>" and source_url is the
-        # permalink, so the serialized citation is byte-identical to before.
+        # Materialize the source-neutral, portable ResolvedCitation directly
+        # from the LoadedComment we already hold (no corpus round-trip — the
+        # comment is loaded during synthesis). For the Reddit path source_label
+        # is "r/<sub>" and source_url is the permalink, so the serialized
+        # citation carries the same text + url as before under generic names.
         label = m.source_label or (
             m.subreddit if m.subreddit.startswith("r/") else f"r/{m.subreddit}"
         )
         link = m.source_url or m.permalink or m.post_url
         quotes.append(
-            QuoteCitation(
+            ResolvedCitation(
+                record_id=m.comment_id,
+                source=m.source,
+                source_name=label,
+                source_url=link,
                 text=m.body,
-                permalink=link,
-                subreddit=label,
                 author_hash=m.author_hash,
-                upvotes=m.engagement or m.upvotes,
+                engagement=m.engagement or m.upvotes,
             )
         )
         if len(quotes) >= MAX_QUOTES_PER_CLUSTER:

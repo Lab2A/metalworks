@@ -16,7 +16,10 @@ Structural-provenance contract:
   references; the service verifies quotes (exact-match), validates indices
   (list-id-prefixed at the LLM boundary, see metalworks.research.triangulate),
   and assembles THIS.
-- Quote text is exact-matched to a stored Reddit comment — no fabrication.
+- Quote text is exact-matched to a stored source comment — no fabrication.
+  Citations are the source-neutral `ResolvedCitation` (materialized inline so a
+  report stays self-contained over git + MCP); `CitationRef` is the thin
+  live-view pointer used where the corpus is present.
 - Web findings carry URL + title + published_at from the grounding tool's
   citation metadata, not from the LLM's prose.
 - Cross-references are indices-to-indices, never free text.
@@ -39,7 +42,7 @@ import hashlib
 import math
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -97,28 +100,88 @@ class SignalStrength(StrEnum):
 # ──────────────────────────────────────────────────────────────────────────
 
 
-class QuoteCitation(BaseModel):
-    """One verified, real Reddit quote backing a cluster.
+class CitationRef(BaseModel):
+    """The thin, live-view citation form: a pointer into the loaded corpus.
 
-    `text` MUST exact-match the stored source comment (the quote-verification
-    gate) — the service rejects any quote that doesn't, so a QuoteCitation
-    that reaches this contract is guaranteed real.
+    Used INTERNALLY during synthesis (and a future refresh path) where the
+    corpus is present, so a citation can resolve verbatim text/url on demand
+    instead of carrying them inline. Never the persisted/serialized shape — a
+    `DemandReport` that leaves the process (committed to git, sent over MCP)
+    always carries the materialized `ResolvedCitation` instead, because a
+    detached report has no corpus to resolve against.
     """
 
+    evidence_id: str = Field(
+        description="Content-addressed citation id (``q:<hash>``); matches the resolved form's id."
+    )
+    record_id: str = Field(
+        description="Corpus-wide id of the backing record/comment (resolve against the corpus)."
+    )
+    kind: Literal["quote"] = Field(
+        default="quote", description="Evidence family — quote for a cluster citation."
+    )
+
+
+class ResolvedCitation(BaseModel):
+    """One verified, source-neutral quote backing a cluster — the PORTABLE form.
+
+    This is what serializes to ``runs/*.json``, ``research.md``, and every MCP
+    response. It carries the verbatim ``text`` + ``source_url`` INLINE so a
+    report stays readable when detached from the corpus (committed to git, sent
+    over the wire) — the portability guarantee.
+
+    `text` MUST exact-match the backing source comment (the quote-verification
+    gate) — the service rejects any quote that doesn't, so a ResolvedCitation
+    that reaches this contract is guaranteed real.
+
+    Generic over sources: it replaces the Reddit-shaped fields of the old
+    ``QuoteCitation`` (``permalink`` → ``source_url``, ``subreddit`` → ``source``
+    (+ ``source_name`` / ``extra``), ``upvotes`` → ``engagement``).
+    """
+
+    evidence_id: str = Field(
+        default="",
+        description="Stable content-addressed citation id (``q:<hash of source_url|text>``). "
+        "Defaulted/recomputed by the `id` computed field; carried so a CitationRef matches.",
+    )
+    record_id: str = Field(
+        default="",
+        description="Corpus-wide id of the backing record/comment, for live re-resolution.",
+    )
+    source: str = Field(
+        default="reddit",
+        description="Origin source, e.g. 'reddit', 'hackernews', 'reviews'.",
+    )
+    source_name: str = Field(
+        default="",
+        description="Human-readable origin label, e.g. 'r/Supplements' for Reddit.",
+    )
+    source_url: str = Field(
+        default="", description="Resolvable link to the quote in context (the provenance link)."
+    )
     text: str = Field(description="Verbatim quote, exact-matched to the source comment.")
-    permalink: str = Field(description="Direct link to the source thread/comment.")
-    subreddit: str = Field(description="Source subreddit, e.g. 'r/Supplements'.")
     author_hash: str = Field(
         description="Stable pseudonymous author id (salted hash) — for distinct-author "
         "counting, never the raw username. Pseudonymization, not anonymization."
     )
-    upvotes: int = Field(default=0, description="Upvotes on the source comment, for context.")
+    engagement: int = Field(
+        default=0,
+        description="Source-native engagement signal (Reddit upvotes, HN points, …), for context.",
+    )
+    extra: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Source-specific fields that don't earn a spine column.",
+    )
 
     @computed_field
     @property
     def id(self) -> str:
-        """Stable content-addressed evidence id (``q:<hash of permalink|text>``)."""
-        return _evidence_id("q", self.permalink, self.text)
+        """Stable content-addressed evidence id (``q:<hash of source_url|text>``)."""
+        return _evidence_id("q", self.source_url, self.text)
+
+    def as_ref(self) -> CitationRef:
+        """The thin live-view pointer for this resolved citation."""
+        return CitationRef(evidence_id=self.id, record_id=self.record_id, kind="quote")
 
 
 class InsightCluster(BaseModel):
@@ -143,9 +206,9 @@ class InsightCluster(BaseModel):
     signal: SignalStrength = Field(
         description="Confidence chip, derived from distinct_author_count."
     )
-    quotes: list[QuoteCitation] = Field(
-        description="2-3 verified quotes. A cluster with zero verified quotes is never "
-        "shipped (no-quote-no-theme)."
+    quotes: list[ResolvedCitation] = Field(
+        description="2-3 verified quotes (materialized, portable). A cluster with zero verified "
+        "quotes is never shipped (no-quote-no-theme)."
     )
     attribution_method: str | None = Field(default=None)
     attribution_confidence: str | None = Field(default=None)
@@ -233,7 +296,15 @@ class PriceFinding(BaseModel):
 
 
 class SourceMapEntry(BaseModel):
-    subreddit: str
+    source: str = Field(
+        default="",
+        description="Source-neutral origin label for this map row (e.g. 'r/Supplements').",
+    )
+    subreddit: str = Field(
+        default="",
+        description="Deprecated Reddit alias for `source`; kept additive so the pipeline's "
+        "existing population still validates. Read `source`.",
+    )
     subscribers: int | None = None
     threads_examined: int = 0
     skew: str | None = None
@@ -494,7 +565,8 @@ class DemandReport(BaseModel):
     optimized_axis: str
     source: str = Field(
         default="reddit_arctic_shift",
-        description="Provenance: 'reddit_arctic_shift' | 'reddit_live' | 'mixed'.",
+        description="Provenance of the corpus this run drew on: "
+        "'reddit_arctic_shift' | 'reddit_live' | 'hackernews' | 'reviews' | 'mixed'.",
     )
     date_range_start: datetime
     date_range_end: datetime
@@ -547,7 +619,7 @@ class DemandReport(BaseModel):
                 records.setdefault(
                     q.id,
                     EvidenceRecord(
-                        id=q.id, kind="quote", text=q.text, url=q.permalink, provenance="verbatim"
+                        id=q.id, kind="quote", text=q.text, url=q.source_url, provenance="verbatim"
                     ),
                 )
         for w in self.web_findings:

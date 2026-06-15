@@ -32,7 +32,7 @@ from metalworks.contract import (
     InsightCluster,
     PriceEvidence,
     PriceFinding,
-    QuoteCitation,
+    ResolvedCitation,
     SignalStrength,
 )
 from metalworks.embeddings import FakeEmbedding
@@ -57,13 +57,13 @@ class _NullReader:
         return None
 
 
-def _quote(text: str, permalink: str, author_hash: str = "a1") -> QuoteCitation:
-    return QuoteCitation(
-        text=text, permalink=permalink, subreddit="SkincareAddiction", author_hash=author_hash
+def _quote(text: str, permalink: str, author_hash: str = "a1") -> ResolvedCitation:
+    return ResolvedCitation(
+        text=text, source_url=permalink, source_name="r/SkincareAddiction", author_hash=author_hash
     )
 
 
-def _cluster(rank: int, *, quotes: list[QuoteCitation]) -> InsightCluster:
+def _cluster(rank: int, *, quotes: list[ResolvedCitation]) -> InsightCluster:
     return InsightCluster(
         rank=rank,
         claim=f"consumers want outcome {rank}",

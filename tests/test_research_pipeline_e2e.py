@@ -4,7 +4,7 @@ Runs the FULL research pipeline (reader → triage → hydration → synthesis �
 web → triangulate → assembly) with zero network: a local DuckDB-written
 parquet corpus, a fake comment source, FakeEmbedding, MemoryStores, and a
 scripted FakeChatModel. Proves the wiring holds and the structural-provenance
-contract survives the whole pipeline (every QuoteCitation resolves into the
+contract survives the whole pipeline (every ResolvedCitation resolves into the
 hydrated corpus).
 """
 
@@ -17,7 +17,12 @@ from typing import Any
 
 import pytest
 
-from metalworks.contract import ResearchBrief, TargetSubreddit, TriageThresholds
+from metalworks.contract import (
+    DemandReport,
+    ResearchBrief,
+    TargetSubreddit,
+    TriageThresholds,
+)
 from metalworks.embeddings import FakeEmbedding
 from metalworks.llm import FakeChatModel, GroundedResult, GroundingChunk, GroundingSupport
 from metalworks.research.arctic.reader import ArcticReader
@@ -137,7 +142,7 @@ def _scripted_chat() -> FakeChatModel:
         ),
     )
     # Cluster synthesis: one theme citing representatives 0 and 1 (top-2 by
-    # upvotes). Quotes are index-based, so QuoteCitation.text IS a real
+    # upvotes). Quotes are index-based, so ResolvedCitation.text IS a real
     # comment body — resolves into the corpus by construction.
     chat.script(
         _SynthesisOutput,
@@ -227,8 +232,29 @@ def test_pipeline_end_to_end_offline(tmp_path: Path) -> None:
     assert cluster.quotes, "cluster must carry at least one verified quote"
     corpus_bodies = {c.body for c in comments}
     for q in cluster.quotes:
-        assert q.text in corpus_bodies, "every QuoteCitation must resolve into the corpus"
-        assert q.permalink  # provenance link present
+        assert q.text in corpus_bodies, "every ResolvedCitation must resolve into the corpus"
+        assert q.source_url  # provenance link present
+        # Citations are the materialized, source-neutral form: generic source
+        # fields are populated (Reddit maps onto them), Reddit-named fields gone.
+        assert q.source == "reddit"
+        assert q.source_name.startswith("r/")
+        assert not hasattr(q, "permalink")
+        assert not hasattr(q, "subreddit")
+
+    # 4b. Portability (clean-break golden): the report serializes and reloads
+    # with NO corpus present, and is SEMANTICALLY equivalent — same clusters,
+    # claims, scores, and citation text+url (now under generic field names).
+    detached = DemandReport.model_validate_json(report.model_dump_json())
+    assert [c.claim for c in detached.ranked_clusters] == [c.claim for c in report.ranked_clusters]
+    assert [c.demand_score for c in detached.ranked_clusters] == [
+        c.demand_score for c in report.ranked_clusters
+    ]
+    orig_citations = [(q.text, q.source_url) for c in report.ranked_clusters for q in c.quotes]
+    reloaded_citations = [
+        (q.text, q.source_url) for c in detached.ranked_clusters for q in c.quotes
+    ]
+    assert reloaded_citations == orig_citations  # text + url survive detached round-trip
+    assert {r.id for r in detached.evidence} == {r.id for r in report.evidence}
 
     # 5. Web stream produced a grounded finding (claim from LLM, URL from metadata).
     assert len(report.web_findings) == 1

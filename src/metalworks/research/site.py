@@ -10,7 +10,7 @@ clusters by ``demand_score`` and makes exactly ONE constrained
 ``deps.chat.complete_structured`` call that, per cluster, (a) assigns a
 ``SiteSection`` role and (b) picks a VERBATIM fragment to quote out of that
 cluster's quotes. The builder then re-runs EXACT-MATCH grounding: the picked
-fragment must be a substring of some real ``QuoteCitation.text`` in that cluster.
+fragment must be a substring of some real ``ResolvedCitation.text`` in that cluster.
 If it is, the section ships ``provenance="verbatim"`` with a single
 ``EvidenceRef`` to that quote; if not (or if no quote backs it), the section is
 DROPPED — no-quote-no-section. The hero is built on the cluster with the highest
@@ -44,7 +44,7 @@ from metalworks.contract import (
     EvidenceRecord,
     EvidenceRef,
     InsightCluster,
-    QuoteCitation,
+    ResolvedCitation,
 )
 from metalworks.contract.site import MarketingSite, SiteSection
 
@@ -161,7 +161,7 @@ def _hero_rank(clusters: list[InsightCluster]) -> int | None:
     return hero.rank
 
 
-def _matching_quote(cluster: InsightCluster, fragment: str) -> QuoteCitation | None:
+def _matching_quote(cluster: InsightCluster, fragment: str) -> ResolvedCitation | None:
     """The cluster quote whose text contains ``fragment`` verbatim, or None.
 
     Exact-match grounding: the LLM-picked fragment must be a real substring of a

@@ -321,9 +321,9 @@
           "type": "integer"
         },
         "quotes": {
-          "description": "2-3 verified quotes. A cluster with zero verified quotes is never shipped (no-quote-no-theme).",
+          "description": "2-3 verified quotes (materialized, portable). A cluster with zero verified quotes is never shipped (no-quote-no-theme).",
           "items": {
-            "$ref": "#/$defs/QuoteCitation"
+            "$ref": "#/$defs/ResolvedCitation"
           },
           "title": "Quotes",
           "type": "array"
@@ -476,45 +476,6 @@
       "title": "PriceFinding",
       "type": "object"
     },
-    "QuoteCitation": {
-      "description": "One verified, real Reddit quote backing a cluster.\n\n`text` MUST exact-match the stored source comment (the quote-verification\ngate) \u2014 the service rejects any quote that doesn't, so a QuoteCitation\nthat reaches this contract is guaranteed real.",
-      "properties": {
-        "author_hash": {
-          "description": "Stable pseudonymous author id (salted hash) \u2014 for distinct-author counting, never the raw username. Pseudonymization, not anonymization.",
-          "title": "Author Hash",
-          "type": "string"
-        },
-        "permalink": {
-          "description": "Direct link to the source thread/comment.",
-          "title": "Permalink",
-          "type": "string"
-        },
-        "subreddit": {
-          "description": "Source subreddit, e.g. 'r/Supplements'.",
-          "title": "Subreddit",
-          "type": "string"
-        },
-        "text": {
-          "description": "Verbatim quote, exact-matched to the source comment.",
-          "title": "Text",
-          "type": "string"
-        },
-        "upvotes": {
-          "default": 0,
-          "description": "Upvotes on the source comment, for context.",
-          "title": "Upvotes",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "text",
-        "permalink",
-        "subreddit",
-        "author_hash"
-      ],
-      "title": "QuoteCitation",
-      "type": "object"
-    },
     "ResearchBrief": {
       "description": "The contract produced by the conversational planner.\n\nA Brief is the persisted, versioned record of what the planner and the\nuser agreed to research. Briefs are IMMUTABLE: editing a brief writes a\nnew row with a fresh `brief_id` and a `supersedes` pointer to the prior\nversion. Runs FK to a single brief_id; a re-run after edit creates a new\nrun pointing at the new brief.",
       "properties": {
@@ -653,6 +614,69 @@
       "title": "ResearchBrief",
       "type": "object"
     },
+    "ResolvedCitation": {
+      "description": "One verified, source-neutral quote backing a cluster \u2014 the PORTABLE form.\n\nThis is what serializes to ``runs/*.json``, ``research.md``, and every MCP\nresponse. It carries the verbatim ``text`` + ``source_url`` INLINE so a\nreport stays readable when detached from the corpus (committed to git, sent\nover the wire) \u2014 the portability guarantee.\n\n`text` MUST exact-match the backing source comment (the quote-verification\ngate) \u2014 the service rejects any quote that doesn't, so a ResolvedCitation\nthat reaches this contract is guaranteed real.\n\nGeneric over sources: it replaces the Reddit-shaped fields of the old\n``QuoteCitation`` (``permalink`` \u2192 ``source_url``, ``subreddit`` \u2192 ``source``\n(+ ``source_name`` / ``extra``), ``upvotes`` \u2192 ``engagement``).",
+      "properties": {
+        "author_hash": {
+          "description": "Stable pseudonymous author id (salted hash) \u2014 for distinct-author counting, never the raw username. Pseudonymization, not anonymization.",
+          "title": "Author Hash",
+          "type": "string"
+        },
+        "engagement": {
+          "default": 0,
+          "description": "Source-native engagement signal (Reddit upvotes, HN points, \u2026), for context.",
+          "title": "Engagement",
+          "type": "integer"
+        },
+        "evidence_id": {
+          "default": "",
+          "description": "Stable content-addressed citation id (``q:<hash of source_url|text>``). Defaulted/recomputed by the `id` computed field; carried so a CitationRef matches.",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "extra": {
+          "additionalProperties": true,
+          "description": "Source-specific fields that don't earn a spine column.",
+          "title": "Extra",
+          "type": "object"
+        },
+        "record_id": {
+          "default": "",
+          "description": "Corpus-wide id of the backing record/comment, for live re-resolution.",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "source": {
+          "default": "reddit",
+          "description": "Origin source, e.g. 'reddit', 'hackernews', 'reviews'.",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_name": {
+          "default": "",
+          "description": "Human-readable origin label, e.g. 'r/Supplements' for Reddit.",
+          "title": "Source Name",
+          "type": "string"
+        },
+        "source_url": {
+          "default": "",
+          "description": "Resolvable link to the quote in context (the provenance link).",
+          "title": "Source Url",
+          "type": "string"
+        },
+        "text": {
+          "description": "Verbatim quote, exact-matched to the source comment.",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "author_hash"
+      ],
+      "title": "ResolvedCitation",
+      "type": "object"
+    },
     "SignalStrength": {
       "description": "Per-cluster confidence, driven by distinct-author count.\n\nRendered as a text-labelled chip (never color alone) so a thin-evidence\ncluster never reads as authoritative as a well-supported one.",
       "enum": [
@@ -733,7 +757,15 @@
           "default": null,
           "title": "Skew"
         },
+        "source": {
+          "default": "",
+          "description": "Source-neutral origin label for this map row (e.g. 'r/Supplements').",
+          "title": "Source",
+          "type": "string"
+        },
         "subreddit": {
+          "default": "",
+          "description": "Deprecated Reddit alias for `source`; kept additive so the pipeline's existing population still validates. Read `source`.",
           "title": "Subreddit",
           "type": "string"
         },
@@ -755,9 +787,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "subreddit"
-      ],
       "title": "SourceMapEntry",
       "type": "object"
     },
@@ -1062,7 +1091,7 @@
     },
     "source": {
       "default": "reddit_arctic_shift",
-      "description": "Provenance: 'reddit_arctic_shift' | 'reddit_live' | 'mixed'.",
+      "description": "Provenance of the corpus this run drew on: 'reddit_arctic_shift' | 'reddit_live' | 'hackernews' | 'reviews' | 'mixed'.",
       "title": "Source",
       "type": "string"
     },

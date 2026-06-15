@@ -23,18 +23,35 @@ export interface EvidenceRecord {
   provenance: "verbatim" | "grounded-web" | "derived";
 }
 
-export interface QuoteCitation {
+export interface CitationRef {
+  /** Content-addressed citation id (``q:<hash>``); matches the resolved form's id. */
+  evidence_id: string;
+  /** Corpus-wide id of the backing record/comment (resolve against the corpus). */
+  record_id: string;
+  /** Evidence family — quote for a cluster citation. */
+  kind?: "quote";
+}
+
+export interface ResolvedCitation {
+  /** Stable content-addressed citation id (``q:<hash of source_url|text>``). Defaulted/recomputed by the `id` computed field; carried so a CitationRef matches. */
+  evidence_id?: string;
+  /** Corpus-wide id of the backing record/comment, for live re-resolution. */
+  record_id?: string;
+  /** Origin source, e.g. 'reddit', 'hackernews', 'reviews'. */
+  source?: string;
+  /** Human-readable origin label, e.g. 'r/Supplements' for Reddit. */
+  source_name?: string;
+  /** Resolvable link to the quote in context (the provenance link). */
+  source_url?: string;
   /** Verbatim quote, exact-matched to the source comment. */
   text: string;
-  /** Direct link to the source thread/comment. */
-  permalink: string;
-  /** Source subreddit, e.g. 'r/Supplements'. */
-  subreddit: string;
   /** Stable pseudonymous author id (salted hash) — for distinct-author counting, never the raw username. Pseudonymization, not anonymization. */
   author_hash: string;
-  /** Upvotes on the source comment, for context. */
-  upvotes?: number;
-  /** Stable content-addressed evidence id (``q:<hash of permalink|text>``). */
+  /** Source-native engagement signal (Reddit upvotes, HN points, …), for context. */
+  engagement?: number;
+  /** Source-specific fields that don't earn a spine column. */
+  extra?: Record<string, unknown>;
+  /** Stable content-addressed evidence id (``q:<hash of source_url|text>``). */
   id: string;
 }
 
@@ -51,8 +68,8 @@ export interface InsightCluster {
   mention_count: number;
   /** Confidence chip, derived from distinct_author_count. */
   signal: SignalStrength;
-  /** 2-3 verified quotes. A cluster with zero verified quotes is never shipped (no-quote-no-theme). */
-  quotes: QuoteCitation[];
+  /** 2-3 verified quotes (materialized, portable). A cluster with zero verified quotes is never shipped (no-quote-no-theme). */
+  quotes: ResolvedCitation[];
   attribution_method?: string | null;
   attribution_confidence?: string | null;
   demographic_match?: number | null;
@@ -107,7 +124,10 @@ export interface PriceFinding {
 }
 
 export interface SourceMapEntry {
-  subreddit: string;
+  /** Source-neutral origin label for this map row (e.g. 'r/Supplements'). */
+  source?: string;
+  /** Deprecated Reddit alias for `source`; kept additive so the pipeline's existing population still validates. Read `source`. */
+  subreddit?: string;
   subscribers?: number | null;
   threads_examined?: number;
   skew?: string | null;
@@ -228,7 +248,7 @@ export interface DemandReport {
   fork: Fork;
   pinned_axis: string;
   optimized_axis: string;
-  /** Provenance: 'reddit_arctic_shift' | 'reddit_live' | 'mixed'. */
+  /** Provenance of the corpus this run drew on: 'reddit_arctic_shift' | 'reddit_live' | 'hackernews' | 'reviews' | 'mixed'. */
   source?: string;
   date_range_start: string;
   date_range_end: string;
