@@ -50,6 +50,6 @@ own infrastructure, not something metalworks configures for you.
 
 | Backend | Use it for | Infra |
 | --- | --- | --- |
-| `MemoryStores` | tests, one-shot runs, the offline demo | none |
+| `MemoryStores` | tests, one-shot runs | none |
 | `SqliteStores` | a single machine, persistence across runs | none |
 | your own | a service, a shared DB, multi-tenant | yours |

@@ -22,30 +22,10 @@ Read the [USAGE_POLICY](https://github.com/Lab2A/metalworks/blob/main/USAGE_POLI
 version: authentic, disclosed engagement only. No fake personas, no vote
 manipulation, no coordinated inauthentic behavior.
 
-## Quickstart (no API key)
+## Quickstart
 
-The headline is the offline demo: fake models on a bundled Reddit corpus, no
-keys, no network.
-
-```bash
-pip install "metalworks[research]"
-```
-
-```python
-from metalworks import Metalworks
-
-research = Metalworks.demo().research("Is there demand for a focus supplement?",
-                                     subreddits=["Supplements"])
-report = research.demand   # .research() returns a Research bundle; the report is on .demand
-print(report.verdict)
-for cluster in report.ranked_clusters:
-    print(cluster.signal, cluster.distinct_author_count, cluster.claim)
-```
-
-### Then: a real demand report
-
-Install a provider SDK and set its key. Google or OpenAI is simplest — one key covers both
-the chat model and the embeddings the pipeline needs:
+Install metalworks with a provider SDK and set its key. Google or OpenAI is simplest — one
+key covers both the chat model and the embeddings the pipeline needs:
 
 ```bash
 pip install "metalworks[google,research]"   # or [openai,research]
@@ -154,11 +134,11 @@ Four form factors share that contract:
 2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report
    commands (`metalworks research position|competitor-map|surface|site|launch|content-plan`,
    `metalworks build init`),
-   `metalworks quickstart`, `metalworks doctor`, `metalworks mcp serve`.
+   `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
    or SSE.
-4. **Claude Code plugin** — `/demand-report` and friends, zero keys on the demo
-   path (`/plugin marketplace add Lab2A/metalworks`).
+4. **Claude Code plugin** — `/demand-report` and friends
+   (`/plugin marketplace add Lab2A/metalworks`).
 
 ## Testing your own adapters and backends
 

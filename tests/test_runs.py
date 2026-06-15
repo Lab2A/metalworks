@@ -104,9 +104,7 @@ def test_facade_persists_run_inside_a_project(
         def close(self) -> None:
             return None
 
-    mw = Metalworks(
-        chat=FakeChatModel(), embeddings=FakeEmbedding(), reader=_Reader(), _offline=False
-    )
+    mw = Metalworks(chat=FakeChatModel(), embeddings=FakeEmbedding(), reader=_Reader())
     result = mw.research("demand?", subreddits=["Supplements"])  # explicit subs → no planner LLM
 
     assert result.demand.report_id == "rep-123"

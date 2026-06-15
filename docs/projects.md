@@ -89,7 +89,6 @@ pos = mw.positioning(research)    # reads the same in-memory bundle
 | --- | --- | --- |
 | Inside a `.metalworks/` project | SQLite on `.metalworks/corpus.db` | Persists; memory accumulates across commands |
 | No project (casual use) | In-process memory | Zero — nothing written |
-| `Metalworks.demo()` | In-process memory, offline | Zero — never touches disk or network |
 
 The CLI also keeps a global store at `~/.metalworks/` for runs you make outside any project,
 and that's where the Reddit `post-log.jsonl` audit trail and any connected-account tokens

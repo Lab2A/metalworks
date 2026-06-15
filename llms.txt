@@ -16,8 +16,7 @@ provider modules. Install only what matches the API key you have:
 
 - `from metalworks import Metalworks` — the high-level facade and the one entry
   point most users need. `Metalworks()` resolves a provider from your env keys
-  (or pass `model="provider/model"`). `Metalworks.demo()` runs the whole research
-  pipeline offline with zero keys and zero network (needs `[arctic]`).
+  (or pass `model="provider/model"`).
   - `.research(question, subreddits=[...])` -> `DemandReport`.
   - `.plan(prompt)` -> `ResearchBrief` (walks the D1-D8 planner).
   - `.reddit.{search,subreddit,comments,rules,inbox,post}` — Reddit surfaces

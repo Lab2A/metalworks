@@ -1,13 +1,9 @@
-"""Offline demo corpus for ``metalworks quickstart``.
+"""A small local Reddit corpus for offline pipeline tests.
 
-A tiny, hand-authored set of submission rows is written to a local Parquet file
-in a temp directory at runtime (via duckdb, the ``[arctic]`` extra), so the
-quickstart runs with ZERO API keys and ZERO network: the corpus is local, and
-the pipeline runs on :class:`~metalworks.llm.FakeChatModel` /
-:class:`~metalworks.embeddings.FakeEmbedding`.
-
-We generate the Parquet at runtime rather than committing a binary blob so the
-package stays text-only and the data is human-readable here.
+Writes a handful of hand-authored submission rows to a local Parquet file (via
+duckdb), laid out exactly how :class:`~metalworks.research.arctic.reader.ArcticReader`
+globs for them — ``<root>/submissions/<YYYY>/<MM>/*.parquet`` under the current
+month. A test fixture only; not shipped in the package.
 """
 
 from __future__ import annotations
@@ -17,19 +13,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# A handful of realistic-looking submissions for a single subreddit. The corpus
-# is written under the CURRENT year/month so the ArcticReader's
-# ``latest_available_month`` probe (which walks back from today) finds it. One
-# subreddit, one month so the directory layout matches the Arctic glob
-# (``<root>/submissions/<YYYY>/<MM>/*.parquet``).
-DEMO_SUBREDDIT = "Supplements"
+SAMPLE_SUBREDDIT = "Supplements"
 _NOW = datetime.now(UTC)
-DEMO_YEAR = _NOW.year
-DEMO_MONTH = _NOW.month
+_YEAR = _NOW.year
+_MONTH = _NOW.month
 
-_DEMO_ROWS: list[dict[str, Any]] = [
+_ROWS: list[dict[str, Any]] = [
     {
-        "id": "demo01",
+        "id": "row01",
         "title": "Looking for a focus supplement without the jitters",
         "selftext": "Coffee wrecks my stomach but I need to concentrate at work. "
         "Anything that actually helps without making me anxious?",
@@ -37,7 +28,7 @@ _DEMO_ROWS: list[dict[str, Any]] = [
         "num_comments": 38,
     },
     {
-        "id": "demo02",
+        "id": "row02",
         "title": "Best nootropic stack for studying that won't break the bank?",
         "selftext": "Student budget here. I keep seeing $60 bottles. Is there anything "
         "under $25 a month that's actually worth it?",
@@ -45,7 +36,7 @@ _DEMO_ROWS: list[dict[str, Any]] = [
         "num_comments": 21,
     },
     {
-        "id": "demo03",
+        "id": "row03",
         "title": "Magnesium glycinate finally fixed my sleep",
         "selftext": "After months of bad sleep, 400mg of magnesium glycinate before bed "
         "changed everything. Anyone else?",
@@ -53,7 +44,7 @@ _DEMO_ROWS: list[dict[str, Any]] = [
         "num_comments": 74,
     },
     {
-        "id": "demo04",
+        "id": "row04",
         "title": "Are focus gummies just candy with caffeine?",
         "selftext": "Every brand markets focus gummies to students. Is there real evidence "
         "or is it just sugar and marketing?",
@@ -61,7 +52,7 @@ _DEMO_ROWS: list[dict[str, Any]] = [
         "num_comments": 15,
     },
     {
-        "id": "demo05",
+        "id": "row05",
         "title": "What do you wish a supplement company would actually make?",
         "selftext": "If you could design the perfect daily focus product, what would be in "
         "it and what price would you pay?",
@@ -71,28 +62,27 @@ _DEMO_ROWS: list[dict[str, Any]] = [
 ]
 
 
-def write_demo_corpus(root: Path) -> Path:
-    """Write the demo submissions Parquet under ``root`` and return ``root``.
+def write_sample_corpus(root: Path) -> Path:
+    """Write the sample submissions Parquet under ``root`` and return ``root``.
 
-    Layout: ``<root>/submissions/<YYYY>/<MM>/demo.parquet`` — exactly what
-    :class:`~metalworks.research.arctic.reader.ArcticReader` globs for. Requires
-    ``duckdb`` (the ``[arctic]`` extra); the caller guards for its absence.
+    Layout: ``<root>/submissions/<YYYY>/<MM>/sample.parquet``. Requires duckdb
+    (the ``[arctic]`` extra); callers guard for its absence with ``importorskip``.
     """
     import duckdb
 
-    month_dir = root / "submissions" / f"{DEMO_YEAR:04d}" / f"{DEMO_MONTH:02d}"
+    month_dir = root / "submissions" / f"{_YEAR:04d}" / f"{_MONTH:02d}"
     month_dir.mkdir(parents=True, exist_ok=True)
-    out = month_dir / "demo.parquet"
+    out = month_dir / "sample.parquet"
 
-    base_ts = int(time.mktime((DEMO_YEAR, DEMO_MONTH, 15, 12, 0, 0, 0, 0, 0)))
+    base_ts = int(time.mktime((_YEAR, _MONTH, 15, 12, 0, 0, 0, 0, 0)))
     values: list[str] = []
-    for i, row in enumerate(_DEMO_ROWS):
+    for i, row in enumerate(_ROWS):
         title = str(row["title"]).replace("'", "''")
         selftext = str(row["selftext"]).replace("'", "''")
-        url = f"https://reddit.com/r/{DEMO_SUBREDDIT}/comments/{row['id']}/"
+        url = f"https://reddit.com/r/{SAMPLE_SUBREDDIT}/comments/{row['id']}/"
         values.append(
-            f"('{row['id']}', '{DEMO_SUBREDDIT}', '{title}', '{selftext}', "
-            f"'demo_author_{i}', {int(row['score'])}, {int(row['num_comments'])}, "
+            f"('{row['id']}', '{SAMPLE_SUBREDDIT}', '{title}', '{selftext}', "
+            f"'sample_author_{i}', {int(row['score'])}, {int(row['num_comments'])}, "
             f"'{url}', {base_ts + i})"
         )
 
@@ -110,20 +100,3 @@ def write_demo_corpus(root: Path) -> Path:
     finally:
         con.close()
     return root
-
-
-from metalworks.cli._demo.scripted import (  # noqa: E402
-    DemoChatModel,
-    DemoComments,
-    build_demo_chat,
-)
-
-__all__ = [
-    "DEMO_MONTH",
-    "DEMO_SUBREDDIT",
-    "DEMO_YEAR",
-    "DemoChatModel",
-    "DemoComments",
-    "build_demo_chat",
-    "write_demo_corpus",
-]

@@ -15,7 +15,6 @@ mw = Metalworks()                       # provider inferred from env keys
 - `mw.research(question, subreddits=[...]) -> Research` — demand research (the `DemandReport` is on `.demand`).
 - `mw.reddit.search / subreddit / comments / rules / inbox / post` — Reddit surfaces.
 - `mw.discovery.run / filter / generate` — discovery loop + building blocks.
-- `Metalworks.demo()` — offline, zero-key, for a smoke test (needs `[arctic]`).
 
 Construction never raises; a `MissingKeyError` (with a `fix` string) surfaces only when a
 call needs a key. Every error carries `error_code`, `message`, `fix`, and `docs_url` — relay

@@ -4,11 +4,10 @@ Covers:
 
 1. Lazy construction: ``Metalworks()`` with no API keys never raises, and the
    namespaces are reachable without resolving a provider.
-2. ``Metalworks.demo()`` runs the whole research pipeline with zero keys and
-   zero network (the DX-1 Champion-tier guarantee), for both a plain question
-   and a pre-built ResearchBrief.
-3. ``MissingKeyError`` surfaces only on a real-key path (a research call with no
+2. ``MissingKeyError`` surfaces only on a real-key path (a research call with no
    provider key), not at construction.
+3. The facade threads one deps object through the pillar arc (offline, with
+   injected Fake models over a local corpus).
 4. ``.reddit.post`` refuses a compliance-blocked draft and audit-logs it.
 """
 
@@ -46,49 +45,6 @@ def test_research_without_key_raises_missing_key(
     _clear_keys(monkeypatch)
     with pytest.raises(MissingKeyError):
         Metalworks().research("Is there demand for X?", subreddits=["test"])
-
-
-def test_demo_runs_fully_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    pytest.importorskip("duckdb")  # demo corpus needs the [arctic] extra
-    monkeypatch.chdir(tmp_path)
-    _clear_keys(monkeypatch)
-    from metalworks.cli._demo import DEMO_SUBREDDIT
-    from metalworks.contract import Research
-    from metalworks.contract.research import DemandReport
-
-    result = Metalworks.demo().research(
-        "Is there demand for a focus supplement?", subreddits=[DEMO_SUBREDDIT]
-    )
-    assert isinstance(result, Research)
-    assert isinstance(result.demand, DemandReport)
-    # The whole point: the offline demo produces a NON-EMPTY report.
-    assert result.demand.ranked_clusters, "demo report must not be empty"
-    assert result.evidence == result.demand.evidence
-    assert result.competitors is None
-    assert result.positioning is None
-
-
-def test_demo_accepts_a_prebuilt_brief(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    pytest.importorskip("duckdb")
-    monkeypatch.chdir(tmp_path)
-    _clear_keys(monkeypatch)
-    from metalworks.cli._demo import DEMO_SUBREDDIT
-    from metalworks.contract import Research, ResearchBrief, TargetSubreddit
-
-    brief = ResearchBrief(
-        brief_id="demo-brief",
-        question="Focus supplement demand?",
-        decision_context="ctx",
-        success_criteria=["needs"],
-        must_address=[],
-        target_subreddits=[TargetSubreddit(name=DEMO_SUBREDDIT, rationale="core")],
-        web_research_directions=[],
-        relevance_rubric="Posts about focus supplements.",
-        time_window_months=1,
-    )
-    result = Metalworks.demo().research(brief)
-    assert isinstance(result, Research)
-    assert result.demand.query
 
 
 def test_post_refuses_and_audits_blocked_draft(
@@ -141,18 +97,43 @@ def test_pillar_exports_are_importable_from_the_package() -> None:
 def test_facade_runs_the_pillar_arc_offline(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # The full arc threads ONE deps object through every pillar via the facade —
-    # no hand-built ResearchDeps, no reaching into private internals.
+    # The full arc threads ONE deps object through the pillars via the facade —
+    # no hand-built ResearchDeps, no reaching into private internals. Fake models
+    # are injected through the public constructor over a local sample corpus.
     pytest.importorskip("duckdb")
     pytest.importorskip("rank_bm25")
     monkeypatch.chdir(tmp_path)
     _clear_keys(monkeypatch)
-    from metalworks.cli._demo import DEMO_SUBREDDIT
     from metalworks.contract import ChannelPlan, ContentPlan, PositioningBrief
+    from metalworks.embeddings import FakeEmbedding
+    from metalworks.llm import FakeChatModel
     from metalworks.research import ResearchDeps
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.stores import MemoryStores
+    from sample_corpus import SAMPLE_SUBREDDIT, write_sample_corpus
 
-    mw = Metalworks.demo()
-    research = mw.research("Is there demand for a focus supplement?", subreddits=[DEMO_SUBREDDIT])
+    class _NoComments:  # offline comment source — yields nothing, touches no network
+        def comments_for_links(self, link_ids: object) -> object:
+            return iter([])
+
+    write_sample_corpus(tmp_path / "corpus")
+    reader = ArcticReader(data_root=str(tmp_path / "corpus"), probe_sleep_s=0.0)
+    mw = Metalworks(
+        chat=FakeChatModel(),
+        fast_chat=FakeChatModel(),
+        embeddings=FakeEmbedding(),
+        reader=reader,
+        comments=_NoComments(),
+        store=MemoryStores(),
+    )
+    try:
+        research = mw.research(
+            "Is there demand for a focus supplement?",
+            subreddits=[SAMPLE_SUBREDDIT],
+            time_window_months=1,  # the sample corpus is a single month
+        )
+    finally:
+        reader.close()
 
     assert isinstance(mw.deps, ResearchDeps)  # public escape hatch
     assert isinstance(mw.positioning(research), PositioningBrief)  # Pillar B via facade
