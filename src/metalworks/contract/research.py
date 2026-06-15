@@ -671,6 +671,133 @@ class DemandReport(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Version diff (live-view refresh)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class ClusterDelta(BaseModel):
+    """A cluster matched across two report versions, with its movement.
+
+    Identity is SEMANTIC — nearest-neighbor on the claim embedding — not
+    positional: rank is renumbered every run, so it can't serve as an id. The
+    match is advisory (LLM synthesis is non-deterministic, so a claim's wording
+    can drift run-to-run even when the underlying theme is stable); the score
+    deltas are the signal.
+    """
+
+    claim_before: str
+    claim_after: str
+    similarity: float = Field(
+        description="Cosine between the two claim embeddings that matched the pair."
+    )
+    demand_score_before: float
+    demand_score_after: float
+    distinct_authors_before: int
+    distinct_authors_after: int
+
+    @computed_field
+    @property
+    def demand_score_delta(self) -> float:
+        return round(self.demand_score_after - self.demand_score_before, 6)
+
+    @computed_field
+    @property
+    def distinct_authors_delta(self) -> int:
+        return self.distinct_authors_after - self.distinct_authors_before
+
+
+class ReportDiff(BaseModel):
+    """A deterministic diff between two versions of a report lineage.
+
+    The reliable layer is the deterministic COUNT deltas — threads, distinct
+    authors, cluster count, source distribution — read straight from the two
+    reports' own fields. Cluster-level changes are matched by claim-embedding
+    nearest-neighbor and are ADVISORY: non-deterministic synthesis means a
+    claim's wording can shift between runs, so the wording diff is a hint while
+    the counts are ground truth. Diffing a report against an identical
+    re-synthesis yields ``is_empty`` — the refresh determinism guarantee.
+    """
+
+    lineage_id: str
+    from_report_id: str
+    to_report_id: str
+    from_version: int
+    to_version: int
+
+    # ── Deterministic layer (ground truth) ──
+    total_threads_before: int
+    total_threads_after: int
+    total_distinct_authors_before: int
+    total_distinct_authors_after: int
+    cluster_count_before: int
+    cluster_count_after: int
+    source_distribution_before: dict[str, int] = Field(
+        default_factory=dict, description="Source label → threads examined, prior version."
+    )
+    source_distribution_after: dict[str, int] = Field(
+        default_factory=dict, description="Source label → threads examined, later version."
+    )
+
+    # ── Cluster layer (advisory, claim-embedding matched) ──
+    clusters_added: list[str] = Field(
+        default_factory=list[str], description="Claims present only in the later version."
+    )
+    clusters_dropped: list[str] = Field(
+        default_factory=list[str], description="Claims present only in the prior version."
+    )
+    clusters_changed: list[ClusterDelta] = Field(
+        default_factory=list[ClusterDelta], description="Matched clusters whose demand moved."
+    )
+    clusters_unchanged: int = Field(
+        default=0, description="Matched clusters with no material movement."
+    )
+
+    @computed_field
+    @property
+    def total_distinct_authors_delta(self) -> int:
+        return self.total_distinct_authors_after - self.total_distinct_authors_before
+
+    @computed_field
+    @property
+    def total_threads_delta(self) -> int:
+        return self.total_threads_after - self.total_threads_before
+
+    @computed_field
+    @property
+    def is_empty(self) -> bool:
+        """True when nothing material changed (a refresh on an unchanged corpus)."""
+        return (
+            not self.clusters_added
+            and not self.clusters_dropped
+            and not self.clusters_changed
+            and self.total_threads_before == self.total_threads_after
+            and self.total_distinct_authors_before == self.total_distinct_authors_after
+            and self.source_distribution_before == self.source_distribution_after
+        )
+
+    @computed_field
+    @property
+    def summary(self) -> str:
+        """One-line human summary of the movement."""
+        if self.is_empty:
+            return "No change since the prior version."
+        parts: list[str] = []
+        if self.clusters_added:
+            parts.append(f"+{len(self.clusters_added)} themes")
+        if self.clusters_dropped:
+            parts.append(f"-{len(self.clusters_dropped)} themes")
+        if self.clusters_changed:
+            parts.append(f"{len(self.clusters_changed)} shifted")
+        dt = self.total_threads_delta
+        if dt:
+            parts.append(f"{'+' if dt > 0 else ''}{dt} threads")
+        da = self.total_distinct_authors_delta
+        if da:
+            parts.append(f"{'+' if da > 0 else ''}{da} authors")
+        return ", ".join(parts) if parts else "No material change."
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Compact summaries
 # ──────────────────────────────────────────────────────────────────────────
 
