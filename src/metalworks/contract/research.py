@@ -197,7 +197,18 @@ class InsightCluster(BaseModel):
     )
     distinct_author_count: int = Field(
         description="Number of DISTINCT authors expressing this — the honest base rate, "
-        "not mention count."
+        "not mention count. Authored sources only (0 for authorless web; see breadth_count)."
+    )
+    breadth_count: int = Field(
+        default=0,
+        description="Source-neutral breadth = distinct authors + distinct domains (authorless "
+        "web). The demand_score driver, so authored / web / mixed clusters rank comparably. "
+        "Equals distinct_author_count for all-authored (Reddit/HN) clusters.",
+    )
+    breadth_unit: str = Field(
+        default="authors",
+        description="What breadth_count counts: 'authors' (all authored), 'domains' (all "
+        "authorless web), or 'voices' (mixed).",
     )
     mention_count: int = Field(
         description="Total mentions (>= distinct_author_count). Kept separate so base-rate "

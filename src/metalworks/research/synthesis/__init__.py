@@ -131,10 +131,17 @@ def synthesize(
     Returns: A SynthesisOutput. Raises RuntimeError if the core cluster
     synthesis LLM fails 3 retries (fail loud, never empty-success).
     """
-    # 1. Load hydrated rows.
+    # 1. Load hydrated rows. The synthesis working set is `units`: every comment,
+    # PLUS each commentless record (a web page, a link-only story) as its own unit
+    # — when there is no comment thread the record itself is the demand signal.
+    # For the Reddit path every post has comments, so `units == comments` and the
+    # downstream math is byte-identical.
     posts = loader.load_posts(deps, hydrated_post_ids)
     comments = loader.load_comments(deps, hydrated_post_ids)
-    if not comments:
+    units = comments + loader.load_commentless_records_as_units(
+        deps, hydrated_post_ids, exclude_ids={c.post_id for c in comments}
+    )
+    if not units:
         return SynthesisOutput(
             ranked_clusters=[],
             verdict=verdict.derive_verdict(total_distinct_authors=0),
@@ -149,15 +156,15 @@ def synthesize(
         )
 
     # 2. Embed-group dedup. Vectors come from the cache (reused across runs when a
-    # project corpus.db is present), keyed on comment_id; misses are embedded once
+    # project corpus.db is present), keyed on the unit id; misses are embedded once
     # and persisted.
-    vectors = cached_embed(deps, [(c.comment_id, c.body) for c in comments], task="document")
+    vectors = cached_embed(deps, [(c.comment_id, c.body) for c in units], task="document")
 
     def _embed(c: LoadedComment) -> list[float] | None:
         return vectors.get(c.comment_id)
 
-    groups = embed_group.embed_group(comments, _embed)
-    representatives = [comments[g[0]] for g in groups]  # one per near-dup group
+    groups = embed_group.embed_group(units, _embed)
+    representatives = [units[g[0]] for g in groups]  # one per near-dup group
 
     # 3. LLM theme labeling — RAISES after retries.
     clusters, cluster_authors, _cluster_subs, member_indices = cluster_ranker.build_clusters(
@@ -165,7 +172,7 @@ def synthesize(
         axis_context=_axis_context(brief),
         representatives=representatives,
         groups=groups,
-        comments=comments,
+        comments=units,
     )
 
     # 4. Audience inference (descriptors + structured profile).
@@ -175,8 +182,11 @@ def synthesize(
     audience_profile = audience_mod.build_audience_profile(deps, coded)
 
     # 5. Per-cluster attribution_method/confidence from the static map.
+    # member_indices index into `units` (the list handed to build_clusters), so
+    # dereference units here — web units carry an empty subreddit, ignored by the
+    # Reddit-static audience map.
     for cluster, mi in zip(clusters, member_indices, strict=False):
-        method, confidence = audience_mod.describe_audience([comments[i].subreddit for i in mi])
+        method, confidence = audience_mod.describe_audience([units[i].subreddit for i in mi])
         cluster.attribution_method = method
         cluster.attribution_confidence = confidence
 
@@ -205,8 +215,8 @@ def synthesize(
     synthesized_post_ids: set[str] = set()
     for mi in member_indices:
         for i in mi:
-            if 0 <= i < len(comments):
-                pid = comments[i].post_id
+            if 0 <= i < len(units):
+                pid = units[i].post_id
                 if pid:
                     synthesized_post_ids.add(pid)
 

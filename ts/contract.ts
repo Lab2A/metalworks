@@ -62,8 +62,12 @@ export interface InsightCluster {
   claim: string;
   /** Ranking signal. Weights distinct-author breadth ABOVE single-post virality (50 authors x 2 upvotes outranks 1 author x 200 upvotes). */
   demand_score: number;
-  /** Number of DISTINCT authors expressing this — the honest base rate, not mention count. */
+  /** Number of DISTINCT authors expressing this — the honest base rate, not mention count. Authored sources only (0 for authorless web; see breadth_count). */
   distinct_author_count: number;
+  /** Source-neutral breadth = distinct authors + distinct domains (authorless web). The demand_score driver, so authored / web / mixed clusters rank comparably. Equals distinct_author_count for all-authored (Reddit/HN) clusters. */
+  breadth_count?: number;
+  /** What breadth_count counts: 'authors' (all authored), 'domains' (all authorless web), or 'voices' (mixed). */
+  breadth_unit?: string;
   /** Total mentions (>= distinct_author_count). Kept separate so base-rate honesty is visible. */
   mention_count: number;
   /** Confidence chip, derived from distinct_author_count. */

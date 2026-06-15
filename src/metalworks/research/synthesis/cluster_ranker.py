@@ -20,6 +20,7 @@ import math
 import re
 import time
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -66,17 +67,59 @@ class _SynthesisOutput(BaseModel):
 
 
 # ── pure helpers ─────────────────────────────────────────────────────────────
-def signal_from_author_count(distinct_authors: int) -> SignalStrength:
-    if distinct_authors >= SIGNAL_HIGH_AUTHORS:
+def signal_from_breadth(breadth: int) -> SignalStrength:
+    """Confidence chip from breadth (distinct authors + domains). For an
+    all-authored cluster breadth == distinct authors, so the Reddit chip is
+    unchanged."""
+    if breadth >= SIGNAL_HIGH_AUTHORS:
         return SignalStrength.HIGH
-    if distinct_authors >= SIGNAL_MEDIUM_AUTHORS:
+    if breadth >= SIGNAL_MEDIUM_AUTHORS:
         return SignalStrength.MEDIUM
     return SignalStrength.LOW
 
 
-def compute_demand_score(distinct_authors: int, total_engagement: int) -> float:
-    """Rank by breadth of voices, not virality (50x2 outranks 1x200)."""
-    return distinct_authors * AUTHOR_WEIGHT + math.log1p(max(total_engagement, 0))
+# Back-compat alias — breadth == author count for all-authored clusters.
+signal_from_author_count = signal_from_breadth
+
+
+def compute_demand_score(breadth: int, total_engagement: int) -> float:
+    """Rank by breadth of voices, not virality (50x2 outranks 1x200).
+
+    ``breadth`` is the source-neutral count of distinct independent voices —
+    distinct authors for authored sources, distinct domains for authorless web,
+    summed for mixed clusters — so every source ranks on the same axis.
+    """
+    return breadth * AUTHOR_WEIGHT + math.log1p(max(total_engagement, 0))
+
+
+def _domain(url: str) -> str:
+    """Registrable-ish domain of a URL for breadth counting (netloc, no www.)."""
+    netloc = urlsplit(url).netloc.lower()
+    return netloc[4:] if netloc.startswith("www.") else netloc
+
+
+def cluster_breadth(members: list[LoadedComment]) -> tuple[int, int, str]:
+    """Distinct independent voices behind a cluster, source-aware.
+
+    A "voice" is an author when the record has one (Reddit/HN/reviews) or a
+    distinct domain when it doesn't (authorless web). Returns
+    ``(breadth, distinct_authors, unit)`` where ``breadth`` = distinct authors +
+    distinct domains and ``unit`` is ``"authors"`` (all authored), ``"domains"``
+    (all authorless web), or ``"voices"`` (mixed). Authored-only clusters get
+    ``breadth == distinct_authors`` and ``unit == "authors"`` — the Reddit path
+    is unchanged.
+    """
+    authors = {m.author_hash for m in members if m.author_hash}
+    domains = {_domain(m.source_url) for m in members if not m.author_hash}
+    domains.discard("")
+    breadth = len(authors) + len(domains)
+    if authors and domains:
+        unit = "voices"
+    elif domains:
+        unit = "domains"
+    else:
+        unit = "authors"
+    return breadth, len(authors), unit
 
 
 def _format_numbered_comment(i: int, c: LoadedComment) -> str:
@@ -203,14 +246,16 @@ def _build_cluster(
         return None
 
     distinct_authors = {m.author_hash for m in members if m.author_hash}
-    distinct_count = len(distinct_authors)
+    breadth, distinct_count, breadth_unit = cluster_breadth(members)
     cluster = InsightCluster(
         rank=rank,
         claim=candidate.claim,
-        demand_score=compute_demand_score(distinct_count, sum(m.upvotes for m in members)),
+        demand_score=compute_demand_score(breadth, sum(m.upvotes for m in members)),
         distinct_author_count=distinct_count,
+        breadth_count=breadth,
+        breadth_unit=breadth_unit,
         mention_count=len(members),
-        signal=signal_from_author_count(distinct_count),
+        signal=signal_from_breadth(breadth),
         quotes=quotes,
     )
     return cluster, distinct_authors, [m.subreddit for m in members], member_comment_indices

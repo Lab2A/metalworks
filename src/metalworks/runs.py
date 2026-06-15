@@ -45,9 +45,13 @@ def render_run_markdown(research: Research) -> str:
         lines += ["## Top demand clusters", ""]
         for cluster in report.ranked_clusters[:8]:
             lines.append(f"### {cluster.rank}. {cluster.claim}")
+            breadth_str = (
+                f"{cluster.distinct_author_count} distinct authors"
+                if cluster.breadth_unit == "authors"
+                else f"{cluster.breadth_count} {cluster.breadth_unit}"
+            )
             lines.append(
-                f"_signal: {cluster.signal} · {cluster.distinct_author_count} distinct authors · "
-                f"{cluster.mention_count} mentions_"
+                f"_signal: {cluster.signal} · {breadth_str} · {cluster.mention_count} mentions_"
             )
             if cluster.quotes:
                 quote = cluster.quotes[0]

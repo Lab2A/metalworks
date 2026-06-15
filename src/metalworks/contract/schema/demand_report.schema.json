@@ -288,6 +288,18 @@
           "default": null,
           "title": "Attribution Method"
         },
+        "breadth_count": {
+          "default": 0,
+          "description": "Source-neutral breadth = distinct authors + distinct domains (authorless web). The demand_score driver, so authored / web / mixed clusters rank comparably. Equals distinct_author_count for all-authored (Reddit/HN) clusters.",
+          "title": "Breadth Count",
+          "type": "integer"
+        },
+        "breadth_unit": {
+          "default": "authors",
+          "description": "What breadth_count counts: 'authors' (all authored), 'domains' (all authorless web), or 'voices' (mixed).",
+          "title": "Breadth Unit",
+          "type": "string"
+        },
         "claim": {
           "description": "One-line synthesized insight (what consumers want/feel/struggle with).",
           "title": "Claim",
@@ -311,7 +323,7 @@
           "title": "Demographic Match"
         },
         "distinct_author_count": {
-          "description": "Number of DISTINCT authors expressing this \u2014 the honest base rate, not mention count.",
+          "description": "Number of DISTINCT authors expressing this \u2014 the honest base rate, not mention count. Authored sources only (0 for authorless web; see breadth_count).",
           "title": "Distinct Author Count",
           "type": "integer"
         },
