@@ -16,7 +16,14 @@ A few terms used in the code below:
 - The **compliance check** is an automatic check that catches fake or off-topic drafts before you
   ever see them (detailed below).
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/find-threads log aggregation on a budget
+/draft-reply
+```
+
+```python Python
 from metalworks import Metalworks
 from metalworks.contract import DiscoveryContext, Persona, PersonaSet
 
@@ -37,6 +44,8 @@ opps = mw.discovery.run(
 for o in opps:
     print(o.post.url, "→", o.draft_reply[:120], "| passed compliance:", o.compliance.pass_)
 ```
+
+</CodeGroup>
 
 `discovery.run` searches your queries, filters each candidate for relevance, drafts a reply in the
 matching persona's voice, runs it through a compliance check, and returns `Opportunity` objects.

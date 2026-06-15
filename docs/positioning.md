@@ -13,7 +13,14 @@ back to a real quote you can open.
 
 ## Positioning — your angle
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/demand-report an affordable, jitter-free focus supplement for developers
+/position-wedge
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()
@@ -27,11 +34,11 @@ if pos.price_hypothesis:
     print(pos.price_hypothesis.framing)
 ```
 
-From the command line:
-
-```bash
+```bash CLI
 metalworks research position <report-id>
 ```
+
+</CodeGroup>
 
 You get back a positioning statement built around one **unmet need your competitors
 miss** — metalworks finds the strongest need in your report that the wider market
@@ -71,7 +78,14 @@ than guessing a number.
 
 ## Competitors — the rivals to beat
 
-```python
+<CodeGroup>
+
+```text Claude Code
+# uses the report you already made
+/competitor-map
+```
+
+```python Python
 comp = mw.competitors(research)
 
 for rival in comp.competitors:
@@ -80,11 +94,11 @@ for rival in comp.competitors:
         print("   misses:", gap.claim, f"[{gap.severity}]")
 ```
 
-From the command line:
-
-```bash
+```bash CLI
 metalworks research competitor-map <report-id>
 ```
+
+</CodeGroup>
 
 You get back a `CompetitorMap`: the real products people use today, each with what it
 does well and a **gap you can exploit** — and that gap is always backed by an actual

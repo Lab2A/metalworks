@@ -15,7 +15,14 @@ guarantee.**
 (no AI guessing): **no model, no embeddings, no network, no API key.** It's a pure projection of
 the report, so nothing is invented and no ranking is promised.
 
-```python
+<CodeGroup>
+
+```text Claude Code
+# uses the report you already made
+/content-plan
+```
+
+```python Python
 from metalworks import Metalworks
 mw = Metalworks()
 research = mw.research("an affordable, jitter-free focus supplement for developers")
@@ -29,11 +36,11 @@ content.citation_strategy.reddit_targets     # the real Reddit permalinks to cit
 content.citation_strategy.prompt_set         # example prompts to check citability against
 ```
 
-From the CLI (`report-id` comes from `metalworks research list`):
-
-```bash
+```bash CLI
 metalworks research content-plan <report-id>
 ```
+
+</CodeGroup>
 
 ## What you give it / what you get back
 

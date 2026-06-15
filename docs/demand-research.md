@@ -13,7 +13,13 @@ every other step runs on, so do it first.
 
 ## Run it
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/demand-report an affordable, jitter-free focus supplement for developers
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()                       # picks up your provider key from the env
@@ -30,11 +36,11 @@ for c in report.ranked_clusters:
         print("   ", q.source_url, "→", q.text[:80])
 ```
 
-From the command line:
-
-```bash
+```bash CLI
 metalworks research run --question "an affordable, jitter-free focus supplement for developers"
 ```
+
+</CodeGroup>
 
 A run prints something like:
 
