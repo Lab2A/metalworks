@@ -98,11 +98,18 @@ def _pull_corpus(
 
 
 def _build_corpus_stats(items: Iterable[ExplorationItem]) -> CorpusStats:
-    """Deterministic distributions over the relevant corpus (never LLM-inferred)."""
+    """Deterministic distributions over the relevant corpus (never LLM-inferred).
+
+    The rollup keys on a neutral `source_bucket` — for Reddit this is the
+    subreddit; other sources supply their own bucket. The `SourceMapEntry`
+    contract field stays `subreddit` for now (1c adds a generic alias
+    additively), so the bucket value is passed straight through.
+    """
     items = list(items)
-    by_sub: Counter[str] = Counter(item.subreddit or "(unknown)" for item in items)
+    by_bucket: Counter[str] = Counter(item.subreddit or "(unknown)" for item in items)
     subreddit_distribution = [
-        SourceMapEntry(subreddit=sub, threads_examined=count) for sub, count in by_sub.most_common()
+        SourceMapEntry(subreddit=bucket, threads_examined=count)
+        for bucket, count in by_bucket.most_common()
     ]
     percentile_bands: dict[str, int] = {}
     scored = [it.score for it in items if it.score is not None]

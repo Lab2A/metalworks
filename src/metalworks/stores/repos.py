@@ -29,6 +29,8 @@ from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
 from pydantic import BaseModel, Field
 
 from metalworks.contract import (
+    CorpusComment,
+    CorpusRecord,
     DemandReport,
     InboxItem,
     Opportunity,
@@ -106,11 +108,36 @@ class RunRepo(Protocol):
 
 @runtime_checkable
 class CorpusRepo(Protocol):
-    """Post-triage corpus persistence (hydration writes, synthesis reads).
+    """Source-neutral, durable corpus persistence (hydration writes, synthesis reads).
 
-    Upserts are keyed on post_id / comment_id and must be idempotent — the
-    hydration stage retries batches.
+    The authoritative API is the generic record/comment surface
+    (``upsert_records`` / ``get_records`` / ``upsert_corpus_comments`` /
+    ``get_comments_for_records``) over :class:`CorpusRecord` / :class:`CorpusComment`
+    — a Reddit post, an HN story, or a product review all land in the same shape,
+    with source-specific fields tucked into ``extra``. The Reddit-named methods
+    are thin shims kept for existing callers (reddit/, discovery/): they map via
+    ``CorpusRecord.from_reddit_post`` / ``CorpusComment.from_reddit_comment`` on
+    write and reconstruct the Reddit contract from the spine + ``extra`` on read.
+
+    Upserts are keyed on record id / comment id and must be idempotent — the
+    hydration stage retries batches. Records may be comment-less (a link-only
+    story with no quotes).
     """
+
+    # ── Generic record/comment surface (authoritative) ──
+
+    def upsert_records(self, records: Sequence[CorpusRecord]) -> None: ...
+
+    def upsert_corpus_comments(self, comments: Sequence[CorpusComment]) -> None: ...
+
+    def get_records(self, record_ids: Sequence[str]) -> list[CorpusRecord]: ...
+
+    def get_comments_for_records(self, record_ids: Sequence[str]) -> list[CorpusComment]:
+        """ALL comments for the given records — backends paginate to exhaustion;
+        silent truncation here corrupts every downstream count."""
+        ...
+
+    # ── Reddit-named shims (map onto the generic surface) ──
 
     def upsert_posts(self, posts: Sequence[RedditPost]) -> None: ...
 
@@ -123,12 +150,15 @@ class CorpusRepo(Protocol):
         silent truncation here corrupts every downstream count."""
         ...
 
+    # ── Embeddings (keyed by record_id — a CorpusRecord OR CorpusComment id) ──
+
     def upsert_embeddings(
         self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
     ) -> None:
-        """Idempotently store ``comment_id -> embedding vector``, tagged with the
-        embedding model ``identity``. Upserting under a different identity than the
-        stored one replaces the index — vectors from different models are
+        """Idempotently store ``record_id -> embedding vector`` (the key is any
+        corpus id — a :class:`CorpusRecord` or :class:`CorpusComment` id), tagged
+        with the embedding model ``identity``. Upserting under a different identity
+        than the stored one replaces the index — vectors from different models are
         geometrically incompatible and must not be mixed."""
         ...
 
@@ -136,7 +166,7 @@ class CorpusRepo(Protocol):
         self, query: Sequence[float], *, k: int, identity: IndexIdentity
     ) -> list[tuple[str, float]]:
         """Brute-force cosine over the stored vectors → the ``k`` nearest
-        ``(comment_id, score)`` pairs, score descending. Empty index → ``[]``.
+        ``(record_id, score)`` pairs, score descending. Empty index → ``[]``.
         Raises :class:`~metalworks.errors.EmbeddingModelMismatch` when the stored
         index was built with a different model than ``identity``. Needs the
         ``[research]`` extra (numpy) for the cosine math."""
@@ -145,9 +175,9 @@ class CorpusRepo(Protocol):
     def get_embeddings(
         self, ids: Sequence[str], *, identity: IndexIdentity
     ) -> dict[str, list[float]]:
-        """Return the stored vectors for ``ids`` that were embedded under
-        ``identity``, as ``{id: vector}``. Ids with no stored vector — or any when
-        the index was built with a different model — are omitted, so the caller
+        """Return the stored vectors for ``ids`` (any corpus id) that were embedded
+        under ``identity``, as ``{id: vector}``. Ids with no stored vector — or any
+        when the index was built with a different model — are omitted, so the caller
         re-embeds the misses. This is the embedding-cache read path; no numpy
         needed (a plain lookup, not cosine)."""
         ...

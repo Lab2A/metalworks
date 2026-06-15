@@ -9,16 +9,25 @@ line of defense against OTHER processes holding the file.
 Each row stores the pydantic payload as JSON plus the columns queries
 filter/sort on. IN-style queries chunk at 500 ids (SQLite's default
 parameter ceiling is 999 on older builds; 500 leaves headroom).
+
+The corpus is a source-neutral, durable store (Phase 1b): records/comments are
+the generic :class:`CorpusRecord` / :class:`CorpusComment` spine, with the
+source-specific tail in an ``extra`` JSON column. Reddit is mapped on at ingest
+via the Reddit-named shims; new sources add their own mappers without a schema
+change.
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from metalworks.contract import (
+    CorpusComment,
+    CorpusRecord,
     DemandReport,
     InboxItem,
     Opportunity,
@@ -29,6 +38,12 @@ from metalworks.contract import (
 )
 from metalworks.embeddings import IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch, StoreError
+from metalworks.stores.corpus_mapping import (
+    corpus_comments_from_reddit_comments,
+    records_from_reddit_posts,
+    reddit_comment_from_corpus_comment,
+    reddit_post_from_record,
+)
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
 from metalworks.stores.vectors import blob_to_vector, check_dims, cosine_topk, vector_to_blob
 
@@ -48,11 +63,18 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_brief ON runs(brief_id);
 CREATE TABLE IF NOT EXISTS reports (
     report_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS posts (
-    post_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS comments (
-    comment_id TEXT PRIMARY KEY, post_id TEXT NOT NULL, payload TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
+CREATE TABLE IF NOT EXISTS records (
+    id TEXT PRIMARY KEY, source TEXT NOT NULL, source_id TEXT NOT NULL,
+    url TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL,
+    author_hash TEXT, engagement INTEGER NOT NULL, created_at TEXT,
+    extra TEXT NOT NULL, payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_records_source ON records(source);
+CREATE TABLE IF NOT EXISTS corpus_comments (
+    id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, source TEXT NOT NULL,
+    url TEXT NOT NULL, text TEXT NOT NULL, author_hash TEXT NOT NULL,
+    engagement INTEGER NOT NULL, created_at TEXT, extra TEXT NOT NULL,
+    payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_corpus_comments_parent ON corpus_comments(parent_id);
 CREATE TABLE IF NOT EXISTS accounts (
     username TEXT PRIMARY KEY, payload TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS opportunities (
@@ -72,6 +94,12 @@ CREATE TABLE IF NOT EXISTS embedding_meta (
 def _chunks(ids: Sequence[str]) -> Iterator[Sequence[str]]:
     for i in range(0, len(ids), _ID_CHUNK):
         yield ids[i : i + _ID_CHUNK]
+
+
+def _json(extra: dict[str, Any]) -> str:
+    """Serialize the corpus ``extra`` tail for the denormalized column. The
+    authoritative copy is the full ``payload`` JSON; this column is for queries."""
+    return json.dumps(extra, default=str, sort_keys=True)
 
 
 class SqliteStores:
@@ -171,47 +199,96 @@ class SqliteStores:
             ).fetchone()
         return DemandReport.model_validate_json(row[0]) if row else None
 
-    # ── CorpusRepo ──
+    # ── CorpusRepo: generic record/comment surface (authoritative) ──
+
+    def upsert_records(self, records: Sequence[CorpusRecord]) -> None:
+        with self._lock:
+            self._con.executemany(
+                "INSERT OR REPLACE INTO records "
+                "(id, source, source_id, url, title, text, author_hash, engagement, "
+                "created_at, extra, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        r.id,
+                        r.source,
+                        r.source_id,
+                        r.url,
+                        r.title,
+                        r.text,
+                        r.author_hash,
+                        r.engagement,
+                        r.created_at.isoformat() if r.created_at else None,
+                        _json(r.extra),
+                        r.model_dump_json(),
+                    )
+                    for r in records
+                ],
+            )
+            self._con.commit()
+
+    def upsert_corpus_comments(self, comments: Sequence[CorpusComment]) -> None:
+        with self._lock:
+            self._con.executemany(
+                "INSERT OR REPLACE INTO corpus_comments "
+                "(id, parent_id, source, url, text, author_hash, engagement, "
+                "created_at, extra, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        c.id,
+                        c.parent_id,
+                        c.source,
+                        c.url,
+                        c.text,
+                        c.author_hash,
+                        c.engagement,
+                        c.created_at.isoformat() if c.created_at else None,
+                        _json(c.extra),
+                        c.model_dump_json(),
+                    )
+                    for c in comments
+                ],
+            )
+            self._con.commit()
+
+    def get_records(self, record_ids: Sequence[str]) -> list[CorpusRecord]:
+        out: list[CorpusRecord] = []
+        with self._lock:
+            for chunk in _chunks(record_ids):
+                marks = ",".join("?" * len(chunk))
+                rows = self._con.execute(
+                    f"SELECT payload FROM records WHERE id IN ({marks})",
+                    tuple(chunk),
+                ).fetchall()
+                out.extend(CorpusRecord.model_validate_json(r[0]) for r in rows)
+        return out
+
+    def get_comments_for_records(self, record_ids: Sequence[str]) -> list[CorpusComment]:
+        out: list[CorpusComment] = []
+        with self._lock:
+            for chunk in _chunks(record_ids):
+                marks = ",".join("?" * len(chunk))
+                rows = self._con.execute(
+                    f"SELECT payload FROM corpus_comments WHERE parent_id IN ({marks})",
+                    tuple(chunk),
+                ).fetchall()
+                out.extend(CorpusComment.model_validate_json(r[0]) for r in rows)
+        return out
+
+    # ── CorpusRepo: Reddit-named shims (map onto the generic surface) ──
 
     def upsert_posts(self, posts: Sequence[RedditPost]) -> None:
-        with self._lock:
-            self._con.executemany(
-                "INSERT OR REPLACE INTO posts (post_id, payload) VALUES (?, ?)",
-                [(p.post_id, p.model_dump_json()) for p in posts],
-            )
-            self._con.commit()
+        self.upsert_records(records_from_reddit_posts(posts))
 
     def upsert_comments(self, comments: Sequence[RedditComment]) -> None:
-        with self._lock:
-            self._con.executemany(
-                "INSERT OR REPLACE INTO comments (comment_id, post_id, payload) VALUES (?, ?, ?)",
-                [(c.comment_id, c.post_id, c.model_dump_json()) for c in comments],
-            )
-            self._con.commit()
+        self.upsert_corpus_comments(corpus_comments_from_reddit_comments(comments))
 
     def get_posts(self, post_ids: Sequence[str]) -> list[RedditPost]:
-        out: list[RedditPost] = []
-        with self._lock:
-            for chunk in _chunks(post_ids):
-                marks = ",".join("?" * len(chunk))
-                rows = self._con.execute(
-                    f"SELECT payload FROM posts WHERE post_id IN ({marks})",
-                    tuple(chunk),
-                ).fetchall()
-                out.extend(RedditPost.model_validate_json(r[0]) for r in rows)
-        return out
+        return [reddit_post_from_record(r) for r in self.get_records(post_ids)]
 
     def get_comments_for_posts(self, post_ids: Sequence[str]) -> list[RedditComment]:
-        out: list[RedditComment] = []
-        with self._lock:
-            for chunk in _chunks(post_ids):
-                marks = ",".join("?" * len(chunk))
-                rows = self._con.execute(
-                    f"SELECT payload FROM comments WHERE post_id IN ({marks})",
-                    tuple(chunk),
-                ).fetchall()
-                out.extend(RedditComment.model_validate_json(r[0]) for r in rows)
-        return out
+        return [
+            reddit_comment_from_corpus_comment(c) for c in self.get_comments_for_records(post_ids)
+        ]
 
     def upsert_embeddings(
         self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity

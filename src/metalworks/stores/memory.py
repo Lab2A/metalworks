@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from metalworks.contract import (
+    CorpusComment,
+    CorpusRecord,
     DemandReport,
     InboxItem,
     Opportunity,
@@ -19,6 +21,12 @@ from metalworks.contract import (
 )
 from metalworks.embeddings import IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch
+from metalworks.stores.corpus_mapping import (
+    corpus_comments_from_reddit_comments,
+    records_from_reddit_posts,
+    reddit_comment_from_corpus_comment,
+    reddit_post_from_record,
+)
 from metalworks.stores.repos import OpportunityStatus, StoredRedditAccount
 from metalworks.stores.vectors import check_dims, cosine_topk
 
@@ -34,8 +42,8 @@ class MemoryStores:
         self._briefs: dict[str, ResearchBrief] = {}
         self._runs: dict[str, RunSummary] = {}
         self._reports: dict[str, DemandReport] = {}
-        self._posts: dict[str, RedditPost] = {}
-        self._comments: dict[str, RedditComment] = {}
+        self._records: dict[str, CorpusRecord] = {}
+        self._corpus_comments: dict[str, CorpusComment] = {}
         self._accounts: dict[str, StoredRedditAccount] = {}
         self._opportunities: dict[str, Opportunity] = {}
         self._inbox: dict[str, InboxItem] = {}
@@ -83,23 +91,41 @@ class MemoryStores:
         found = self._reports.get(report_id)
         return found.model_copy(deep=True) if found else None
 
-    # ── CorpusRepo ──
+    # ── CorpusRepo: generic record/comment surface (authoritative) ──
+
+    def upsert_records(self, records: Sequence[CorpusRecord]) -> None:
+        for record in records:
+            self._records[record.id] = record.model_copy(deep=True)
+
+    def upsert_corpus_comments(self, comments: Sequence[CorpusComment]) -> None:
+        for comment in comments:
+            self._corpus_comments[comment.id] = comment.model_copy(deep=True)
+
+    def get_records(self, record_ids: Sequence[str]) -> list[CorpusRecord]:
+        wanted = set(record_ids)
+        return [r.model_copy(deep=True) for rid, r in self._records.items() if rid in wanted]
+
+    def get_comments_for_records(self, record_ids: Sequence[str]) -> list[CorpusComment]:
+        wanted = set(record_ids)
+        return [
+            c.model_copy(deep=True) for c in self._corpus_comments.values() if c.parent_id in wanted
+        ]
+
+    # ── CorpusRepo: Reddit-named shims (map onto the generic surface) ──
 
     def upsert_posts(self, posts: Sequence[RedditPost]) -> None:
-        for post in posts:
-            self._posts[post.post_id] = post.model_copy(deep=True)
+        self.upsert_records(records_from_reddit_posts(posts))
 
     def upsert_comments(self, comments: Sequence[RedditComment]) -> None:
-        for comment in comments:
-            self._comments[comment.comment_id] = comment.model_copy(deep=True)
+        self.upsert_corpus_comments(corpus_comments_from_reddit_comments(comments))
 
     def get_posts(self, post_ids: Sequence[str]) -> list[RedditPost]:
-        wanted = set(post_ids)
-        return [p.model_copy(deep=True) for pid, p in self._posts.items() if pid in wanted]
+        return [reddit_post_from_record(r) for r in self.get_records(post_ids)]
 
     def get_comments_for_posts(self, post_ids: Sequence[str]) -> list[RedditComment]:
-        wanted = set(post_ids)
-        return [c.model_copy(deep=True) for c in self._comments.values() if c.post_id in wanted]
+        return [
+            reddit_comment_from_corpus_comment(c) for c in self.get_comments_for_records(post_ids)
+        ]
 
     def upsert_embeddings(
         self, vectors: Mapping[str, Sequence[float]], *, identity: IndexIdentity
