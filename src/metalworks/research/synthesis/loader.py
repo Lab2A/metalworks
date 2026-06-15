@@ -45,14 +45,22 @@ def load_posts(deps: ResearchDeps, post_ids: Sequence[str]) -> list[LoadedPost]:
         if not p.post_id or p.post_id in seen:
             continue
         seen.add(p.post_id)
+        subreddit = p.subreddit or ""
+        permalink = p.url or ""
         out.append(
             LoadedPost(
                 post_id=p.post_id,
-                subreddit=p.subreddit or "",
+                subreddit=subreddit,
                 title=p.title or "",
                 score=p.score,
                 num_comments=p.num_comments,
-                permalink=p.url or "",
+                permalink=permalink,
+                # Source-neutral display fields, derived from the Reddit row.
+                source="reddit",
+                source_label=f"r/{subreddit}" if subreddit else "",
+                engagement=int(p.score or 0),
+                engagement_unit="upvotes",
+                source_url=permalink,
             )
         )
     return out
@@ -80,15 +88,24 @@ def load_comments(
         if not c.comment_id or c.comment_id in seen:
             continue
         seen.add(c.comment_id)
+        subreddit = c.subreddit or ""
+        permalink = c.permalink or ""
+        upvotes = int(c.score or 0)
         out.append(
             LoadedComment(
                 comment_id=c.comment_id,
                 post_id=c.post_id or "",
-                subreddit=c.subreddit or "",
+                subreddit=subreddit,
                 body=body,
-                upvotes=int(c.score or 0),
+                upvotes=upvotes,
                 author_hash=c.author_hash or "",
-                permalink=c.permalink or "",
+                permalink=permalink,
+                # Source-neutral display fields, derived from the Reddit row.
+                source="reddit",
+                source_label=f"r/{subreddit}" if subreddit else "",
+                engagement=upvotes,
+                engagement_unit="upvotes",
+                source_url=permalink,
             )
         )
 
