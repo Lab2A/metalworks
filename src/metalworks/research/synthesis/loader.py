@@ -137,3 +137,66 @@ def load_comments(
     # cap from silently dropping the strongest signal (a long-tail filter).
     out.sort(key=lambda c: c.upvotes, reverse=True)
     return out[:cap]
+
+
+def load_commentless_records_as_units(
+    deps: ResearchDeps,
+    post_ids: Sequence[str],
+    *,
+    exclude_ids: set[str],
+) -> list[LoadedComment]:
+    """Records from a comment-less source contribute their OWN text as a unit.
+
+    A web page has no comment thread — the page text itself IS the unit of demand
+    signal. We map each such record to a `LoadedComment` so it flows through the
+    existing embed-group + cluster pipeline unchanged.
+
+    The discriminator is the ``extra["is_unit"]`` flag the hydration stage sets
+    on records whose SOURCE has no comment layer (``comments_for`` returned
+    ``None``). This is deliberately a per-source property, not "any record with
+    zero comments": a comment-bearing source (Reddit, HN) carries its signal in
+    comments, so a Reddit post with zero comments in a run stays excluded
+    (unchanged behavior), while a web record is always promoted. ``exclude_ids``
+    are record ids that DO have comments — a guard against double-counting.
+
+    Authorless units carry ``author_hash=""``; the breadth ranker counts them by
+    distinct domain instead of distinct author, so they rank comparably rather
+    than scoring zero for having no author.
+    """
+    if not post_ids:
+        return []
+    out: list[LoadedComment] = []
+    seen: set[str] = set()
+    for r in deps.corpus.get_records(list(dict.fromkeys(post_ids))):
+        if not r.id or r.id in exclude_ids or r.id in seen:
+            continue
+        # Only records a comment-less source flagged at ingest become units; a
+        # comment-bearing source's posts are represented by their comments.
+        if not r.extra.get("is_unit"):
+            continue
+        seen.add(r.id)
+        # The page/story text is the signal; fall back to the title for link-only
+        # records whose body is empty.
+        body = (r.text or r.title or "").strip()
+        if not body:
+            continue
+        subreddit = str(r.extra.get("subreddit") or "")
+        engagement = int(r.engagement or 0)
+        url = r.url or ""
+        out.append(
+            LoadedComment(
+                comment_id=r.id,
+                post_id=r.id,
+                subreddit=subreddit,
+                body=body,
+                upvotes=engagement,
+                author_hash=r.author_hash or "",
+                permalink=url,
+                source=r.source,
+                source_label=_source_label(r.source, subreddit),
+                engagement=engagement,
+                engagement_unit=_engagement_unit(r.source),
+                source_url=url,
+            )
+        )
+    return out

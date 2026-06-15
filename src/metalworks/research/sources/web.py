@@ -117,6 +117,10 @@ class WebItemSource:
     """
 
     source_id = "web"
+    # Web has no comment layer: each record (a page) is a self-representing
+    # synthesis unit — its own text is the demand signal. The pipeline reads this
+    # opt-in flag to promote web records to units and rank them by domain breadth.
+    yields_units = True
 
     def __init__(
         self,

@@ -226,10 +226,26 @@ def run_research(
     ingest_records(deps.corpus, relevant_records)
     n_comments = 0
     any_comment_layer = False
+    unit_source_ids: set[str] = set()
     for source in deps.effective_sources():
         written, has_comments = ingest_comments_for(deps.corpus, source, post_ids)
         n_comments += written
         any_comment_layer = any_comment_layer or has_comments
+        # A source OPTS IN to self-representing units (web): its records carry the
+        # demand signal in their own text. This is an explicit flag, NOT inferred
+        # from has_comments — a Reddit source with no comment client wired also
+        # has no comments, but its posts are still comment-bearing, not units.
+        if getattr(source, "yields_units", False):
+            unit_source_ids.add(source.source_id)
+    # Flag the unit-source records so synthesis promotes each to its own unit.
+    # Idempotent re-upsert; only the (small) unit subset is rewritten.
+    if unit_source_ids:
+        unit_records = [
+            r.model_copy(update={"extra": {**r.extra, "is_unit": True}})
+            for r in relevant_records
+            if r.source in unit_source_ids
+        ]
+        ingest_records(deps.corpus, unit_records)
     comments_error: str | None = None
     if not any_comment_layer:
         comments_error = "no comment source configured (deps.comments is None)"

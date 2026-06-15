@@ -70,6 +70,15 @@ class ItemSource(Protocol):
     body markers) is the SOURCE's job: by the time records/comments cross this
     boundary they carry tombstones (``author_hash=None`` / empty body), not raw
     sentinels. The shared synthesis loader no longer special-cases them.
+
+    Optional ``yields_units = True`` (class attribute, default ``False`` when
+    absent) marks a source whose records are SELF-REPRESENTING: each record's own
+    text is a synthesis unit, because the source has no comment layer (e.g. web
+    pages). Synthesis then clusters the records themselves and the ranker measures
+    their breadth by distinct domain instead of distinct author. This is an
+    explicit opt-in, NOT inferred from :meth:`comments_for` returning ``None`` — a
+    comment-bearing source whose comment client simply isn't wired also returns
+    ``None`` but is not a unit source.
     """
 
     source_id: str
