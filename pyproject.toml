@@ -55,9 +55,13 @@ research = [
 ]
 exa = ["exa-py>=1.0"]
 tavily = ["tavily-python>=0.5"]
+# Parallel/Firecrawl: the package gates the extra; the adapter calls the REST
+# endpoint over the core httpx dep (their SDK search surfaces are still in beta).
+parallel = ["parallel-web>=1.1"]
+firecrawl = ["firecrawl-py>=4.0"]
 mcp = ["mcp[cli]>=1.2"]
 all = [
-  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,mcp]",
+  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,mcp]",
 ]
 dev = [
   "pytest>=8",

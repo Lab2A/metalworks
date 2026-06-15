@@ -324,9 +324,12 @@ def resolve_embeddings() -> EmbeddingProvider:
 def resolve_search() -> SearchProvider | None:
     """Resolve an external :class:`~metalworks.search.SearchProvider`, or ``None``.
 
-    Exa (``EXA_API_KEY``) is preferred, then Tavily (``TAVILY_API_KEY``). Returns
-    ``None`` when neither is set — the web stream then relies on model-native
-    grounding, which is the intended graceful degradation, so this never raises.
+    Precedence by first-present key: Exa (``EXA_API_KEY``) → Tavily
+    (``TAVILY_API_KEY``) → Parallel (``PARALLEL_API_KEY``) → Firecrawl
+    (``FIRECRAWL_API_KEY``). Each adapter is lazy-imported only when its key is
+    present. Returns ``None`` when none is set — the web stream then relies on
+    model-native grounding, which is the intended graceful degradation, so this
+    never raises.
     """
     if os.environ.get("EXA_API_KEY"):
         from metalworks.search.adapters.exa import ExaSearch
@@ -336,6 +339,14 @@ def resolve_search() -> SearchProvider | None:
         from metalworks.search.adapters.tavily import TavilySearch
 
         return TavilySearch()
+    if os.environ.get("PARALLEL_API_KEY"):
+        from metalworks.search.adapters.parallel import ParallelSearch
+
+        return ParallelSearch()
+    if os.environ.get("FIRECRAWL_API_KEY"):
+        from metalworks.search.adapters.firecrawl import FirecrawlSearch
+
+        return FirecrawlSearch()
     return None
 
 

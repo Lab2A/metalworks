@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -120,10 +122,50 @@ def test_resolve_embeddings_falls_back_to_local_when_no_keys(
     assert type(provider).__name__ == "FastEmbedEmbedding"
 
 
+_SEARCH_KEYS = ("EXA_API_KEY", "TAVILY_API_KEY", "PARALLEL_API_KEY", "FIRECRAWL_API_KEY")
+
+
+def _clear_search_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in _SEARCH_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
 def test_resolve_search_none_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("EXA_API_KEY", raising=False)
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    _clear_search_keys(monkeypatch)
     assert config.resolve_search() is None
+
+
+def test_resolve_search_picks_parallel_when_only_parallel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # parallel-web gates the extra; install a fake so construction succeeds.
+    monkeypatch.setitem(sys.modules, "parallel", ModuleType("parallel"))
+    _clear_search_keys(monkeypatch)
+    monkeypatch.setenv("PARALLEL_API_KEY", "pk-test")
+    provider = config.resolve_search()
+    assert type(provider).__name__ == "ParallelSearch"
+
+
+def test_resolve_search_picks_firecrawl_when_only_firecrawl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "firecrawl", ModuleType("firecrawl"))
+    _clear_search_keys(monkeypatch)
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    provider = config.resolve_search()
+    assert type(provider).__name__ == "FirecrawlSearch"
+
+
+def test_resolve_search_precedence_parallel_below_tavily(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Tavily key present alongside Parallel → Tavily wins (earlier in the chain).
+    pytest.importorskip("tavily")
+    _clear_search_keys(monkeypatch)
+    monkeypatch.setenv("TAVILY_API_KEY", "tv-test")
+    monkeypatch.setenv("PARALLEL_API_KEY", "pk-test")
+    provider = config.resolve_search()
+    assert type(provider).__name__ == "TavilySearch"
 
 
 def test_config_save_load_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
