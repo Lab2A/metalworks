@@ -1,0 +1,147 @@
+"""Source connectors: the ``ItemSource`` protocol + an append-friendly registry.
+
+This is the seam that turns "Reddit research" into "research over any source".
+A connector implements :class:`ItemSource` — it knows how to *pull* top-level
+items (:class:`~metalworks.contract.CorpusRecord`) and their comments
+(:class:`~metalworks.contract.CorpusComment`) for a query over a time window,
+yielding the source-neutral corpus spine. The pipeline never speaks Reddit (or
+HN, or reviews) directly; it speaks ``ItemSource`` and lets
+:func:`~metalworks.research.sources.ingest.ingest_source` write the pulled
+records into the durable corpus.
+
+Window neutrality
+-----------------
+The bulk corpus is month-partitioned, so the existing reader speaks
+:class:`~metalworks.research.types.MonthRef`. :class:`SourceWindow` neutralizes
+that: it carries the resolved ``months`` (what Arctic needs) plus a
+source-agnostic ``[start, end]`` datetime span (what a date-ranged API source
+needs). A connector reads whichever it understands; the pipeline only ever holds
+an opaque ``SourceWindow``.
+
+Append-friendly registry
+-------------------------
+:data:`SOURCES` is a module-level ``dict[str, factory]``. A new connector
+(e.g. a concurrent Hacker News stream) self-registers on import by calling
+:func:`register_source` at module scope — it never has to edit a shared list
+inline, so two connector streams can land without colliding on this file. The
+built-in Arctic connector registers itself when
+:mod:`metalworks.research.sources.arctic` is imported (which :func:`get_source`
+triggers lazily for the ``"reddit"`` / ``"arctic"`` ids).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from metalworks.contract import CorpusComment, CorpusRecord
+    from metalworks.research.types import MonthRef
+
+
+@dataclass(frozen=True)
+class SourceWindow:
+    """A source-neutral time window over the corpus.
+
+    ``months`` is the month-partition list the bulk (Arctic) reader needs;
+    ``start`` / ``end`` are the equivalent absolute span for a date-ranged API
+    source. A connector reads whichever representation it understands. Empty
+    ``months`` is legal for a source that only windows by datetime span.
+    """
+
+    months: Sequence[MonthRef] = field(default_factory=tuple)
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@runtime_checkable
+class ItemSource(Protocol):
+    """A connector that pulls source-neutral corpus items for a query/window.
+
+    Implementations yield :class:`~metalworks.contract.CorpusRecord` (top-level
+    items) and, when the source has them, :class:`~metalworks.contract.CorpusComment`
+    (quote-bearing sub-items). A source with no comment layer returns ``None``
+    from :meth:`comments_for` — the ingest path then records the run as
+    comment-less rather than treating it as an error.
+
+    Sentinel normalization (Reddit's ``[deleted]`` / ``[removed]`` author and
+    body markers) is the SOURCE's job: by the time records/comments cross this
+    boundary they carry tombstones (``author_hash=None`` / empty body), not raw
+    sentinels. The shared synthesis loader no longer special-cases them.
+    """
+
+    source_id: str
+
+    def pull(
+        self, *, query: str, window: SourceWindow, limit: int | None = None
+    ) -> Iterator[CorpusRecord]:
+        """Yield candidate :class:`CorpusRecord`s for ``query`` over ``window``.
+
+        ``limit`` is a per-pull dev guard (``None`` in production). The pull is
+        the *candidate* set; the pipeline triages it for relevance before any
+        expensive comment fetch.
+        """
+        ...
+
+    def comments_for(self, record_ids: Sequence[str]) -> Iterator[list[CorpusComment]] | None:
+        """Yield one comment batch per record id, in input order.
+
+        Returns ``None`` when the source has no comment layer at all (so the
+        caller marks the run comment-less, not failed). A source WITH comments
+        yields a (possibly empty) ``list[CorpusComment]`` per id.
+        """
+        ...
+
+    def latest_window(self) -> SourceWindow:
+        """The most recent window this source can serve (its anchor)."""
+        ...
+
+
+# ── Append-friendly registry ─────────────────────────────────────────────────
+
+SourceFactory = Callable[..., ItemSource]
+
+# Module-level registry. Connectors self-register here on import via
+# ``register_source`` — never by editing a shared inline list — so concurrent
+# connector streams (e.g. a Hacker News adapter) can land without colliding.
+SOURCES: dict[str, SourceFactory] = {}
+
+
+def register_source(source_id: str, factory: SourceFactory) -> None:
+    """Register ``factory`` under ``source_id`` (idempotent on re-import).
+
+    Re-registering the same id overwrites — module re-imports under pytest must
+    not raise, and a downstream override of a built-in is intentional.
+    """
+    SOURCES[source_id] = factory
+
+
+def get_source(source_id: str, **kwargs: object) -> ItemSource:
+    """Construct the registered source for ``source_id``.
+
+    Triggers a lazy import of the built-in Arctic connector for the
+    ``"reddit"`` / ``"arctic"`` ids so a bare ``import`` of this package stays
+    free of ``duckdb`` / ``httpx``. Unknown ids raise ``KeyError``.
+    """
+    if source_id not in SOURCES and source_id in ("reddit", "arctic"):
+        # Lazy self-registration: importing the module runs its register_source.
+        import importlib
+
+        importlib.import_module("metalworks.research.sources.arctic")
+    try:
+        factory = SOURCES[source_id]
+    except KeyError as exc:
+        raise KeyError(f"unknown source {source_id!r}; registered: {sorted(SOURCES)}") from exc
+    return factory(**kwargs)
+
+
+__all__ = [
+    "SOURCES",
+    "ItemSource",
+    "SourceFactory",
+    "SourceWindow",
+    "get_source",
+    "register_source",
+]

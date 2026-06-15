@@ -27,15 +27,17 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from metalworks.contract import (
+    CorpusRecord,
     CorpusStats,
     DemandReport,
     Fork,
     SourceMapEntry,
     WebFinding,
 )
-from metalworks.research.arctic import hydrate_comments, hydrate_submissions
 from metalworks.research.exploration import run_exploration_triage
 from metalworks.research.planner import pick_target_subreddits
+from metalworks.research.sources import SourceWindow
+from metalworks.research.sources.ingest import ingest_comments_for, ingest_records
 from metalworks.research.synthesis import synthesize
 from metalworks.research.triangulate import (
     TriangulationFailedError,
@@ -66,35 +68,42 @@ def _pull_corpus(
     *,
     months: list[MonthRef],
     per_sub_limit: int | None,
-) -> list[ExplorationItem]:
-    """Pull submissions for every brief subreddit into indexed ExplorationItems.
+) -> tuple[list[ExplorationItem], dict[str, CorpusRecord]]:
+    """Pull candidate records from every configured source for triage.
+
+    Each :class:`ItemSource` is pulled once per brief subreddit (Arctic windows
+    by subreddit) over the month window. The pulled :class:`CorpusRecord`s become
+    the triage stage's indexed :class:`ExplorationItem`s AND are returned keyed by
+    id so the run can ingest the triage-relevant subset (matching the prior
+    hydrate-only-the-relevant-subset behavior — we don't durably persist threads
+    triage rejected, and we don't re-fetch them).
 
     `per_sub_limit` is a dev guard (None in production). Triage decides
     relevance, so we never pre-truncate by content. Item indices are the
     triage stage's indexing contract.
     """
+    window = SourceWindow(months=tuple(months))
     items: list[ExplorationItem] = []
-    for sub in brief.target_subreddits:
-        rows = deps.reader.pull_subreddit(
-            subreddit=sub.name,
-            content_type="submissions",
-            months=months,
-            select_cols=["id", "title", "selftext", "subreddit", "score", "num_comments"],
-            limit=per_sub_limit,
-        )
-        for row in rows:
-            items.append(
-                ExplorationItem(
-                    idx=len(items),
-                    post_id=str(row["id"]),
-                    title=str(row.get("title") or ""),
-                    selftext=str(row.get("selftext") or ""),
-                    subreddit=str(row.get("subreddit") or sub.name),
-                    score=row.get("score"),
-                    num_comments=row.get("num_comments"),
+    records_by_id: dict[str, CorpusRecord] = {}
+    for source in deps.effective_sources():
+        for sub in brief.target_subreddits:
+            for r in source.pull(query=sub.name, window=window, limit=per_sub_limit):
+                if not r.id:
+                    continue
+                records_by_id[r.id] = r
+                subreddit = str(r.extra.get("subreddit") or sub.name)
+                items.append(
+                    ExplorationItem(
+                        idx=len(items),
+                        post_id=r.id,
+                        title=r.title,
+                        selftext=r.text,
+                        subreddit=subreddit,
+                        score=r.engagement,
+                        num_comments=r.extra.get("num_comments"),
+                    )
                 )
-            )
-    return items
+    return items, records_by_id
 
 
 def _build_corpus_stats(items: Iterable[ExplorationItem]) -> CorpusStats:
@@ -182,7 +191,9 @@ def run_research(
     months = _window_months(deps, brief)
 
     deps.emit("pulling")
-    items = _pull_corpus(deps, effective_brief, months=months, per_sub_limit=per_sub_limit)
+    items, records_by_id = _pull_corpus(
+        deps, effective_brief, months=months, per_sub_limit=per_sub_limit
+    )
     if not items:
         return _empty_report(
             deps=deps,
@@ -202,17 +213,29 @@ def run_research(
     )
     relevant_items = [items[i] for i in relevant_indices]
 
+    # Hydration = INGEST the triage-relevant subset into the durable corpus:
+    # the records (already pulled, just persist what survived triage) plus their
+    # comments (the expensive per-link API fetch, run only on the relevant set).
+    # This is the auto-ingest write path: on an empty corpus, a single
+    # research() call leaves the relevant threads + quotes persisted as a side
+    # effect — no separate ingest step.
     deps.emit("hydrating")
     stage_errors: list[str] = []
     post_ids = [it.post_id for it in relevant_items]
-    hyd_subs = hydrate_submissions(deps, post_ids=post_ids, months=months)
+    relevant_records = [records_by_id[pid] for pid in post_ids if pid in records_by_id]
+    ingest_records(deps.corpus, relevant_records)
+    n_comments = 0
+    any_comment_layer = False
+    for source in deps.effective_sources():
+        written, has_comments = ingest_comments_for(deps.corpus, source, post_ids)
+        n_comments += written
+        any_comment_layer = any_comment_layer or has_comments
     comments_error: str | None = None
-    if deps.comments is not None:
-        hyd_comments = hydrate_comments(deps, link_ids=post_ids)
-        if hyd_comments.skipped:
-            stage_errors.append("comment_hydration")
-    else:
+    if not any_comment_layer:
         comments_error = "no comment source configured (deps.comments is None)"
+        stage_errors.append("comment_hydration")
+    elif int(getattr(deps.comments, "last_skipped", 0) or 0):
+        # A source dropped links to upstream 5xx/429 — surface partial.
         stage_errors.append("comment_hydration")
 
     # Synthesis || web research — independent, joined at a barrier.
@@ -266,7 +289,8 @@ def run_research(
     is_partial = bool(stage_errors)
     if not is_partial:
         caveat_parts.append(
-            f"Hydrated {hyd_subs.upserted} submissions for {len(relevant_items)} relevant threads."
+            f"Ingested {len(relevant_items)} relevant threads and "
+            f"{n_comments} comments into the corpus."
         )
     caveat: str | None = " ".join(caveat_parts) if caveat_parts else None
 
