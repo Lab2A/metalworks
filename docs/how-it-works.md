@@ -1,6 +1,6 @@
 ---
 title: "Why you can trust the output"
-description: "metalworks never invents demand. Every claim links to a real Reddit comment, anything it can't back is dropped, and it tells you plainly when there's no opening."
+description: "metalworks never invents demand. Every claim links to a real quote you can open, anything it can't back is dropped, and it tells you plainly when there's no opening."
 ---
 
 Most AI market-research tools have the same flaw: ask them anything and they'll produce a
@@ -9,9 +9,9 @@ way. **The model phrases and organizes; it is never the source of a fact.**
 
 ## The promise
 
-1. **Every claim links to a real comment.** Each finding, quote, competitor gap, marketing
-   line, and feature carries a link to the actual Reddit thread it came from. You can open
-   it and read it yourself.
+1. **Every claim links to a real quote.** Each finding, quote, competitor gap, marketing
+   line, and feature carries a link to the actual source it came from — a Reddit thread, a
+   Hacker News comment, a web page. You can open it and read it yourself.
 2. **Anything it can't back, it drops.** If the tool can't tie a statement to a real quote
    (or, for web facts, a real source URL), that statement never ships. It isn't softened or
    guessed — it's removed.
@@ -25,14 +25,14 @@ line by line, back to real people.
 ## How it actually works
 
 - **Quotes are matched, not paraphrased.** A quote in a report is the exact text of a real
-  stored comment. If a piece of generated text doesn't match a real comment, it's dropped.
+  stored record. If a piece of generated text doesn't match a real one, it's dropped.
 - **Numbers are counted, not asserted.** "312 people raised this" comes from counting
   distinct authors, never from a model estimate.
 - **Web facts carry their real source.** When a finding comes from the web, its URL comes
   from the search tool's citation data — never from model prose. No source, no finding.
 - **Every later step inherits this.** Positioning, the marketing site, the build spec,
   launch copy — each reads from the same report and links every claim back to it. The chain
-  runs from a real comment all the way to the line on your landing page.
+  runs from a real quote all the way to the line on your landing page.
 
 This holds even if you [swap in your own model](/docs/custom-chatmodel): the checking
 happens in the pipeline, around the model, not inside it.

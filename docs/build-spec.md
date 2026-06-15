@@ -4,7 +4,7 @@ description: "Turn a validated demand report into a feature spec and a ready-to-
 ---
 
 You proved the demand. Now turn it into a plan your coding agent can build from. `build_spec`
-maps the demand report to a feature list — every feature backed by a real Reddit quote — and
+maps the demand report to a feature list — every feature backed by a real quote — and
 `scaffold` writes a project on disk for your agent (Claude Code, Cursor, etc.) to build inside.
 
 **metalworks writes the spec and scaffolds the project. It does not write your product code.**
@@ -63,7 +63,7 @@ The grounding rules are what make the spec safe to build from:
   cluster's real quotes as the feature's evidence. A feature with no real cluster behind it is
   **dropped** — the build stays tied to real demand. What survives is only what people actually
   asked for (capped at 8 core features).
-- **Personas.** Derived from the report's audience segments, each tied to a real Reddit voice.
+- **Personas.** Derived from the report's audience segments, each tied to a real voice.
 - **Pricing.** Tiers are copied straight from the report's price evidence (`Starter` at the low
   end of observed willingness to pay, `Pro` at the high end). No price signal → no tiers.
 

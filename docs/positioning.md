@@ -9,7 +9,7 @@ Once you have a [demand report](/docs/demand-research), two calls turn it into t
 things you need before you build: **positioning** (who it's for, why it's different,
 roughly what to charge) and a **competitor map** (the rivals to beat, each with a
 real gap you can exploit). Both read from the same report, so every line traces
-back to a real Reddit comment.
+back to a real quote you can open.
 
 ## Positioning — your angle
 
