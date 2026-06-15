@@ -3,24 +3,22 @@ title: "Data model"
 description: "The objects metalworks gives you back: the source-neutral corpus records, the demand report and its ranked clusters, the verbatim quotes behind them, web findings, and the Reddit objects."
 ---
 
-These are the objects metalworks gives you back. Every one is a Pydantic model in
-`metalworks.contract` — the stable surface you can depend on. There aren't many, and they
-all connect through one report, which resolves back to the source-neutral records in the
-[corpus](/docs/corpus).
+When you run research, this is what you get back — and what every later step reads from. Each
+one is a Pydantic model in `metalworks.contract`, the part of the API you can depend on. There
+aren't many, and they all connect through one report.
 
-## The corpus spine
+## The conversations behind a report
 
-Every source — Reddit, Hacker News, the web, your own — maps its items onto one shape, so
-the report layer never has to care where a quote came from:
+Every [source](/docs/sources) — Reddit, Hacker News, the web, your own — produces items in the
+same two shapes, so the rest of metalworks doesn't care where a quote came from:
 
-- **`CorpusRecord`** — a top-level item: `id`, `source`, `source_id`, `url`, `title`, `text`,
-  `author_hash`, `engagement`, `created_at`, and an open `extra` map for source-specific
-  fields (subreddit, domain, rating…).
-- **`CorpusComment`** — a quote-bearing sub-item of a record (a reply or thread comment),
-  the same spine plus a `parent_id`.
+- **`CorpusRecord`** — one thing people are talking about (a Reddit post, an HN story, a web
+  page): `id`, `source`, `url`, `title`, `text`, `author_hash`, `engagement`, `created_at`,
+  plus an `extra` map for anything source-specific (subreddit, domain, rating…).
+- **`CorpusComment`** — a comment under a record (a reply), the same fields plus a `parent_id`.
 
-Citations resolve against these by id, so the chain runs from a line on your landing page
-back to the real record. See [the corpus](/docs/corpus) and [sources](/docs/sources).
+A quote in a report points back to the exact record or comment it came from, so you can always
+trace a claim to the real conversation. See [your research data](/docs/corpus).
 
 ## The demand report and what's inside it
 
@@ -30,21 +28,19 @@ else you generate later reads from this one report.
 - **`DemandReport`** — the output of demand research: a one-line `verdict` (go / no-go), the
   `ranked_clusters` (the real needs people voiced), web `web_findings`, audience and market
   sizing. If a best-effort stage degraded, `partial` is set with a plain-language `caveat`.
-  A report is a versioned view over the corpus: `lineage_id`, `version`, and
-  `parent_report_id` link it to its earlier versions when you [refresh](/docs/corpus) it.
+  `version`, `lineage_id`, and `parent_report_id` track a report's earlier versions when you
+  [update it](/docs/corpus).
 - **`InsightCluster`** — one ranked need. Carries a `claim` (the need, in plain words),
-  `distinct_author_count` (distinct authors, authored sources only), `breadth_count` /
-  `breadth_unit` (the source-neutral count — distinct authors plus distinct domains for
-  authorless web; `"authors"`, `"domains"`, or `"voices"`), `mention_count`, a `signal` chip,
-  a `demand_score` that weights **breadth** over how viral a single post was, and the
-  `quotes` behind it.
-- **`ResolvedCitation`** — a verbatim quote, source-neutral and self-contained. Its `text` is
-  the exact text of a real stored record, and it carries `source_url` (open it and read it
-  yourself), `source` / `source_name` (e.g. `reddit` / `r/Supplements`), `engagement`, and the
-  `record_id` it resolves to in the corpus. This is the *materialized, portable* form that
-  serializes to disk and over MCP, so a report stays readable detached from the corpus;
-  `CitationRef` is the thin live-view pointer used internally. A cluster with zero verified
-  quotes never ships — metalworks drops anything it can't back with a real quote.
+  `distinct_author_count` (how many different people raised it), `breadth_count` /
+  `breadth_unit` (the same idea across sources — different people, or different sites for web
+  pages), `mention_count`, a `signal` chip, a `demand_score` that ranks by how many people
+  care over how viral one post was, and the `quotes` behind it.
+- **`ResolvedCitation`** — a verbatim quote. Its `text` is the exact text of a real comment,
+  and it carries `source_url` (open it and read it yourself), `source` / `source_name` (e.g.
+  `reddit` / `r/Supplements`), and `engagement`. The quote text and link are stored right on it,
+  so a report makes sense on its own — even handed to someone without your saved data. A
+  cluster with zero verified quotes never ships: metalworks drops anything it can't back with a
+  real quote.
 - **`WebFinding`** — a fact pulled from the web. Its `source_url` comes from the search
   tool's citation data, never from model prose. No source, no finding.
 - **`ReportDiff`** — what changed between two versions of a report: count deltas (threads,

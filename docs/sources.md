@@ -1,43 +1,38 @@
 ---
 title: "Sources"
-description: "metalworks reads from many sources, not just Reddit. Each is an ItemSource connector that ingests into one shared corpus — Reddit, Hacker News, web search, or your own. Choose what to read from, or bring your own."
+description: "Choose where metalworks reads from — Reddit, Hacker News, the web, or your own data. Turn sources on or off, mix several at once, or plug in your own."
 ---
 
-**metalworks reads from many sources, not just Reddit.** Reddit is one first-class
-source among several; the signal compounds as you add more. Every source is an
-`ItemSource` connector that pulls source-neutral records into one shared
-[corpus](/docs/corpus), and synthesis runs over the whole corpus — so a report
-can draw on Reddit threads, Hacker News discussions, and web pages at once.
+**A source is where metalworks reads conversations.** Out of the box it can read from Reddit,
+Hacker News, and the web; you can also plug in your own. Read from more than one and you get
+more evidence behind every report.
 
-## Shipped connectors
+## What's available
 
-| Source id | What it reads | Key needed |
+| Name | Reads | Needs a key? |
 | --- | --- | --- |
-| `reddit` | Live public Reddit submissions + comments | none |
-| `arctic` | Reddit historical archive (Arctic Shift) — see [Load a Reddit corpus](/docs/load-reddit-corpus) | none |
-| `hackernews` | Hacker News stories + comments (Algolia API) | none |
-| `web` | Web pages from a search provider (Exa / Tavily / parallel.ai / Firecrawl) | a search key |
+| `reddit` | Public Reddit posts and comments | No |
+| `hackernews` | Hacker News stories and comments | No |
+| `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | A search key |
+| `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | No |
 
-All of them land in the same shape, so a report over a mixed corpus ranks them
-comparably — see [flat priority](#flat-priority-and-breadth) below.
+## Pick what to read from
 
-## Choosing your sources
-
-Three ways, in increasing permanence:
+By default metalworks reads Reddit. To use others, name them when you run:
 
 ```bash
-# One run, ad hoc — override the sources for this run only:
+# read both Reddit and Hacker News for this run
 metalworks research run --question "..." --source reddit --source hackernews
 
-# List what's registered and reachable:
+# see what's available and reachable
 metalworks sources list
 
-# Turn sources on/off persistently (writes the [sources] config table):
+# turn a source on or off for good (saved to your config)
 metalworks sources enable hackernews
 metalworks sources disable arctic
 ```
 
-In Python, pass the connectors directly:
+In Python, pass the sources you want:
 
 ```python
 from metalworks import Metalworks
@@ -47,33 +42,21 @@ mw = Metalworks(sources=[get_source("reddit"), get_source("hackernews")])
 report = mw.research("an affordable, jitter-free focus supplement").demand
 ```
 
-With no override, metalworks uses your configured `[sources]` (and falls back to
-Reddit). Whatever you pick, a single `mw.research(...)` call still works end to
-end on an empty corpus — it ingests the chosen sources on demand, then
-synthesizes. The corpus it builds up is durable and reused next time; see
-[the corpus](/docs/corpus).
+You don't have to set anything up first — a single `mw.research(...)` reads the sources you
+chose and produces a report in one call.
 
-## Flat priority and breadth
+## How mixed sources are ranked
 
-Adding web (or any source) **promotes** it to a peer — it does not weight it above
-the others. Every source ingests into one corpus and synthesis is
-source-agnostic. The one per-source difference is how a cluster's **breadth** is
-measured, so sources stay comparable instead of one drowning out another:
+When a report draws on more than one source, a need is ranked by **how many different people
+raised it** — not by how viral a single post was. Fifty people each mentioning a problem
+once outranks one post with five hundred upvotes. Web pages (which have no author) count by
+how many different sites raised the point. The upshot: no single source can drown out the
+others.
 
-- Authored sources (Reddit, Hacker News): breadth = **distinct authors**.
-- Authorless web: breadth = **distinct domains**.
-- Mixed clusters: the two are summed (`breadth_unit` becomes `"voices"`).
+## Add your own source
 
-Breadth — not raw engagement — drives a cluster's `demand_score`, so fifty
-quiet voices outrank one viral post, and an authorless web hit never scores zero
-just for lacking an author. A cluster carries both `distinct_author_count`
-(authored voices only) and `breadth_count` / `breadth_unit` for the honest,
-source-neutral count.
-
-## Bring your own source
-
-A connector is small. Copy `research/sources/template.py` and implement the
-`ItemSource` protocol:
+A source is a small piece of code that fetches items and hands them to metalworks in a common
+shape. To add one, copy `research/sources/template.py` and fill in three methods:
 
 ```python
 from collections.abc import Iterator, Sequence
@@ -84,42 +67,35 @@ from metalworks.research.sources import SourceWindow, register_source
 class MySource:
     source_id = "mysource"
 
-    def pull(
-        self, *, query: str, window: SourceWindow, limit: int | None = None
-    ) -> Iterator[CorpusRecord]:
-        # Map your API's items onto the corpus spine.
+    def pull(self, *, query, window, limit=None) -> Iterator[CorpusRecord]:
+        # Fetch items and yield them as CorpusRecord (id, url, title, text, …).
         ...
 
-    def comments_for(
-        self, record_ids: Sequence[str]
-    ) -> Iterator[list[CorpusComment]] | None:
-        # Return one batch per id, or None if your source has no comment layer.
+    def comments_for(self, record_ids: Sequence[str]):
+        # Return the comments under each item — or None if your source has no comments.
         ...
 
     def latest_window(self) -> SourceWindow:
+        # The most recent time range your source can return.
         ...
 
 
 register_source("mysource", lambda **_: MySource())
 ```
 
-Then it's selectable like any built-in: `--source mysource`,
-`get_source("mysource")`, or `Metalworks(sources=[MySource()])`.
+Once registered, it works like any built-in: `--source mysource`, `get_source("mysource")`, or
+`Metalworks(sources=[MySource()])`.
 
-**No comment layer?** Some sources (web pages, link-only feeds) have no comment
-thread — the record's own text is the signal. Return `None` from `comments_for`
-**and** set the class attribute `yields_units = True`. metalworks then treats
-each record as its own synthesis unit and ranks it on domain breadth. This is an
-explicit opt-in: a comment-bearing source whose comment client merely isn't wired
-also returns `None`, but is not a unit source.
+**If your source has no comments** (a web page, a product listing), return `None` from
+`comments_for` and add `yields_units = True` to the class. metalworks then treats each item's
+own text as the thing people are talking about.
 
-A conformance check (`metalworks.testing.check_item_source`) verifies your
-connector satisfies the protocol — wire it into your tests.
+To check your source is wired up correctly, use `metalworks.testing.check_item_source` in your
+tests.
 
 ## Next
 
-- [The corpus](/docs/corpus) — the durable store your sources feed, and live,
-  refreshable reports over it.
-- [Demand research](/docs/demand-research) — run a report over your sources.
-- [Bring your own corpus](/docs/custom-corpus) — load data directly without a
-  connector.
+- [Your research data](/docs/corpus) — where what you read is saved, and how to update a
+  report later.
+- [Demand research](/docs/demand-research) — run a report.
+- [Use your own data](/docs/custom-corpus) — load conversations you already have.

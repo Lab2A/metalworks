@@ -3,10 +3,10 @@ title: "Projects & memory"
 description: "How metalworks remembers your work: the .metalworks/ project directory, what persists, and how every command chains off one demand report instead of re-running research."
 ---
 
-metalworks has a memory. Run research once, and every later step — positioning, the site, the
-build spec, launch copy — reads from that same stored report instead of asking you to re-run
-anything. That memory lives in a `.metalworks/` directory in your project, created the same way
-`git init` creates `.git`.
+metalworks saves your work. Run research once, and every later step — positioning, the site,
+the build spec, launch copy — reads from that same saved report instead of re-running research.
+It all lives in a `.metalworks/` folder in your project, created the same way `git init`
+creates `.git`.
 
 This is what lets the CLI and the [Claude Code plugin](/docs/claude-code) work in steps: one
 command produces a report, the next takes its `report_id` and builds on it.
@@ -34,7 +34,7 @@ your-startup/
 └─ .metalworks/
     ├─ project.json          # manifest: id, slug, idea, created_at, runs[]   [commit]
     ├─ config.toml           # non-secret provider/model settings             [commit]
-    ├─ corpus.db             # sqlite: durable multi-source corpus + runs      [gitignored]
+    ├─ corpus.db             # your saved research data (posts, comments)       [gitignored]
     ├─ runs/<report_id>/research.{md,json}                                    [commit]
     └─ artifacts/            # later-stage outputs (positioning, site, …)     [commit]
 ```
@@ -43,7 +43,7 @@ your-startup/
 | --- | --- | --- |
 | `project.json` | The manifest — project id, slug, idea, and a list of every run. | Yes |
 | `config.toml` | Non-secret settings (provider, model). **Secrets only ever come from env vars.** | Yes |
-| `corpus.db` | The durable, multi-source [corpus](/docs/corpus) — records, comments, and embeddings — plus finished reports. Gitignored because it holds verbatim text, salted author hashes, and vectors (not because it's a throwaway cache — it's the authoritative store you grow). | No |
+| `corpus.db` | Your [saved research data](/docs/corpus) — the posts and comments you've read. Kept out of git so your raw data stays private. | No |
 | `runs/<report_id>/research.json` | The full `Research` bundle for one run — the durable, committable artifact. | Yes |
 | `runs/<report_id>/research.md` | A human-readable summary of the same run. | Yes |
 | `artifacts/<kind>.json` | The latest output of each later stage (positioning, marketing site, content plan, …). | Yes |
@@ -72,10 +72,10 @@ is the set of run directories plus git, nothing is overwritten. Later-stage arti
 the `report_id` they were built from, so a stale positioning brief is detectable by comparing
 its stamp to your latest run.
 
-Because the [corpus](/docs/corpus) is durable, you can also **refresh** a report instead of
-starting fresh — `metalworks research refresh <report_id>` re-synthesizes against the
-now-larger corpus and pins a new *version* in the same lineage, with a `diff` of what moved.
-`metalworks research versions <report_id>` lists the lineage; the prior versions stay frozen.
+You can also **update** a report instead of starting fresh: `metalworks research refresh
+<report_id>` re-runs it against everything you've collected since and shows what changed, saved
+as a new version. `metalworks research versions <report_id>` lists every version; older ones
+are kept exactly as they were. See [your research data](/docs/corpus).
 
 In Python the chaining is implicit — you hold the bundle and pass it along — but the same
 persistence happens underneath when a project exists:

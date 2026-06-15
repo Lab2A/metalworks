@@ -40,10 +40,8 @@ for cluster in report.ranked_clusters:
         print("  ", quote.source_url)
 ```
 
-That's a real report grounded in real conversations — see the full
-[Quickstart](/docs/quickstart). Reddit is one source among several; point it at
-[Hacker News, the web, or your own data](/docs/sources) too, and the signal
-compounds in a [durable corpus](/docs/corpus) you can refresh reports against.
+That's a real report grounded in real conversations you can open — see the full
+[Quickstart](/docs/quickstart).
 
 ## What you can do with it
 
@@ -58,10 +56,7 @@ falls into five stages — each step is a single call:
 | **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
 | **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
 
-It all sits on a durable, multi-source [corpus](/docs/corpus) the runs build up: choose what
-to read from in [Sources](/docs/sources), and **refresh** a report against the growing corpus
-to see what changed. New here? Walk one idea from start to finish in the
-[end-to-end walkthrough](/docs/walkthrough).
+New here? Walk one idea from start to finish in the [end-to-end walkthrough](/docs/walkthrough).
 
 ## Why it's not just another AI tool
 
