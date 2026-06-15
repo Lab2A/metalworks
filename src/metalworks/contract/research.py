@@ -559,6 +559,25 @@ class DemandReport(BaseModel):
         description="Owning tenant. Set by the service, never the LLM. "
         "Defaults to 'local' for library/CLI use.",
     )
+    # ── Lineage (live-view versioning) ──
+    # A report is a VIEW over the corpus; a `research refresh` re-synthesizes
+    # against the now-larger corpus and pins a NEW version in the same lineage.
+    # The materialized artifact stays keyed by `report_id` (unique per version,
+    # so `runs/<report_id>/` and portability are unchanged); `lineage_id` is the
+    # stable handle that survives refreshes. Additive + defaulted: a v1 run and
+    # any pre-lineage report both read as version 1 of their own lineage.
+    lineage_id: str = Field(
+        default="",
+        description="Stable id for this report's refresh lineage. Empty ⇒ first "
+        "version (read `effective_lineage_id`, which falls back to `report_id`).",
+    )
+    version: int = Field(
+        default=1, description="Monotonic version within the lineage (1 = original run)."
+    )
+    parent_report_id: str | None = Field(
+        default=None,
+        description="The prior version's `report_id` this refresh supersedes. None for v1.",
+    )
     query: str
     fork: Fork
     pinned_axis: str
@@ -604,6 +623,13 @@ class DemandReport(BaseModel):
     )
 
     @property
+    def effective_lineage_id(self) -> str:
+        """The lineage handle, falling back to ``report_id`` for v1 / pre-lineage
+        reports (where ``lineage_id`` is empty). Use this — never raw
+        ``lineage_id`` — when grouping versions of the same report."""
+        return self.lineage_id or self.report_id
+
+    @property
     def evidence(self) -> list[EvidenceRecord]:
         """Flat, de-duplicated evidence backing this report.
 
@@ -645,6 +671,133 @@ class DemandReport(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Version diff (live-view refresh)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class ClusterDelta(BaseModel):
+    """A cluster matched across two report versions, with its movement.
+
+    Identity is SEMANTIC — nearest-neighbor on the claim embedding — not
+    positional: rank is renumbered every run, so it can't serve as an id. The
+    match is advisory (LLM synthesis is non-deterministic, so a claim's wording
+    can drift run-to-run even when the underlying theme is stable); the score
+    deltas are the signal.
+    """
+
+    claim_before: str
+    claim_after: str
+    similarity: float = Field(
+        description="Cosine between the two claim embeddings that matched the pair."
+    )
+    demand_score_before: float
+    demand_score_after: float
+    distinct_authors_before: int
+    distinct_authors_after: int
+
+    @computed_field
+    @property
+    def demand_score_delta(self) -> float:
+        return round(self.demand_score_after - self.demand_score_before, 6)
+
+    @computed_field
+    @property
+    def distinct_authors_delta(self) -> int:
+        return self.distinct_authors_after - self.distinct_authors_before
+
+
+class ReportDiff(BaseModel):
+    """A deterministic diff between two versions of a report lineage.
+
+    The reliable layer is the deterministic COUNT deltas — threads, distinct
+    authors, cluster count, source distribution — read straight from the two
+    reports' own fields. Cluster-level changes are matched by claim-embedding
+    nearest-neighbor and are ADVISORY: non-deterministic synthesis means a
+    claim's wording can shift between runs, so the wording diff is a hint while
+    the counts are ground truth. Diffing a report against an identical
+    re-synthesis yields ``is_empty`` — the refresh determinism guarantee.
+    """
+
+    lineage_id: str
+    from_report_id: str
+    to_report_id: str
+    from_version: int
+    to_version: int
+
+    # ── Deterministic layer (ground truth) ──
+    total_threads_before: int
+    total_threads_after: int
+    total_distinct_authors_before: int
+    total_distinct_authors_after: int
+    cluster_count_before: int
+    cluster_count_after: int
+    source_distribution_before: dict[str, int] = Field(
+        default_factory=dict, description="Source label → threads examined, prior version."
+    )
+    source_distribution_after: dict[str, int] = Field(
+        default_factory=dict, description="Source label → threads examined, later version."
+    )
+
+    # ── Cluster layer (advisory, claim-embedding matched) ──
+    clusters_added: list[str] = Field(
+        default_factory=list[str], description="Claims present only in the later version."
+    )
+    clusters_dropped: list[str] = Field(
+        default_factory=list[str], description="Claims present only in the prior version."
+    )
+    clusters_changed: list[ClusterDelta] = Field(
+        default_factory=list[ClusterDelta], description="Matched clusters whose demand moved."
+    )
+    clusters_unchanged: int = Field(
+        default=0, description="Matched clusters with no material movement."
+    )
+
+    @computed_field
+    @property
+    def total_distinct_authors_delta(self) -> int:
+        return self.total_distinct_authors_after - self.total_distinct_authors_before
+
+    @computed_field
+    @property
+    def total_threads_delta(self) -> int:
+        return self.total_threads_after - self.total_threads_before
+
+    @computed_field
+    @property
+    def is_empty(self) -> bool:
+        """True when nothing material changed (a refresh on an unchanged corpus)."""
+        return (
+            not self.clusters_added
+            and not self.clusters_dropped
+            and not self.clusters_changed
+            and self.total_threads_before == self.total_threads_after
+            and self.total_distinct_authors_before == self.total_distinct_authors_after
+            and self.source_distribution_before == self.source_distribution_after
+        )
+
+    @computed_field
+    @property
+    def summary(self) -> str:
+        """One-line human summary of the movement."""
+        if self.is_empty:
+            return "No change since the prior version."
+        parts: list[str] = []
+        if self.clusters_added:
+            parts.append(f"+{len(self.clusters_added)} themes")
+        if self.clusters_dropped:
+            parts.append(f"-{len(self.clusters_dropped)} themes")
+        if self.clusters_changed:
+            parts.append(f"{len(self.clusters_changed)} shifted")
+        dt = self.total_threads_delta
+        if dt:
+            parts.append(f"{'+' if dt > 0 else ''}{dt} threads")
+        da = self.total_distinct_authors_delta
+        if da:
+            parts.append(f"{'+' if da > 0 else ''}{da} authors")
+        return ", ".join(parts) if parts else "No material change."
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Compact summaries
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -681,6 +834,11 @@ class RunSummary(BaseModel):
     report_id: str
     brief_id: str | None = None
     query: str
+    # Lineage (mirrors DemandReport): groups a report's refresh versions so the
+    # runs table is the version index. Additive + defaulted (read
+    # `lineage_id or report_id`).
+    lineage_id: str = ""
+    version: int = 1
     status: Literal[
         "queued",
         "planning_brief",
@@ -701,3 +859,19 @@ class RunSummary(BaseModel):
     created_at: datetime
     generated_at: datetime | None = None
     ready_at: datetime | None = None
+
+    @classmethod
+    def from_report(cls, report: DemandReport, *, question: str | None = None) -> RunSummary:
+        """A completed run row for a finished report (carries its lineage)."""
+        return cls(
+            report_id=report.report_id,
+            brief_id=report.brief.brief_id if report.brief else None,
+            query=question or report.query,
+            lineage_id=report.effective_lineage_id,
+            version=report.version,
+            status="complete",
+            total_distinct_authors=report.total_distinct_authors,
+            created_at=report.generated_at,
+            generated_at=report.generated_at,
+            ready_at=report.generated_at,
+        )

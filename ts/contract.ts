@@ -244,6 +244,12 @@ export interface DemandReport {
   report_id: string;
   /** Owning tenant. Set by the service, never the LLM. Defaults to 'local' for library/CLI use. */
   client_id?: string;
+  /** Stable id for this report's refresh lineage. Empty ⇒ first version (read `effective_lineage_id`, which falls back to `report_id`). */
+  lineage_id?: string;
+  /** Monotonic version within the lineage (1 = original run). */
+  version?: number;
+  /** The prior version's `report_id` this refresh supersedes. None for v1. */
+  parent_report_id?: string | null;
   query: string;
   fork: Fork;
   pinned_axis: string;
@@ -298,6 +304,8 @@ export interface RunSummary {
   report_id: string;
   brief_id?: string | null;
   query: string;
+  lineage_id?: string;
+  version?: number;
   status: "queued" | "planning_brief" | "pulling_arctic_shift" | "embedding_triage" | "llm_classifying" | "analyzing_relevant" | "web_research" | "compiling" | "complete" | "failed" | "compile_failed" | "oom_chunked";
   progress?: string | null;
   error?: string | null;

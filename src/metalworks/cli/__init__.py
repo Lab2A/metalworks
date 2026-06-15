@@ -26,8 +26,10 @@ import metalworks
 from metalworks import config
 
 if TYPE_CHECKING:
+    from metalworks.contract import DemandReport
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.stores.repos import RunRepo
 
 app = typer.Typer(
     name="metalworks",
@@ -1028,7 +1030,7 @@ def research_run(
     ] = None,
 ) -> None:
     """Run the research pipeline from a --question (no brief.json needed) or a --brief file."""
-    from metalworks.contract import ResearchBrief
+    from metalworks.contract import ResearchBrief, RunSummary
     from metalworks.research import run_research
     from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
@@ -1086,6 +1088,7 @@ def research_run(
         reader.close()
 
     store.save_report(report)
+    store.save_run(RunSummary.from_report(report, question=research_brief.question))
     if out is not None:
         out.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"[green]Wrote report[/green] {out}")
@@ -1114,6 +1117,154 @@ def research_list(
         query = r.query if len(r.query) <= 50 else r.query[:47] + "…"
         table.add_row(r.report_id, query, str(r.total_distinct_authors), when)
     console.print(table)
+
+
+def _print_diff(diff: object) -> None:
+    """Render a ReportDiff to the console (the version-to-version movement)."""
+    from metalworks.contract import ReportDiff
+
+    assert isinstance(diff, ReportDiff)
+    console.print(
+        f"\n[bold]Refresh diff[/bold] v{diff.from_version} → v{diff.to_version} — {diff.summary}"
+    )
+    console.print(
+        f"  threads {diff.total_threads_before} → {diff.total_threads_after} "
+        f"({diff.total_threads_delta:+d}) · "
+        f"authors {diff.total_distinct_authors_before} → {diff.total_distinct_authors_after} "
+        f"({diff.total_distinct_authors_delta:+d}) · "
+        f"themes {diff.cluster_count_before} → {diff.cluster_count_after}"
+    )
+    for claim in diff.clusters_added:
+        console.print(f"  [green]+ new[/green] {claim}")
+    for claim in diff.clusters_dropped:
+        console.print(f"  [red]- faded[/red] {claim}")
+    for d in diff.clusters_changed:
+        console.print(
+            f"  [yellow]~ shift[/yellow] {d.claim_after} "
+            f"(demand {d.demand_score_delta:+.2f}, authors {d.distinct_authors_delta:+d})"
+        )
+
+
+def _lineage_head(store: RunRepo, prior: DemandReport) -> DemandReport:
+    """The highest-version stored report in ``prior``'s lineage (so a refresh
+    advances from the head and version numbers stay monotonic). Falls back to
+    ``prior`` when no run rows exist for the lineage (e.g. pre-lineage reports)."""
+    lineage = prior.effective_lineage_id
+    runs = [r for r in store.list_runs(limit=10_000) if (r.lineage_id or r.report_id) == lineage]
+    if not runs:
+        return prior
+    head_ref = max(runs, key=lambda r: r.version)
+    head = store.get_report(head_ref.report_id)
+    return head or prior
+
+
+@research_app.command("refresh")
+def research_refresh(
+    report_id: Annotated[
+        str, typer.Argument(help="A stored report id (any version in the lineage).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the new report JSON here.")
+    ] = None,
+) -> None:
+    """Re-synthesize a stored report against the current corpus → a new pinned version + diff."""
+    from metalworks.contract import DemandReport, RunSummary
+    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.refresh import refresh_report
+
+    store = config.default_store()
+    prior = store.get_report(report_id)
+    if prior is None:
+        err_console.print(
+            f"[red]No stored report {report_id}.[/red] "
+            "Run `metalworks research list` to see report ids."
+        )
+        raise typer.Exit(code=1)
+    head = _lineage_head(store, prior)
+    assert isinstance(head, DemandReport)
+    if head.brief is None:
+        err_console.print(
+            "[red]That report has no brief and can't be refreshed.[/red] "
+            "Run `metalworks research run` for a fresh lineage."
+        )
+        raise typer.Exit(code=1)
+
+    chat = _resolve_chat_or_exit()
+    embeddings = _resolve_embeddings_or_exit()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    comments = ArcticShiftApiClient()
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=embeddings,
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+        comments=comments,
+    )
+    console.print(f"[bold]Refreshing[/bold] v{head.version} → v{head.version + 1}: {head.query}")
+    try:
+        new_report, diff = refresh_report(deps, head)
+    finally:
+        reader.close()
+
+    store.save_report(new_report)
+    store.save_run(RunSummary.from_report(new_report))
+    if out is not None:
+        out.write_text(new_report.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote report[/green] {out}")
+    _print_diff(diff)
+    console.print(f"[green]New version[/green] {new_report.report_id} (v{new_report.version})")
+
+
+@research_app.command("versions")
+def research_versions(
+    report_id: Annotated[str, typer.Argument(help="Any report id in the lineage.")],
+) -> None:
+    """List the versions in a report's lineage, oldest → newest."""
+    from metalworks.contract import RunSummary
+
+    store = config.default_store()
+    prior = store.get_report(report_id)
+    if prior is None:
+        err_console.print(f"[red]No stored report {report_id}.[/red]")
+        raise typer.Exit(code=1)
+    lineage = prior.effective_lineage_id
+    runs = sorted(
+        (r for r in store.list_runs(limit=10_000) if (r.lineage_id or r.report_id) == lineage),
+        key=lambda r: r.version,
+    )
+    if not runs:
+        runs = [RunSummary.from_report(prior)]
+    table = Table(show_header=True, header_style="bold", title=f"lineage {lineage}")
+    table.add_column("v", justify="right")
+    table.add_column("report_id")
+    table.add_column("authors", justify="right")
+    table.add_column("generated")
+    for r in runs:
+        when = r.generated_at.strftime("%Y-%m-%d %H:%M") if r.generated_at else "—"
+        table.add_row(str(r.version), r.report_id, str(r.total_distinct_authors or 0), when)
+    console.print(table)
+
+
+@research_app.command("diff")
+def research_diff_cmd(
+    report_a: Annotated[str, typer.Argument(help="The earlier report id.")],
+    report_b: Annotated[str, typer.Argument(help="The later report id.")],
+) -> None:
+    """Show the diff between two stored report versions."""
+    from metalworks.research.diff import diff_reports
+
+    store = config.default_store()
+    a = store.get_report(report_a)
+    b = store.get_report(report_b)
+    missing = [rid for rid, rep in ((report_a, a), (report_b, b)) if rep is None]
+    if missing:
+        err_console.print(f"[red]No stored report(s): {', '.join(missing)}.[/red]")
+        raise typer.Exit(code=1)
+    assert a is not None and b is not None
+    embeddings = _resolve_embeddings_or_exit()
+    _print_diff(diff_reports(a, b, embeddings=embeddings))
 
 
 def _print_positioning(brief: object) -> None:

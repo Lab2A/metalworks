@@ -297,6 +297,7 @@ def run_research(
     deps.emit("assembling")
     return DemandReport(
         report_id=report_id,
+        lineage_id=report_id,  # v1: the lineage is rooted at this run
         client_id=brief.workspace_id,
         query=brief.question,
         fork=Fork.PRODUCT_PINNED,

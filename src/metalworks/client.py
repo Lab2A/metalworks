@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         PositioningBrief,
         RedditComment,
         RedditPost,
+        ReportDiff,
         Research,
         ResearchBrief,
         SubredditIntel,
@@ -305,6 +306,31 @@ class Metalworks:
 
             write_run(project, result, question=brief.question)
         return result
+
+    def refresh(self, prior: Research | DemandReport) -> tuple[Research, ReportDiff]:
+        """Re-synthesize a prior report against the current corpus.
+
+        Returns ``(research, diff)``: a new :class:`~metalworks.contract.Research`
+        bundle pinned as the next version in ``prior``'s lineage, and the
+        :class:`~metalworks.contract.ReportDiff` from ``prior`` to it. A report is
+        a live view — re-running its brief picks up corpus growth (new sources,
+        freshly ingested material) while the prior version stays frozen. Persists
+        the new version as committed files when run inside a project, like
+        :meth:`research`.
+        """
+        from metalworks.contract import Research
+        from metalworks.research.refresh import refresh_report
+
+        new_report, diff = refresh_report(self._r.research_deps(), _demand(prior))
+        result = Research(demand=new_report)
+        from metalworks.project import Project
+
+        project = Project.find()
+        if project is not None:
+            from metalworks.runs import write_run
+
+            write_run(project, result, question=new_report.query, diff=diff)
+        return result, diff
 
     def plan(self, prompt: str) -> ResearchBrief:
         """Walk the D1-D8 planner (recommended answers) → a ``ResearchBrief``."""
