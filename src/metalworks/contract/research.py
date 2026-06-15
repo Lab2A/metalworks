@@ -559,6 +559,25 @@ class DemandReport(BaseModel):
         description="Owning tenant. Set by the service, never the LLM. "
         "Defaults to 'local' for library/CLI use.",
     )
+    # ── Lineage (live-view versioning) ──
+    # A report is a VIEW over the corpus; a `research refresh` re-synthesizes
+    # against the now-larger corpus and pins a NEW version in the same lineage.
+    # The materialized artifact stays keyed by `report_id` (unique per version,
+    # so `runs/<report_id>/` and portability are unchanged); `lineage_id` is the
+    # stable handle that survives refreshes. Additive + defaulted: a v1 run and
+    # any pre-lineage report both read as version 1 of their own lineage.
+    lineage_id: str = Field(
+        default="",
+        description="Stable id for this report's refresh lineage. Empty ⇒ first "
+        "version (read `effective_lineage_id`, which falls back to `report_id`).",
+    )
+    version: int = Field(
+        default=1, description="Monotonic version within the lineage (1 = original run)."
+    )
+    parent_report_id: str | None = Field(
+        default=None,
+        description="The prior version's `report_id` this refresh supersedes. None for v1.",
+    )
     query: str
     fork: Fork
     pinned_axis: str
@@ -602,6 +621,13 @@ class DemandReport(BaseModel):
         default_factory=dict,
         description="must_address item → 'cluster:N' | 'web:N' | 'unaddressable: <reason>'.",
     )
+
+    @property
+    def effective_lineage_id(self) -> str:
+        """The lineage handle, falling back to ``report_id`` for v1 / pre-lineage
+        reports (where ``lineage_id`` is empty). Use this — never raw
+        ``lineage_id`` — when grouping versions of the same report."""
+        return self.lineage_id or self.report_id
 
     @property
     def evidence(self) -> list[EvidenceRecord]:

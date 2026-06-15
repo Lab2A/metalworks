@@ -88,6 +88,9 @@ def write_run(project: Project, research: Research, *, question: str) -> RunRef:
         report_id=report.report_id,
         question=question,
         created_at=report.generated_at,
+        lineage_id=report.effective_lineage_id,
+        version=report.version,
+        parent_report_id=report.parent_report_id,
     )
     manifest = project.read_manifest()
     manifest.runs.append(ref)

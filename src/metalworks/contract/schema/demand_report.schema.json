@@ -1013,6 +1013,12 @@
       "title": "Generated At",
       "type": "string"
     },
+    "lineage_id": {
+      "default": "",
+      "description": "Stable id for this report's refresh lineage. Empty \u21d2 first version (read `effective_lineage_id`, which falls back to `report_id`).",
+      "title": "Lineage Id",
+      "type": "string"
+    },
     "market_sizing": {
       "anyOf": [
         {
@@ -1035,6 +1041,19 @@
     "optimized_axis": {
       "title": "Optimized Axis",
       "type": "string"
+    },
+    "parent_report_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The prior version's `report_id` this refresh supersedes. None for v1.",
+      "title": "Parent Report Id"
     },
     "partial": {
       "default": false,
@@ -1121,6 +1140,12 @@
       ],
       "default": null,
       "title": "Verdict"
+    },
+    "version": {
+      "default": 1,
+      "description": "Monotonic version within the lineage (1 = original run).",
+      "title": "Version",
+      "type": "integer"
     },
     "web_findings": {
       "items": {

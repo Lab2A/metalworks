@@ -53,12 +53,22 @@ def _slugify(text: str) -> str:
 
 
 class RunRef(BaseModel):
-    """A manifest pointer to one persisted research run (files live in ``runs/<run_id>/``)."""
+    """A manifest pointer to one persisted research run (files live in ``runs/<run_id>/``).
+
+    A run is one version in a refresh lineage. ``lineage_id`` groups the
+    versions of a report (a ``research refresh`` mints a new run with the same
+    ``lineage_id`` and ``version`` + 1); ``parent_report_id`` links to the prior
+    version. All three are additive + defaulted so manifests written before
+    lineage tracking still validate (they read as version 1 of their own lineage).
+    """
 
     run_id: str
     report_id: str
     question: str
     created_at: datetime
+    lineage_id: str = ""
+    version: int = 1
+    parent_report_id: str | None = None
 
 
 class ProjectManifest(BaseModel):
