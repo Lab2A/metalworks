@@ -16,6 +16,8 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 
+import pytest
+
 from metalworks.contract import (
     CorpusComment,
     CorpusRecord,
@@ -233,6 +235,9 @@ class _NullReader:
 
 def test_run_research_over_fake_source_one_call_auto_ingest() -> None:
     # EMPTY corpus + research() in ONE call → report (auto-ingest invariant).
+    # Runs the full pipeline, which needs the [research] extra (rank-bm25/numpy).
+    pytest.importorskip("rank_bm25")
+    pytest.importorskip("numpy")
     corpus = MemoryStores()
     all_ids = [rid for rid, _, _ in _RECORDS]
     assert corpus.get_records(all_ids) == []  # truly empty to start
