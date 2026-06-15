@@ -40,6 +40,8 @@ from metalworks.llm.adapters.google import GoogleChatModel, _convert_grounding
 from metalworks.llm.adapters.openai import OpenAIChatModel, _reasoning_effort
 from metalworks.llm.protocol import GroundingSupport
 from metalworks.search.adapters.exa import ExaSearch
+from metalworks.search.adapters.firecrawl import FirecrawlSearch
+from metalworks.search.adapters.parallel import ParallelSearch
 from metalworks.search.adapters.tavily import TavilySearch
 
 GOOGLE_MODULES = ("google", "google.genai", "google.genai.types", "google.genai.errors")
@@ -53,6 +55,8 @@ ADAPTER_MODULES = (
     "metalworks.search.adapters",
     "metalworks.search.adapters.exa",
     "metalworks.search.adapters.tavily",
+    "metalworks.search.adapters.parallel",
+    "metalworks.search.adapters.firecrawl",
     "metalworks.embeddings.adapters",
     "metalworks.embeddings.adapters.google",
     "metalworks.embeddings.adapters.openai",
@@ -66,6 +70,8 @@ EXTRA_AND_KEY_CASES = [
     ),
     pytest.param(ExaSearch, ("exa_py",), ("EXA_API_KEY",), id="exa"),
     pytest.param(TavilySearch, ("tavily",), ("TAVILY_API_KEY",), id="tavily"),
+    pytest.param(ParallelSearch, ("parallel",), ("PARALLEL_API_KEY",), id="parallel"),
+    pytest.param(FirecrawlSearch, ("firecrawl",), ("FIRECRAWL_API_KEY",), id="firecrawl"),
     pytest.param(
         GoogleEmbedding,
         GOOGLE_MODULES,
@@ -544,3 +550,163 @@ def test_openai_compat_missing_key_names_the_env_var(
     with pytest.raises(MissingKeyError) as exc:
         OpenAIChatModel(api_key_env="CUSTOM_LLM_KEY", base_url="http://localhost:1234/v1")
     assert "CUSTOM_LLM_KEY" in str(exc.value.fix)
+
+
+# ── 6. Parallel / Firecrawl SearchProvider mapping (offline, httpx stubbed) ──
+#
+# Both adapters call the REST endpoint over httpx (their SDK search surfaces are
+# still in beta). We install a fake `parallel`/`firecrawl` module so the extra
+# gate passes, construct with an explicit key, then stub the module-level
+# httpx.post with a canned provider response and assert the SearchResult mapping.
+
+
+class _FakeResponse:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+        self.calls_raise = 0
+
+    def raise_for_status(self) -> None:
+        self.calls_raise += 1
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+
+def _capture_post(payload: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Return a fake httpx.post that records its kwargs and returns ``payload``."""
+    captured: dict[str, Any] = {}
+
+    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+        captured["url"] = url
+        captured.update(kwargs)
+        return _FakeResponse(payload)
+
+    return fake_post, captured
+
+
+def test_parallel_search_maps_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fakes(monkeypatch, ("parallel",))
+    from metalworks.search.adapters import parallel as parallel_mod
+
+    provider = parallel_mod.ParallelSearch(api_key="pk-test")
+    payload = {
+        "search_id": "search_abc",
+        "results": [
+            {
+                "url": "https://a.example/post",
+                "title": "Vector DB Benchmarks",
+                "publish_date": "2026-01-15",
+                "excerpts": ["pgvector vs pinecone", "cost comparison table"],
+            },
+            {
+                "url": "https://b.example",
+                "title": "No excerpts here",
+                # publish_date absent → published_at None
+                "excerpts": [],
+            },
+        ],
+    }
+    fake_post, captured = _capture_post(payload)
+    monkeypatch.setattr(parallel_mod.httpx, "post", fake_post)
+
+    results = provider.search(query="vector db benchmarks", max_results=5, recency_days=30)
+
+    assert provider.provider_id == "parallel"
+    assert provider.protocol_version == parallel_mod.PROTOCOL_VERSION
+    assert len(results) == 2
+    first = results[0]
+    assert first.url == "https://a.example/post"
+    assert first.title == "Vector DB Benchmarks"
+    # snippet = joined excerpts, capped at 500 chars
+    assert first.snippet == "pgvector vs pinecone\ncost comparison table"
+    assert first.published_at == "2026-01-15"
+    assert first.raw == payload["results"][0]
+    assert results[1].published_at is None
+    assert results[1].snippet == ""
+    # request shape: objective=query, max_results passed, recency → after_date
+    body = captured["json"]
+    assert body["objective"] == "vector db benchmarks"
+    assert body["max_results"] == 5
+    assert "after_date" in body["source_policy"]
+    assert captured["headers"]["x-api-key"] == "pk-test"
+    assert captured["headers"]["parallel-beta"]
+
+
+def test_parallel_snippet_truncated_to_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fakes(monkeypatch, ("parallel",))
+    from metalworks.search.adapters import parallel as parallel_mod
+
+    provider = parallel_mod.ParallelSearch(api_key="pk-test")
+    long_excerpt = "x" * 900
+    payload = {"results": [{"url": "u", "title": "t", "excerpts": [long_excerpt]}]}
+    fake_post, _ = _capture_post(payload)
+    monkeypatch.setattr(parallel_mod.httpx, "post", fake_post)
+
+    results = provider.search(query="q")
+    assert len(results[0].snippet) == 500
+
+
+def test_firecrawl_search_maps_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fakes(monkeypatch, ("firecrawl",))
+    from metalworks.search.adapters import firecrawl as firecrawl_mod
+
+    provider = firecrawl_mod.FirecrawlSearch(api_key="fc-test")
+    payload = {
+        "success": True,
+        "data": {
+            "web": [
+                {
+                    "url": "https://a.example",
+                    "title": "Has markdown",
+                    "description": "short desc",
+                    "markdown": "# Full page content",
+                },
+                {
+                    "url": "https://b.example",
+                    "title": "Desc only",
+                    "description": "fallback description",
+                    # no markdown → snippet falls back to description
+                },
+            ]
+        },
+        "creditsUsed": 2,
+    }
+    fake_post, captured = _capture_post(payload)
+    monkeypatch.setattr(firecrawl_mod.httpx, "post", fake_post)
+
+    results = provider.search(query="firecrawl test", max_results=3, recency_days=7)
+
+    assert provider.provider_id == "firecrawl"
+    assert len(results) == 2
+    # markdown preferred for the snippet
+    assert results[0].snippet == "# Full page content"
+    assert results[0].url == "https://a.example"
+    assert results[0].published_at is None
+    # falls back to description when markdown absent
+    assert results[1].snippet == "fallback description"
+    # request shape
+    body = captured["json"]
+    assert body["query"] == "firecrawl test"
+    assert body["limit"] == 3
+    assert body["tbs"] == "qdr:w"  # 7 days → weekly bucket
+    assert captured["headers"]["authorization"] == "Bearer fc-test"
+
+
+def test_firecrawl_empty_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fakes(monkeypatch, ("firecrawl",))
+    from metalworks.search.adapters import firecrawl as firecrawl_mod
+
+    provider = firecrawl_mod.FirecrawlSearch(api_key="fc-test")
+    fake_post, _ = _capture_post({"success": True, "data": {}})
+    monkeypatch.setattr(firecrawl_mod.httpx, "post", fake_post)
+    assert provider.search(query="q") == []
+
+
+def test_firecrawl_tbs_buckets(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fakes(monkeypatch, ("firecrawl",))
+    from metalworks.search.adapters.firecrawl import _tbs_for_days
+
+    assert _tbs_for_days(1) == "qdr:d"
+    assert _tbs_for_days(5) == "qdr:w"
+    assert _tbs_for_days(20) == "qdr:m"
+    assert _tbs_for_days(400) == "qdr:y"
