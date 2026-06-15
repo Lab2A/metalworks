@@ -80,6 +80,81 @@ def test_config_set_refuses_secret(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert not (tmp_path / "metalworks.toml").exists()
 
 
+_PROVIDER_KEYS = (
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+)
+
+
+def test_models_list_runs_without_keys(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # With no provider key set, every resolver is guarded: `models list` shows
+    # the matrix + "unresolved" model slots, and still exits 0 (no traceback).
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    result = runner.invoke(app, ["models", "list"])
+    assert result.exit_code == 0
+    assert "reachable" in result.output.lower()
+    assert "anthropic" in result.output
+    assert "openrouter" in result.output
+
+
+def test_models_list_runs_with_a_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # A present key flips the reachability row; the command still exits 0.
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    result = runner.invoke(app, ["models", "list"])
+    assert result.exit_code == 0
+    assert "ANTHROPIC_API_KEY" in result.output
+
+
+def test_models_set_writes_and_is_reflected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    set_result = runner.invoke(app, ["models", "set", "openai/gpt-5"])
+    assert set_result.exit_code == 0
+    assert "openai/gpt-5" in set_result.output
+    # The cwd metalworks.toml now carries `model = "openai/gpt-5"` (same write
+    # path as `config set`).
+    assert 'model = "openai/gpt-5"' in (tmp_path / "metalworks.toml").read_text()
+    # `config list` reflects the written `model` value.
+    list_result = runner.invoke(app, ["config", "list"])
+    assert list_result.exit_code == 0
+    assert "model" in list_result.output
+    assert "openai/gpt-5" in list_result.output
+    # With an OpenAI key present the ref resolves: `models list` shows the
+    # written model id in the chat slot (offline — the adapter constructs from a
+    # dummy key without a network call).
+    for key in ("ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    models_result = runner.invoke(app, ["models", "list"])
+    assert models_result.exit_code == 0
+    assert "gpt-5" in models_result.output
+
+
+def test_models_set_fast_writes_fast_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["models", "set-fast", "openai/gpt-5-mini"])
+    assert result.exit_code == 0
+    get_result = runner.invoke(app, ["config", "get", "fast_model"])
+    assert get_result.exit_code == 0
+    assert "openai/gpt-5-mini" in get_result.output
+
+
+def test_models_set_rejects_empty_ref(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["models", "set", "   "])
+    assert result.exit_code == 2
+    assert not (tmp_path / "metalworks.toml").exists()
+
+
 def test_reddit_post_dry_run_passes_compliance(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -129,6 +204,7 @@ _COMMAND_GROUPS = [
     ["arctic"],
     ["discovery"],
     ["config"],
+    ["models"],
     ["mcp"],
 ]
 

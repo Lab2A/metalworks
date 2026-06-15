@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from rich.console import Console
@@ -42,6 +42,10 @@ research_app = typer.Typer(help="Plan and run demand-research reports.", no_args
 reddit_app = typer.Typer(help="Search Reddit, fetch intel, post (gated).", no_args_is_help=True)
 arctic_app = typer.Typer(help="Read the Arctic Shift historical corpus.", no_args_is_help=True)
 config_app = typer.Typer(help="Read and write non-secret config.", no_args_is_help=True)
+models_app = typer.Typer(
+    help="Inspect and set the chat/fast/embedding model and provider reachability.",
+    no_args_is_help=True,
+)
 mcp_app = typer.Typer(help="Run the metalworks MCP server.", no_args_is_help=True)
 
 _ENV_EXAMPLE = """\
@@ -188,6 +192,120 @@ def config_set(key: str, value: str) -> None:
     cfg[key] = value
     path = config.save_config(cfg)
     console.print(f"[green]Set[/green] {key} = {value} [dim]({path})[/dim]")
+
+
+# ── models sub-app ──────────────────────────────────────────────────────────
+
+# Provider → (key env var(s), importable SDK/extra module) for the reachability
+# matrix. Mirrors `doctor`'s _EXTRA_PROBES / _KEY_PROBES but keyed by the
+# provider the resolvers actually route to, so a row maps 1:1 to "can metalworks
+# reach this provider right now". OpenRouter is keyed on OPENROUTER_API_KEY and
+# rides the OpenAI SDK (it is an OpenAI-compatible endpoint).
+_PROVIDER_MATRIX: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    ("anthropic", ("ANTHROPIC_API_KEY",), "anthropic"),
+    ("openai", ("OPENAI_API_KEY",), "openai"),
+    ("google", ("GOOGLE_API_KEY", "GEMINI_API_KEY"), "google.genai"),
+    ("openrouter", ("OPENROUTER_API_KEY",), "openai"),
+)
+
+
+def _resolved_model_id(label: str, resolver: Any) -> tuple[str, str]:
+    """Run a model resolver and return (status_markup, plain_detail).
+
+    Wrapped per the brief: on this branch ``resolve_embeddings`` can raise
+    ``MissingKeyError`` without a key (another stream changes that), so every
+    resolver call is guarded and rendered as a message + fix instead of a
+    traceback.
+    """
+    from metalworks.errors import MetalworksError
+
+    try:
+        model = resolver()
+    except MetalworksError as exc:
+        fix = f" [dim]({exc.fix})[/dim]" if getattr(exc, "fix", None) else ""
+        return f"[yellow]unresolved[/yellow] — {exc.message}{fix}", "unresolved"
+    except Exception as exc:  # display, never crash `models list`
+        return f"[yellow]unresolved[/yellow] — {exc}", "unresolved"
+    model_id = getattr(model, "model_id", None) or model.__class__.__name__
+    return f"[green]{model_id}[/green]", str(model_id)
+
+
+@models_app.command("list")
+def models_list() -> None:
+    """Show the resolved chat/fast/embedding models and provider reachability.
+
+    Read-only: it calls the same resolvers the pipeline uses (each guarded) and
+    introspects keys/extras — it never changes how models resolve.
+    """
+    model_ref = config.setting("model")
+    fast_ref = config.setting("fast_model")
+
+    console.print("[bold]Resolved models[/bold]")
+    rows: tuple[tuple[str, Any], ...] = (
+        ("chat", lambda: config.resolve_chat(model_ref)),
+        # fast falls back to the main model ref when no fast_model is set.
+        ("fast", lambda: config.resolve_chat(fast_ref or model_ref)),
+        ("embedding", config.resolve_embeddings),
+    )
+    model_table = Table(show_header=True, header_style="bold")
+    model_table.add_column("slot")
+    model_table.add_column("model")
+    for label, resolver in rows:
+        markup, _ = _resolved_model_id(label, resolver)
+        model_table.add_row(label, markup)
+    console.print(model_table)
+
+    console.print("\n[bold]Provider reachability[/bold]")
+    matrix = Table(show_header=True, header_style="bold")
+    matrix.add_column("provider")
+    matrix.add_column("key")
+    matrix.add_column("extra")
+    matrix.add_column("reachable")
+    for provider, env_vars, module in _PROVIDER_MATRIX:
+        found = next((v for v in env_vars if os.environ.get(v)), None)
+        key_cell = f"[green]set[/green] ({found})" if found else "[dim]unset[/dim]"
+        importable = _module_available(module)
+        extra_cell = (
+            f"[green]importable[/green] ({module})"
+            if importable
+            else f"[dim]missing[/dim] ({module})"
+        )
+        reachable = bool(found) and importable
+        reach_cell = "[green]yes[/green]" if reachable else "[dim]no[/dim]"
+        matrix.add_row(provider, key_cell, extra_cell, reach_cell)
+    console.print(matrix)
+
+
+def _set_model_setting(key: str, ref: str) -> None:
+    """Write a model ref to the cwd config via the same path as ``config set``."""
+    ref = ref.strip()
+    if not ref:
+        err_console.print(f"[red]{key} must be a non-empty model ref (e.g. openai/gpt-5).[/red]")
+        raise typer.Exit(code=2)
+    cfg = config.load_config()
+    cfg[key] = ref
+    path = config.save_config(cfg)
+    console.print(f"[green]Set[/green] {key} = {ref} [dim]({path})[/dim]")
+
+
+@models_app.command("set")
+def models_set(
+    ref: Annotated[
+        str, typer.Argument(help="Model ref, e.g. openai/gpt-5 or anthropic:claude-sonnet-4.")
+    ],
+) -> None:
+    """Set the main chat model (writes ``model`` to the cwd metalworks.toml)."""
+    _set_model_setting("model", ref)
+
+
+@models_app.command("set-fast")
+def models_set_fast(
+    ref: Annotated[
+        str, typer.Argument(help="Model ref for the fast slot, e.g. openai/gpt-5-mini.")
+    ],
+) -> None:
+    """Set the fast model (writes ``fast_model`` to the cwd metalworks.toml)."""
+    _set_model_setting("fast_model", ref)
 
 
 # ── research sub-app ────────────────────────────────────────────────────────
@@ -1139,6 +1257,7 @@ app.add_typer(reddit_app, name="reddit")
 app.add_typer(arctic_app, name="arctic")
 app.add_typer(discovery_app, name="discovery")
 app.add_typer(config_app, name="config")
+app.add_typer(models_app, name="models")
 app.add_typer(mcp_app, name="mcp")
 
 
