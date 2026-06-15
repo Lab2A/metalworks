@@ -76,6 +76,7 @@ inauthentic behavior, no vote manipulation. See
 
 ## Versioning
 
-Pre-release. The `.mcp.json` pins the server to the `main` branch via git. Once
-metalworks is on PyPI, it switches to a version pin
-(`metalworks[mcp,arctic,reddit]==0.1.0`) bumped in lockstep with the package.
+Pre-release. The `.mcp.json` installs the latest metalworks from PyPI
+(`metalworks[mcp,arctic,reddit]`), so `uvx` always resolves the newest published
+release. A future stable line may switch to a version pin
+(`metalworks[mcp,arctic,reddit]==X.Y.Z`) bumped in lockstep with the package.
