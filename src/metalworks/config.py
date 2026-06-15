@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from metalworks._genai_client import vertex_enabled
 from metalworks.errors import MissingKeyError
@@ -231,8 +231,53 @@ def resolve_chat(model: str | None = None) -> ChatModel:
     raise MissingKeyError(_ALL_CHAT_KEYS, provider=f"unknown chat provider '{provider}'")
 
 
+def _config_fallback_models() -> list[str]:
+    """Read the optional non-secret ``fallback_models`` config setting.
+
+    Accepts a TOML array of refs (``fallback_models = ["openai/gpt-5", ...]``).
+    Returns ``[]`` when unset or not a list of strings — an empty list means *no
+    wrapper*, preserving default behaviour.
+    """
+    value = load_config().get("fallback_models")
+    if isinstance(value, list):
+        items = cast("list[object]", value)
+        return [item for item in items if isinstance(item, str) and item.strip()]
+    return []
+
+
+def resolve_chat_chain(
+    model: str | None = None,
+    fallback_models: list[str] | None = None,
+) -> ChatModel:
+    """Resolve the primary chat model, optionally wrapped in a fallback chain.
+
+    The primary is resolved exactly as :func:`resolve_chat` would. When at least
+    one fallback ref is configured — via the explicit ``fallback_models``
+    argument, else the ``fallback_models`` config-file setting — each fallback is
+    resolved with the same chat resolution and the chain is wrapped in a
+    :class:`~metalworks.llm.FallbackChatModel`.
+
+    **Opt-in and behaviour-preserving:** with no fallbacks configured this
+    returns exactly what :func:`resolve_chat` returns — the bare single model,
+    no wrapper — so the default path is byte-for-byte unchanged. Secrets/env
+    handling is unchanged: every model (primary and fallbacks) goes through the
+    same :func:`resolve_chat`, which reads keys only from the environment.
+    """
+    primary = resolve_chat(model)
+    refs = fallback_models if fallback_models is not None else _config_fallback_models()
+    if not refs:
+        return primary
+    from metalworks.llm import FallbackChatModel
+
+    chain: list[ChatModel] = [primary]
+    chain.extend(resolve_chat(ref) for ref in refs)
+    return FallbackChatModel(chain)
+
+
 def resolve_models(
-    model: str | None = None, fast_model: str | None = None
+    model: str | None = None,
+    fast_model: str | None = None,
+    fallback_models: list[str] | None = None,
 ) -> tuple[ChatModel, ChatModel]:
     """Resolve a (main, fast) :class:`~metalworks.llm.ChatModel` pair.
 
@@ -240,8 +285,13 @@ def resolve_models(
     ref or ``None`` (env inference). When ``fast_model`` is not given, the fast
     slot falls back to the main model — the same rule the deps objects apply via
     their ``filter_model`` property, lifted to construction time.
+
+    ``fallback_models`` is an opt-in ordered list of additional refs for the
+    *main* model's failover chain (see :func:`resolve_chat_chain`). With none
+    configured, the main slot is exactly the single :func:`resolve_chat` model —
+    no wrapper, no behaviour change — and the fast slot continues to mirror it.
     """
-    main = resolve_chat(model)
+    main = resolve_chat_chain(model, fallback_models=fallback_models)
     fast = resolve_chat(fast_model) if fast_model else main
     return main, fast
 
@@ -345,6 +395,7 @@ __all__ = [
     "default_store",
     "load_config",
     "resolve_chat",
+    "resolve_chat_chain",
     "resolve_embeddings",
     "resolve_models",
     "resolve_search",

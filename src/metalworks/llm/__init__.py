@@ -11,6 +11,7 @@ same way metalworks tests itself.
 """
 
 from metalworks.llm.fake import FakeChatModel
+from metalworks.llm.fallback import FallbackChatModel
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
     ChatCapabilities,
@@ -28,6 +29,7 @@ __all__ = [
     "ChatCapabilities",
     "ChatModel",
     "FakeChatModel",
+    "FallbackChatModel",
     "GroundedChatModel",
     "GroundedResult",
     "GroundingChunk",
