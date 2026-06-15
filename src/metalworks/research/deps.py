@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.research.sources import ItemSource
     from metalworks.research.types import MonthRef
     from metalworks.search import SearchProvider
     from metalworks.stores.repos import CorpusRepo
@@ -85,6 +86,7 @@ class ResearchDeps:
     fast_chat: ChatModel | None = None
     search: SearchProvider | None = None
     comments: CommentSource | None = None
+    sources: list[ItemSource] | None = None
     clock: Callable[[], datetime] = default_clock
     emit: Callable[[str], None] = _noop_emit
     author_salt: str = "metalworks-local"
@@ -93,3 +95,25 @@ class ResearchDeps:
     def filter_model(self) -> ChatModel:
         """The cheap model for triage; falls back to the capable one."""
         return self.fast_chat if self.fast_chat is not None else self.chat
+
+    def effective_sources(self) -> list[ItemSource]:
+        """The configured connectors, defaulting to Reddit/Arctic.
+
+        When ``sources`` is unset (the common case, and every existing caller),
+        derive a single :class:`ArcticItemSource` from ``reader`` + ``comments``
+        so behavior is unchanged: research still ingests-then-synthesizes Reddit
+        in one call. The default is deliberately built here, NOT hardcoded as a
+        mutable dataclass default — which-source-is-default stays configurable by
+        a later ``[sources]`` config stream without touching this seam.
+        """
+        if self.sources is not None:
+            return self.sources
+        from metalworks.research.sources.arctic import ArcticItemSource
+
+        return [
+            ArcticItemSource(
+                reader=self.reader,
+                comments=self.comments,
+                author_salt=self.author_salt,
+            )
+        ]

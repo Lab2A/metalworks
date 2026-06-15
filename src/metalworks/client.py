@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from metalworks.reddit import PostResult, RateLimiter, RedditSearch
     from metalworks.research import ResearchDeps
     from metalworks.research.deps import CommentSource, CorpusReader
+    from metalworks.research.sources import ItemSource
     from metalworks.search import SearchProvider
     from metalworks.stores import MemoryStores, SqliteStores
 
@@ -181,6 +182,18 @@ class _Resolver:
             self._reddit_obj = RedditSearch(limiter=self.limiter())
         return self._reddit_obj
 
+    def sources(self) -> list[ItemSource]:
+        """The configured ItemSource connectors — default Reddit/Arctic.
+
+        Built here as the single place the default source is chosen. For now the
+        default is Reddit/Arctic, derived from the resolved reader + comment
+        client; which-source-is-default stays configurable by a later
+        ``[sources]`` config stream without re-plumbing this seam.
+        """
+        from metalworks.research.sources.arctic import ArcticItemSource
+
+        return [ArcticItemSource(reader=self.reader(), comments=self.comments())]
+
     def research_deps(self) -> ResearchDeps:
         from metalworks.research import ResearchDeps
 
@@ -192,6 +205,7 @@ class _Resolver:
             reader=self.reader(),
             search=self.search(),
             comments=self.comments(),
+            sources=self.sources(),
         )
 
 

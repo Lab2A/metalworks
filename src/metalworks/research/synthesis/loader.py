@@ -5,8 +5,10 @@ hydration stage. This module is the one boundary between the synthesis core and
 storage: every other synthesis module operates on the in-memory `LoadedComment`
 / `LoadedPost` shapes produced here.
 
-We never keep `[deleted]` / `[removed]` / empty bodies — synthesis ranking on
-those is meaningless and they'd just chew up LLM tokens.
+Removal-sentinel normalization (`[deleted]` / `[removed]`) now happens at the
+SOURCE/ingest boundary (`research/sources/ingest.py`), not here — the corpus the
+loader reads is already free of them, so this module stays source-neutral. We
+still drop empty bodies defensively (a blank comment carries no quotable signal).
 
 DESIGN NOTE: we read the source-neutral corpus through
 `deps.corpus.get_records(...)` / `deps.corpus.get_comments_for_records(...)`,
@@ -93,9 +95,10 @@ def load_comments(
 ) -> list[LoadedComment]:
     """Pull comment rows for the post-triage subset, capped at `cap`.
 
-    Filters out `[deleted]` / `[removed]` / empty bodies inline, maps the generic
-    `CorpusComment.engagement` → `LoadedComment.upvotes`, and returns the
-    highest-engagement comments first so the cap chops noise, not signal.
+    Removal sentinels are already normalized away at ingest; here we just drop
+    empty bodies defensively, map the generic `CorpusComment.engagement` →
+    `LoadedComment.upvotes`, and return the highest-engagement comments first so
+    the cap chops noise, not signal.
     """
     if not post_ids:
         return []
@@ -103,7 +106,7 @@ def load_comments(
     seen: set[str] = set()
     for c in deps.corpus.get_comments_for_records(list(dict.fromkeys(post_ids))):
         body = (c.text or "").strip()
-        if not body or body in ("[deleted]", "[removed]"):
+        if not body:
             continue
         if not c.id or c.id in seen:
             continue

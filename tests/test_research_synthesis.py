@@ -101,14 +101,17 @@ def _loaded(cid: str, body: str, *, upvotes: int = 1, author: str = "a1") -> Loa
 # ── loader: contract → LoadedPost/LoadedComment mapping ─────────────────────
 
 
-def test_loader_maps_score_to_upvotes_and_filters_deleted() -> None:
+def test_loader_maps_score_to_upvotes_and_drops_empty() -> None:
+    # Removal sentinels are normalized away at the INGEST boundary now (see
+    # test_itemsource.test_ingest_source_is_idempotent), so the loader's only
+    # remaining body filter is the defensive empty-body drop. Writing directly
+    # to the store bypasses ingest, so any sentinel bodies here survive — the
+    # loader is source-neutral and no longer special-cases them.
     store = MemoryStores()
     store.upsert_comments(
         [
             _comment("c1", "real signal here", score=42),
-            _comment("c2", "[deleted]"),
-            _comment("c3", "[removed]"),
-            _comment("c4", "   "),  # whitespace-only → empty after strip
+            _comment("c4", "   "),  # whitespace-only → empty after strip → dropped
         ]
     )
     deps = _deps(store)
