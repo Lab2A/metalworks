@@ -55,4 +55,8 @@ def test_no_provider_sdks_in_sys_modules() -> None:
 
 
 def test_version_exposed() -> None:
-    assert metalworks.__version__ == "0.0.1"
+    # Don't pin the literal (it changes every release) — assert it's exposed as a
+    # PEP 440-ish version string and matches the installed package metadata.
+    import re
+
+    assert re.fullmatch(r"\d+\.\d+\.\d+([.\-+].*)?", metalworks.__version__)
