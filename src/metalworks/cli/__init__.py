@@ -47,6 +47,14 @@ models_app = typer.Typer(
     no_args_is_help=True,
 )
 mcp_app = typer.Typer(help="Run the metalworks MCP server.", no_args_is_help=True)
+sources_app = typer.Typer(
+    help="List, enable, and disable the data sources research ingests from.",
+    no_args_is_help=True,
+)
+corpus_app = typer.Typer(
+    help="Ingest sources into, and inspect, the local corpus store.",
+    no_args_is_help=True,
+)
 
 _ENV_EXAMPLE = """\
 # metalworks — secrets come from the environment ONLY (never the config file).
@@ -354,7 +362,10 @@ def setup(
         else:
             console.print("[dim]No model ref entered — skipping.[/dim]")
 
-    # 3. Offer to create a project (same path as `init` / Project.init).
+    # 3. Choose data sources (writes [sources].enabled). Default: keep current.
+    _setup_sources_step(yes)
+
+    # 4. Offer to create a project (same path as `init` / Project.init).
     make_project = yes is False and typer.confirm(
         "Create a .metalworks/ project here?", default=False
     )
@@ -372,7 +383,7 @@ def setup(
             config.save_config(seed, path=project.config_path)
             console.print(f"  [green]Wrote[/green] {project.config_path}")
 
-    # 4. Offer to pre-download the local embedding model (same path as `models warm`).
+    # 5. Offer to pre-download the local embedding model (same path as `models warm`).
     warm = yes is False and typer.confirm(
         "Pre-download the local embedding model now?", default=False
     )
@@ -390,9 +401,45 @@ def setup(
             if exc.fix:
                 console.print(f"  [dim]{exc.fix}[/dim]")
 
-    # 5. Finish with the doctor summary.
+    # 6. Finish with the doctor summary.
     console.print("\n[bold]── doctor ──[/bold]")
     doctor(fix=False)
+
+
+def _setup_sources_step(yes: bool) -> None:
+    """Setup's "choose your data sources" step.
+
+    Lists registered sources (keyless/needs-extra annotated) and lets the user
+    pick a comma-separated set, writing ``[sources].enabled``. The default is the
+    CURRENT enabled set (Reddit out of the box) so accepting the default is a
+    no-op. Under ``--yes`` (or a defaulted prompt) it keeps the current set and
+    writes nothing — non-destructive and fully scriptable.
+    """
+    current = config.enabled_source_ids()
+    discovered = _discover_sources()
+    console.print("\n[bold]Data sources[/bold]")
+    for sid in sorted({*discovered, *current}):
+        note, probe = _SOURCE_REACH.get(sid, ("registered", None))
+        on = "[green]enabled[/green]" if sid in current else "[dim]available[/dim]"
+        reach = (
+            ""
+            if probe is None or _module_available(probe)
+            else f" [yellow](needs {probe})[/yellow]"
+        )
+        console.print(f"  {sid:<12} {on}  [dim]{note}[/dim]{reach}")
+    default = ",".join(current)
+    if yes:
+        console.print(f"  [dim]--yes → keeping current sources: {default}.[/dim]")
+        return
+    picked = typer.prompt(
+        "Which sources should research ingest from? (comma-separated)", default=default
+    )
+    chosen = [s.strip() for s in (picked or default).split(",") if s.strip()]
+    if not chosen or chosen == current:
+        console.print(f"  [dim]Keeping current sources: {', '.join(current)}.[/dim]")
+        return
+    path = config.save_sources_config(chosen)
+    console.print(f"  [green]Wrote[/green] sources = {chosen} [dim]({path})[/dim]")
 
 
 # ── config sub-app ──────────────────────────────────────────────────────────
@@ -402,7 +449,8 @@ def setup(
 def config_list() -> None:
     """Print the merged non-secret config (cwd over ~/.config/metalworks/)."""
     cfg = config.load_config()
-    if not cfg:
+    sources_cfg = config.load_sources_config()
+    if not cfg and not sources_cfg:
         console.print("[dim]No config set. Run `metalworks init` to scaffold one.[/dim]")
         return
     table = Table(show_header=True, header_style="bold")
@@ -410,6 +458,10 @@ def config_list() -> None:
     table.add_column("value")
     for key, value in sorted(cfg.items()):
         table.add_row(key, str(value))
+    # The [sources] table is nested, so load_config() (scalars only) skips it;
+    # surface it here so `config list` reflects enabled sources.
+    for key, value in sorted(sources_cfg.items()):
+        table.add_row(f"sources.{key}", str(value))
     console.print(table)
 
 
@@ -575,6 +627,326 @@ def models_warm() -> None:
     console.print("[green]Ready.[/green] The embedding model is cached locally.")
 
 
+# ── sources sub-app ─────────────────────────────────────────────────────────
+
+# Reachability annotation for known source ids: which keyless extra (importable
+# module) a built-in connector rides, and whether it needs a key/extra at all.
+# Stream 2c owns the connectors; this map is the CLI's display-only hint so
+# `sources list` can mirror `models list`'s "reachable?" column without reaching
+# into the connectors. An id not listed here is shown as registered-only.
+_SOURCE_REACH: dict[str, tuple[str, str | None]] = {
+    # source_id -> (human note, importable module to probe; None = keyless, no extra)
+    "reddit": ("keyless (Arctic corpus)", "duckdb"),
+    "arctic": ("keyless (Arctic corpus)", "duckdb"),
+    "hackernews": ("keyless (public API)", None),
+}
+
+
+def _discover_sources() -> list[str]:
+    """All known source ids: the registry, plus the built-ins that self-register
+    lazily on first ``get_source``. Triggers those lazy imports (best-effort) so
+    a freshly-imported CLI still lists Reddit/Arctic and any registered connector.
+    """
+    import contextlib
+
+    from metalworks.research.sources import SOURCES, get_source
+
+    for builtin in ("reddit", "hackernews"):
+        if builtin not in SOURCES:
+            # Best-effort: a built-in may not be importable / may need kwargs.
+            with contextlib.suppress(Exception):
+                get_source(builtin)
+    return sorted(SOURCES)
+
+
+@sources_app.command("list")
+def sources_list() -> None:
+    """Show registered data sources, which are enabled, and their reachability.
+
+    Read-only. Mirrors ``models list``: one row per registered source with its
+    enabled state (from ``[sources].enabled``) and a keyless/needs-extra hint.
+    """
+    enabled = config.enabled_source_ids()
+    discovered = _discover_sources()
+    # Show every id that is either registered or named in config (so a configured
+    # but not-yet-importable source still appears, flagged unreachable).
+    ids = sorted({*discovered, *enabled})
+
+    console.print("[bold]Data sources[/bold]")
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("source")
+    table.add_column("enabled")
+    table.add_column("reachable")
+    table.add_column("notes")
+    for sid in ids:
+        registered = sid in discovered
+        note, probe = _SOURCE_REACH.get(
+            sid, ("registered" if registered else "not registered", None)
+        )
+        on = sid in enabled
+        if not registered:
+            reach_cell = "[dim]no[/dim]"
+        elif probe is not None and not _module_available(probe):
+            reach_cell = f"[yellow]missing[/yellow] ({probe})"
+        else:
+            reach_cell = "[green]yes[/green]"
+        en_cell = "[green]on[/green]" if on else "[dim]off[/dim]"
+        table.add_row(sid, en_cell, reach_cell, note)
+    console.print(table)
+    console.print(f"\n[dim]enabled order:[/dim] {', '.join(enabled)}")
+
+
+def _edit_enabled(source_id: str, *, enable: bool) -> None:
+    """Add/remove ``source_id`` in ``[sources].enabled`` and persist it.
+
+    Preserves order (append on enable; filter on disable) and is idempotent.
+    Refuses to disable the last source — an empty enabled list would silently
+    fall back to the Reddit default, which is surprising; keep at least one.
+    """
+    current = config.enabled_source_ids()
+    if enable:
+        if source_id in current:
+            console.print(f"[dim]{source_id} is already enabled.[/dim]")
+            return
+        # Warn (don't block) when the id isn't registered yet: a connector may
+        # ship in a later install/extra. It's persisted and shown as unreachable
+        # in `sources list` until it can be constructed.
+        if source_id not in _discover_sources():
+            console.print(
+                f"[yellow]Note:[/yellow] {source_id!r} is not a registered source yet — "
+                "it'll show as unreachable until its connector is installed."
+            )
+        new = [*current, source_id]
+    else:
+        if source_id not in current:
+            console.print(f"[dim]{source_id} is not enabled.[/dim]")
+            return
+        new = [s for s in current if s != source_id]
+        if not new:
+            err_console.print(
+                "[red]Refusing to disable the last source[/red] — at least one must stay enabled. "
+                "Enable another first, then disable this one."
+            )
+            raise typer.Exit(code=1)
+    path = config.save_sources_config(new)
+    verb = "Enabled" if enable else "Disabled"
+    console.print(f"[green]{verb}[/green] {source_id} [dim]({path})[/dim]")
+    console.print(f"[dim]enabled order:[/dim] {', '.join(new)}")
+
+
+@sources_app.command("enable")
+def sources_enable(
+    source_id: Annotated[str, typer.Argument(help="Source id to enable, e.g. hackernews.")],
+) -> None:
+    """Enable a source: append it to ``[sources].enabled`` in the cwd metalworks.toml."""
+    _edit_enabled(source_id, enable=True)
+
+
+@sources_app.command("disable")
+def sources_disable(
+    source_id: Annotated[str, typer.Argument(help="Source id to disable, e.g. hackernews.")],
+) -> None:
+    """Disable a source: remove it from ``[sources].enabled`` in the cwd metalworks.toml."""
+    _edit_enabled(source_id, enable=False)
+
+
+# ── corpus sub-app ──────────────────────────────────────────────────────────
+
+
+def _arctic_source_kwargs() -> dict[str, Any]:
+    """Build the kwargs the Arctic (reddit) connector needs: a reader + live
+    comment client. Other (keyless) connectors ignore these — ``resolve_sources``
+    only passes the kwargs a factory accepts.
+    """
+    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+
+    return {
+        "reader": ArcticReader(probe_sleep_s=0.0),
+        "comments": ArcticShiftApiClient(),
+    }
+
+
+def _widen_window(source: Any, months: int | None) -> Any:
+    """Take ``source.latest_window()`` and widen it to ``months`` if it has a
+    month anchor. A keyless date-ranged source keeps its own latest window."""
+    from metalworks.research.sources import SourceWindow
+    from metalworks.research.types import months_back
+
+    window = source.latest_window()
+    if months and months > 1 and getattr(window, "months", None):
+        anchor = list(window.months)[-1]
+        return SourceWindow(months=tuple(months_back(months, anchor=anchor)))
+    return window
+
+
+@corpus_app.command("add")
+def corpus_add(
+    source: Annotated[
+        str, typer.Option("--source", help="Source id to ingest from (e.g. reddit, hackernews).")
+    ],
+    query: Annotated[
+        str, typer.Option("--query", "-q", help="Query for the source (a subreddit for reddit).")
+    ],
+    months: Annotated[
+        int | None,
+        typer.Option("--months", help="Window in months back (sources with a month anchor)."),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Cap records pulled (dev guard; default unlimited)."),
+    ] = None,
+) -> None:
+    """Ingest one source's items for a query into the local corpus store.
+
+    Resolves ``--source`` via the registry, pulls records (+ comments) for the
+    query over the window, and upserts them into ``config.default_store()``.
+    Idempotent — re-running the same window upserts by id (no duplicates).
+    """
+    from metalworks.research.sources.ingest import ingest_source
+
+    store = config.default_store()
+    kwargs = _arctic_source_kwargs() if source in ("reddit", "arctic") else {}
+    try:
+        item_source = config.resolve_sources(override=[source], **kwargs)[0]
+    except KeyError:
+        err_console.print(
+            f"[red]Unknown source {source!r}.[/red] Run `metalworks sources list` for ids."
+        )
+        raise typer.Exit(code=1) from None
+
+    window = _widen_window(item_source, months)
+    console.print(f"[bold]Ingesting[/bold] {source} for {query!r}...")
+    reader = kwargs.get("reader")
+    try:
+        result = ingest_source(store, item_source, query=query, window=window, limit=limit)
+    finally:
+        if reader is not None and hasattr(reader, "close"):
+            reader.close()
+    tail = "" if result.has_comments else " (source has no comments)"
+    console.print(
+        f"[green]Ingested[/green] {result.records} records, "
+        f"{result.comments} comments{tail} from {source}."
+    )
+
+
+@corpus_app.command("sync")
+def corpus_sync(
+    query: Annotated[
+        list[str] | None,
+        typer.Option("--query", "-q", help="Query per source (repeatable; default: 'all')."),
+    ] = None,
+    months: Annotated[
+        int | None, typer.Option("--months", help="Window in months back (default: latest).")
+    ] = None,
+    limit: Annotated[
+        int | None, typer.Option("--limit", help="Cap records pulled per query (dev guard).")
+    ] = None,
+) -> None:
+    """Re-ingest the enabled sources for a recent window into the local store.
+
+    Iterates ``config.resolve_sources()`` (the ``[sources].enabled`` set) and
+    ingests each over its latest window (or ``--months`` back). Pass ``--query``
+    (repeatable) to scope each source; with none, a broad ``"all"`` query is used.
+    """
+    from metalworks.research.sources.ingest import ingest_source
+
+    store = config.default_store()
+    kwargs = _arctic_source_kwargs()
+    sources = config.resolve_sources(**kwargs)
+    queries = query or ["all"]
+    reader = kwargs.get("reader")
+    total_records = total_comments = 0
+    try:
+        for item_source in sources:
+            sid = getattr(item_source, "source_id", "?")
+            window = _widen_window(item_source, months)
+            for q in queries:
+                result = ingest_source(store, item_source, query=q, window=window, limit=limit)
+                total_records += result.records
+                total_comments += result.comments
+                console.print(
+                    f"  [dim]{sid}[/dim] {q!r}: {result.records} records, "
+                    f"{result.comments} comments"
+                )
+    finally:
+        if reader is not None and hasattr(reader, "close"):
+            reader.close()
+    console.print(
+        f"[green]Synced[/green] {len(sources)} source(s): "
+        f"{total_records} records, {total_comments} comments total."
+    )
+
+
+def _corpus_counts(store: Any) -> dict[str, Any]:
+    """Count records/comments in ``store``, broken down by source.
+
+    The CorpusRepo protocol exposes only id-keyed reads, so this duck-types the
+    two concrete backends: SqliteStores (a ``_con`` over the ``records`` /
+    ``corpus_comments`` tables, both with a ``source`` column) and MemoryStores
+    (``_records`` / ``_corpus_comments`` dicts of pydantic models). Returns
+    ``{records, comments, by_source: {src: {records, comments}}}``.
+    """
+    from collections import Counter
+
+    rec_by: Counter[str] = Counter()
+    com_by: Counter[str] = Counter()
+
+    con = getattr(store, "_con", None)
+    if con is not None:  # SqliteStores
+        lock = getattr(store, "_lock", None)
+        ctx = lock if lock is not None else _nullcontext()
+        with ctx:
+            for src, n in con.execute("SELECT source, COUNT(*) FROM records GROUP BY source"):
+                rec_by[str(src)] += int(n)
+            for src, n in con.execute(
+                "SELECT source, COUNT(*) FROM corpus_comments GROUP BY source"
+            ):
+                com_by[str(src)] += int(n)
+    else:  # MemoryStores
+        for rec in getattr(store, "_records", {}).values():
+            rec_by[str(getattr(rec, "source", "?"))] += 1
+        for com in getattr(store, "_corpus_comments", {}).values():
+            com_by[str(getattr(com, "source", "?"))] += 1
+
+    by_source: dict[str, dict[str, int]] = {}
+    for src in sorted({*rec_by, *com_by}):
+        by_source[src] = {"records": rec_by[src], "comments": com_by[src]}
+    return {
+        "records": sum(rec_by.values()),
+        "comments": sum(com_by.values()),
+        "by_source": by_source,
+    }
+
+
+class _nullcontext:
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+
+@corpus_app.command("stats")
+def corpus_stats() -> None:
+    """Show local corpus counts: total records/comments, broken down by source."""
+    store = config.default_store()
+    counts = _corpus_counts(store)
+    console.print("[bold]Corpus[/bold]")
+    console.print(f"  records:  {counts['records']}")
+    console.print(f"  comments: {counts['comments']}")
+    by_source = counts["by_source"]
+    if not by_source:
+        console.print("  [dim]empty store — run `metalworks corpus add` or `corpus sync`.[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("source")
+    table.add_column("records", justify="right")
+    table.add_column("comments", justify="right")
+    for src, c in sorted(by_source.items()):
+        table.add_row(src, str(c["records"]), str(c["comments"]))
+    console.print(table)
+
+
 # ── research sub-app ────────────────────────────────────────────────────────
 
 
@@ -644,6 +1016,13 @@ def research_run(
     months: Annotated[
         int | None, typer.Option("--months", help="Corpus time window in months (default 12).")
     ] = None,
+    source: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--source",
+            help="Override the data sources to ingest from (repeatable); else configured/Reddit.",
+        ),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
     ] = None,
@@ -663,13 +1042,28 @@ def research_run(
     embeddings = _resolve_embeddings_or_exit()
     store = config.default_store()
     reader = ArcticReader(probe_sleep_s=0.0)
+    comments = ArcticShiftApiClient()
+    # --source overrides the run's connectors; without it deps.sources stays None
+    # so effective_sources() keeps the configured/Reddit default (unchanged path).
+    override_sources = None
+    if source:
+        try:
+            override_sources = config.resolve_sources(
+                override=source, reader=reader, comments=comments
+            )
+        except KeyError as exc:
+            err_console.print(
+                f"[red]{exc}[/red] Run `metalworks sources list` to see registered ids."
+            )
+            raise typer.Exit(code=1) from exc
     deps = ResearchDeps(
         chat=chat,
         embeddings=embeddings,
         corpus=store,
         reader=reader,
         search=config.resolve_search(),
-        comments=ArcticShiftApiClient(),
+        comments=comments,
+        sources=override_sources,
     )
 
     if brief is not None:
@@ -1524,6 +1918,8 @@ app.add_typer(arctic_app, name="arctic")
 app.add_typer(discovery_app, name="discovery")
 app.add_typer(config_app, name="config")
 app.add_typer(models_app, name="models")
+app.add_typer(sources_app, name="sources")
+app.add_typer(corpus_app, name="corpus")
 app.add_typer(mcp_app, name="mcp")
 
 

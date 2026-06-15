@@ -295,3 +295,96 @@ def test_resolve_models_fast_falls_back_to_main(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     main, fast = config.resolve_models()
     assert main is fast  # no fast_model given → fast slot is the main model
+
+
+# ── [sources] table + resolve_sources (Phase 2d) ─────────────────────────────
+
+
+def test_enabled_source_ids_defaults_to_reddit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert config.enabled_source_ids() == ["reddit"]
+    assert config.default_source_id() == "reddit"
+
+
+def test_sources_config_is_read_ordered(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "metalworks.toml").write_text(
+        '[sources]\nenabled = ["hackernews", "reddit"]\ndefault = "hackernews"\n',
+        encoding="utf-8",
+    )
+    assert config.enabled_source_ids() == ["hackernews", "reddit"]
+    assert config.default_source_id() == "hackernews"
+
+
+def test_save_sources_config_preserves_scalars(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config.save_config({"provider": "openai", "model": "openai/gpt-5"})
+    config.save_sources_config(["reddit", "hackernews"])
+    text = (tmp_path / "metalworks.toml").read_text()
+    # The scalar settings survive the [sources] rewrite.
+    assert 'provider = "openai"' in text
+    assert 'model = "openai/gpt-5"' in text
+    assert config.enabled_source_ids() == ["reddit", "hackernews"]
+
+
+def test_resolve_sources_default_is_reddit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # With nothing configured, resolve_sources defaults to the Reddit/Arctic
+    # connector. That connector needs a reader (and optional comments client),
+    # supplied as kwargs — the CLI callers always pass them; a fake is enough.
+    monkeypatch.chdir(tmp_path)
+
+    class _FakeReader:
+        def latest_available_month(self, content_type: str = "submissions"):  # pragma: no cover
+            from metalworks.research.types import MonthRef
+
+            return MonthRef(2024, 1)
+
+        def close(self) -> None:  # pragma: no cover
+            return None
+
+    sources = config.resolve_sources(reader=_FakeReader())
+    assert len(sources) == 1
+    assert sources[0].source_id == "reddit"
+
+
+def test_resolve_sources_override_via_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from metalworks.research.sources import register_source
+
+    class _Fake:
+        source_id = "fake"
+
+        def pull(self, *, query, window, limit=None):  # pragma: no cover - protocol stub
+            return iter(())
+
+        def comments_for(self, record_ids):  # pragma: no cover
+            return None
+
+        def latest_window(self):  # pragma: no cover
+            from metalworks.research.sources import SourceWindow
+
+            return SourceWindow()
+
+    register_source("fake", lambda **k: _Fake())
+    sources = config.resolve_sources(override=["fake"])
+    assert [s.source_id for s in sources] == ["fake"]
+
+
+def test_build_source_drops_unaccepted_kwargs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A keyless source factory that accepts NO kwargs must still construct when
+    # resolve_sources is called with reader=/comments= (for the Arctic source).
+    from metalworks.research.sources import register_source
+
+    class _Keyless:
+        source_id = "keyless"
+
+    register_source("keyless", lambda: _Keyless())
+    sources = config.resolve_sources(override=["keyless"], reader=object(), comments=object())
+    assert sources[0].source_id == "keyless"

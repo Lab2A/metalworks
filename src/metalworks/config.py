@@ -31,6 +31,7 @@ from metalworks.project import Project
 if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.research.sources import ItemSource
     from metalworks.search import SearchProvider
     from metalworks.stores import MemoryStores, SqliteStores
 
@@ -65,6 +66,12 @@ _COMPAT_PROVIDERS = frozenset({"openrouter", "openai-compatible", "compat"})
 
 _CONFIG_FILENAME = "metalworks.toml"
 _DEFAULT_STORE_PATH = Path.home() / ".metalworks" / "store.db"
+
+# The default active source when nothing is configured. Reddit (the Arctic
+# connector) stays the default for now — do NOT change this without an explicit
+# decision; ``resolve_sources`` falls back to it and every existing caller relies
+# on it.
+_DEFAULT_SOURCE = "reddit"
 
 
 # ── Non-secret config (TOML) ────────────────────────────────────────────────
@@ -117,20 +124,77 @@ def _toml_scalar(value: Any) -> str:
     return f'"{text}"'
 
 
+def _toml_array(values: list[str]) -> str:
+    """Emit a TOML array of strings on one line (used for ``[sources].enabled``)."""
+    return "[" + ", ".join(_toml_scalar(v) for v in values) + "]"
+
+
 def save_config(config: dict[str, Any], *, path: Path | None = None) -> Path:
     """Write the non-secret config to ``path`` (default: cwd ``metalworks.toml``).
 
-    Hand-rolled TOML emit (no tomli-w dependency) — the config is a flat table of
-    scalars, so the serialization stays trivial.
+    Hand-rolled TOML emit (no tomli-w dependency). The body is a flat table of
+    scalars; the one nested table we emit is ``[sources]`` (passed as a ``dict``
+    under the ``"sources"`` key), so onboarding/CLI writes can persist the
+    ordered ``enabled`` array alongside the scalar settings in one file.
     """
     target = path or default_config_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# metalworks — non-secret settings. Secrets come from the environment only.",
     ]
-    lines.extend(f"{key} = {_toml_scalar(value)}" for key, value in sorted(config.items()))
+    scalars: dict[str, Any] = {k: v for k, v in config.items() if not isinstance(v, dict)}
+    tables: dict[str, dict[str, Any]] = {
+        k: cast("dict[str, Any]", v) for k, v in config.items() if isinstance(v, dict)
+    }
+    lines.extend(f"{key} = {_toml_scalar(value)}" for key, value in sorted(scalars.items()))
+    for table_name, table in sorted(tables.items()):
+        lines.append("")
+        lines.append(f"[{table_name}]")
+        for key, value in sorted(table.items()):
+            if isinstance(value, list):
+                items = [str(v) for v in cast("list[Any]", value)]
+                lines.append(f"{key} = {_toml_array(items)}")
+            else:
+                lines.append(f"{key} = {_toml_scalar(value)}")
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return target
+
+
+def _full_config_at(path: Path) -> dict[str, Any]:
+    """Read every top-level key (scalars AND tables) from one config file.
+
+    ``load_config`` intentionally merges only scalars across files; for an
+    in-place rewrite of a single file we need its full contents (so a sources
+    edit preserves the scalar settings already in it). Missing file → ``{}``.
+    """
+    if not path.is_file():
+        return {}
+    with path.open("rb") as fh:
+        return tomllib.load(fh)
+
+
+def save_sources_config(
+    enabled: list[str], *, default: str | None = None, path: Path | None = None
+) -> Path:
+    """Persist the ``[sources]`` table into the target config file in place.
+
+    Reads the target file's full contents (scalars + any existing ``[sources]``),
+    replaces the ``enabled`` list (and ``default`` when given, preserving a prior
+    one otherwise), and rewrites via :func:`save_config` so the scalar settings
+    already in the file are kept. Default target: the active project's config,
+    else the cwd ``metalworks.toml`` — the same target ``save_config`` uses.
+    """
+    target = path or default_config_path()
+    existing = _full_config_at(target)
+    prior_sources = existing.get("sources")
+    sources: dict[str, Any] = (
+        dict(cast("dict[str, Any]", prior_sources)) if isinstance(prior_sources, dict) else {}
+    )
+    sources["enabled"] = list(enabled)
+    if default is not None:
+        sources["default"] = default
+    existing["sources"] = sources
+    return save_config(existing, path=target)
 
 
 def setting(name: str, *, arg: str | None = None, env: str | None = None) -> str | None:
@@ -143,6 +207,95 @@ def setting(name: str, *, arg: str | None = None, env: str | None = None) -> str
             return env_val
     value = load_config().get(name)
     return str(value) if value is not None else None
+
+
+# ── [sources] table ──────────────────────────────────────────────────────────
+
+
+def load_sources_config() -> dict[str, Any]:
+    """Read the merged ``[sources]`` table (cwd winning over the home config).
+
+    ``load_config`` deliberately ignores nested tables (it keeps only scalar
+    top-level keys), so the ordered ``[sources]`` table needs its own reader.
+    The schema is::
+
+        [sources]
+        enabled = ["reddit", "hackernews"]   # ordered active source ids
+        default = "reddit"                    # optional preferred id
+
+    Returns an empty dict when no file declares a ``[sources]`` table. Like
+    ``load_config`` it never reads secrets — source credentials stay env-only.
+    """
+    merged: dict[str, Any] = {}
+    # Reverse so the cwd file (highest precedence) is applied last.
+    for path in reversed(config_search_paths()):
+        if not path.is_file():
+            continue
+        with path.open("rb") as fh:
+            data = tomllib.load(fh)
+        section = data.get("sources")
+        if isinstance(section, dict):
+            merged.update(cast("dict[str, Any]", section))
+    return merged
+
+
+def enabled_source_ids() -> list[str]:
+    """The ordered active source ids from ``[sources].enabled``.
+
+    Defaults to ``["reddit"]`` (the Arctic connector) when nothing is configured
+    — Reddit stays the default for now. Non-string / empty entries are dropped so
+    a malformed config degrades to the default rather than crashing a run.
+    """
+    enabled = load_sources_config().get("enabled")
+    if isinstance(enabled, list):
+        items = cast("list[object]", enabled)
+        ids = [item.strip() for item in items if isinstance(item, str) and item.strip()]
+        if ids:
+            return ids
+    return [_DEFAULT_SOURCE]
+
+
+def default_source_id() -> str:
+    """The preferred source id from ``[sources].default`` (else the first enabled)."""
+    configured = load_sources_config().get("default")
+    if isinstance(configured, str) and configured.strip():
+        return configured.strip()
+    return enabled_source_ids()[0]
+
+
+def resolve_sources(override: list[str] | None = None, **source_kwargs: Any) -> list[ItemSource]:
+    """Construct the active :class:`ItemSource` connectors, in order.
+
+    Mirrors :func:`resolve_search`: it maps source *ids* — the explicit
+    ``override`` list when given, else ``[sources].enabled`` from config, else the
+    ``["reddit"]`` default — through :func:`~metalworks.research.sources.get_source`
+    from the registry. Each id is constructed with whichever of ``source_kwargs``
+    its factory accepts (so a caller can pass ``reader=`` / ``comments=`` for the
+    Arctic connector while a keyless connector ignores them). Secrets stay
+    env-only — nothing here reads a credential.
+
+    An unknown id raises ``KeyError`` from the registry (the CLI surfaces it).
+    """
+    from metalworks.research.sources import get_source
+
+    ids = override if override is not None else enabled_source_ids()
+    return [_build_source(get_source, sid, source_kwargs) for sid in ids]
+
+
+def _build_source(get_source: Any, source_id: str, source_kwargs: dict[str, Any]) -> ItemSource:
+    """Construct one source, passing only the kwargs its factory accepts.
+
+    A connector like Arctic needs ``reader=`` / ``comments=``; a keyless one
+    takes none. Rather than make callers know which is which, we try the full
+    kwarg set and fall back to the accepted subset (then to none) on a
+    ``TypeError`` so an extra kwarg never breaks a keyless source.
+    """
+    if not source_kwargs:
+        return cast("ItemSource", get_source(source_id))
+    try:
+        return cast("ItemSource", get_source(source_id, **source_kwargs))
+    except TypeError:
+        return cast("ItemSource", get_source(source_id))
 
 
 # ── Provider resolution ─────────────────────────────────────────────────────
@@ -403,13 +556,18 @@ __all__ = [
     "auto_store",
     "config_search_paths",
     "default_config_path",
+    "default_source_id",
     "default_store",
+    "enabled_source_ids",
     "load_config",
+    "load_sources_config",
     "resolve_chat",
     "resolve_chat_chain",
     "resolve_embeddings",
     "resolve_models",
     "resolve_search",
+    "resolve_sources",
     "save_config",
+    "save_sources_config",
     "setting",
 ]
