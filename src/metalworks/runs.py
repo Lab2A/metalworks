@@ -19,7 +19,7 @@ from metalworks.project import RunRef
 
 if TYPE_CHECKING:
     from metalworks.contract import Research
-    from metalworks.contract.research import DemandReport
+    from metalworks.contract.research import DemandReport, ReportDiff
     from metalworks.project import Project
 
 
@@ -68,12 +68,51 @@ def render_run_markdown(research: Research) -> str:
     return "\n".join(lines)
 
 
-def write_run(project: Project, research: Research, *, question: str) -> RunRef:
+def render_diff_markdown(diff: ReportDiff) -> str:
+    """A readable Markdown summary of a refresh — what moved between versions."""
+    lines: list[str] = [
+        f"# Refresh diff — v{diff.from_version} → v{diff.to_version}",
+        "",
+        f"**{diff.summary}**",
+        "",
+        f"- Threads: {diff.total_threads_before} → {diff.total_threads_after} "
+        f"({diff.total_threads_delta:+d})",
+        f"- Distinct authors: {diff.total_distinct_authors_before} → "
+        f"{diff.total_distinct_authors_after} ({diff.total_distinct_authors_delta:+d})",
+        f"- Demand themes: {diff.cluster_count_before} → {diff.cluster_count_after}",
+        "",
+    ]
+    if diff.clusters_added:
+        lines += ["## New themes", ""] + [f"- {c}" for c in diff.clusters_added] + [""]
+    if diff.clusters_dropped:
+        lines += ["## Faded themes", ""] + [f"- {c}" for c in diff.clusters_dropped] + [""]
+    if diff.clusters_changed:
+        lines += ["## Shifted themes", ""]
+        for d in diff.clusters_changed:
+            lines.append(
+                f"- {d.claim_after} — demand {d.demand_score_before:.2f} → "
+                f"{d.demand_score_after:.2f} ({d.demand_score_delta:+.2f}), "
+                f"authors {d.distinct_authors_delta:+d}"
+            )
+        lines.append("")
+    lines += [
+        "---",
+        f"_lineage `{diff.lineage_id}` · {diff.from_report_id} → {diff.to_report_id}_",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def write_run(
+    project: Project, research: Research, *, question: str, diff: ReportDiff | None = None
+) -> RunRef:
     """Persist ``research`` under ``.metalworks/runs/<report_id>/`` and record it
     in the project manifest. Returns the `RunRef` that was appended.
 
     The run directory is keyed on ``report_id`` (unique per run); a re-run mints a
     new id and a new directory, so history is just the set of run dirs (and git).
+    When ``diff`` is supplied (a refresh), ``diff.{json,md}`` are written
+    alongside so the version-to-version change is a committed, readable artifact.
     """
     report = research.demand
     run_dir = project.runs_dir / report.report_id
@@ -82,6 +121,9 @@ def write_run(project: Project, research: Research, *, question: str) -> RunRef:
         research.model_dump_json(indent=2) + "\n", encoding="utf-8"
     )
     (run_dir / "research.md").write_text(render_run_markdown(research), encoding="utf-8")
+    if diff is not None:
+        (run_dir / "diff.json").write_text(diff.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        (run_dir / "diff.md").write_text(render_diff_markdown(diff), encoding="utf-8")
 
     ref = RunRef(
         run_id=report.report_id,

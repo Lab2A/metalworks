@@ -304,6 +304,8 @@ export interface RunSummary {
   report_id: string;
   brief_id?: string | null;
   query: string;
+  lineage_id?: string;
+  version?: number;
   status: "queued" | "planning_brief" | "pulling_arctic_shift" | "embedding_triage" | "llm_classifying" | "analyzing_relevant" | "web_research" | "compiling" | "complete" | "failed" | "compile_failed" | "oom_chunked";
   progress?: string | null;
   error?: string | null;

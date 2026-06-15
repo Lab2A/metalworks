@@ -834,6 +834,11 @@ class RunSummary(BaseModel):
     report_id: str
     brief_id: str | None = None
     query: str
+    # Lineage (mirrors DemandReport): groups a report's refresh versions so the
+    # runs table is the version index. Additive + defaulted (read
+    # `lineage_id or report_id`).
+    lineage_id: str = ""
+    version: int = 1
     status: Literal[
         "queued",
         "planning_brief",
@@ -854,3 +859,19 @@ class RunSummary(BaseModel):
     created_at: datetime
     generated_at: datetime | None = None
     ready_at: datetime | None = None
+
+    @classmethod
+    def from_report(cls, report: DemandReport, *, question: str | None = None) -> RunSummary:
+        """A completed run row for a finished report (carries its lineage)."""
+        return cls(
+            report_id=report.report_id,
+            brief_id=report.brief.brief_id if report.brief else None,
+            query=question or report.query,
+            lineage_id=report.effective_lineage_id,
+            version=report.version,
+            status="complete",
+            total_distinct_authors=report.total_distinct_authors,
+            created_at=report.generated_at,
+            generated_at=report.generated_at,
+            ready_at=report.generated_at,
+        )
