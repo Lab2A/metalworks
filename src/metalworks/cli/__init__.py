@@ -80,9 +80,72 @@ def version() -> None:
     console.print(f"metalworks {metalworks.__version__}")
 
 
+def _doctor_hints() -> list[str]:
+    """Compute the actionable Hints lines `doctor` prints (and `--fix` acts on).
+
+    Pure read-only: inspects env keys and importable modules only. Returns the
+    same human-readable lines the report shows, so the report and the repair
+    path can never drift.
+    """
+    # openrouter shares the openai SDK, so its missing-extra hint points at [openai].
+    _extra_for = {"openrouter": "openai"}
+    hints: list[str] = []
+    for provider, env_vars, module in _PROVIDER_MATRIX:
+        found = next((v for v in env_vars if os.environ.get(v)), None)
+        if found and not _module_available(module):
+            extra = _extra_for.get(provider, provider)
+            hints.append(
+                f"{found} is set but `{module}` is not installed → "
+                f'pip install "metalworks[{extra}]"'
+            )
+    if not any(os.environ.get(v) for _, evs, _ in _PROVIDER_MATRIX for v in evs):
+        hints.append("No provider key found → set one (e.g. OPENAI_API_KEY) to run the pipeline.")
+    if not any(os.environ.get(v) for v in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")):
+        if _module_available("fastembed"):
+            hints.append(
+                "No embedding key → using the local model (no key needed). "
+                "Run `metalworks models warm` to pre-download it."
+            )
+        else:
+            hints.append(
+                'No embedding key and fastembed not installed → pip install "metalworks[research]" '
+                "(or set GOOGLE_API_KEY / OPENAI_API_KEY)."
+            )
+    return hints
+
+
+def _embeddings_are_local() -> bool:
+    """True when the resolved embedding provider is the keyless local fastembed model.
+
+    Used by `doctor --fix` to decide whether warming (pre-download) is the safe,
+    in-process repair to run. Guarded so a resolution error never crashes doctor.
+    """
+    from metalworks.embeddings.adapters.fastembed import FastEmbedEmbedding
+
+    try:
+        return isinstance(config.resolve_embeddings(), FastEmbedEmbedding)
+    except Exception:
+        return False
+
+
 @app.command()
-def doctor() -> None:
-    """Report installed extras, configured keys, store path, and Reddit auth."""
+def doctor(
+    fix: Annotated[
+        bool,
+        typer.Option(
+            "--fix",
+            help="Run SAFE in-process repairs (e.g. pre-download the local embedding model); "
+            "print pip/export commands for the rest as guidance. Never runs pip or mutates env.",
+        ),
+    ] = False,
+) -> None:
+    """Report installed extras, configured keys, store path, and Reddit auth.
+
+    With ``--fix``, after printing the report it performs only safe, reversible,
+    in-process repairs (currently: warming the local embedding model) and prints
+    the remaining steps (``pip install …`` / ``export …``) as copy-paste guidance.
+    It never runs pip and never mutates the environment.
+    """
     console.print(f"[bold]metalworks {metalworks.__version__}[/bold]")
 
     console.print("\n[bold]Optional extras[/bold]")
@@ -125,35 +188,56 @@ def doctor() -> None:
         console.print(f"  [yellow]could not read store: {exc}[/yellow]")
 
     console.print("\n[bold]Hints[/bold]")
-    # openrouter shares the openai SDK, so its missing-extra hint points at [openai].
-    _extra_for = {"openrouter": "openai"}
-    hints: list[str] = []
-    for provider, env_vars, module in _PROVIDER_MATRIX:
-        found = next((v for v in env_vars if os.environ.get(v)), None)
-        if found and not _module_available(module):
-            extra = _extra_for.get(provider, provider)
-            hints.append(
-                f"{found} is set but `{module}` is not installed → "
-                f'pip install "metalworks[{extra}]"'
-            )
-    if not any(os.environ.get(v) for _, evs, _ in _PROVIDER_MATRIX for v in evs):
-        hints.append("No provider key found → set one (e.g. OPENAI_API_KEY) to run the pipeline.")
-    if not any(os.environ.get(v) for v in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")):
-        if _module_available("fastembed"):
-            hints.append(
-                "No embedding key → using the local model (no key needed). "
-                "Run `metalworks models warm` to pre-download it."
-            )
-        else:
-            hints.append(
-                'No embedding key and fastembed not installed → pip install "metalworks[research]" '
-                "(or set GOOGLE_API_KEY / OPENAI_API_KEY)."
-            )
+    hints = _doctor_hints()
     if hints:
         for h in hints:
             console.print(f"  [yellow]•[/yellow] {h}")
     else:
         console.print("  [green]all set[/green]")
+
+    if fix:
+        _doctor_fix(hints)
+
+
+def _doctor_fix(hints: list[str]) -> None:
+    """Perform SAFE in-process repairs and print the rest as copy-paste guidance.
+
+    Only reversible, in-process actions run automatically (warming the local
+    embedding model). Anything that would run pip or mutate the environment is
+    printed for the user to run, never executed.
+    """
+    console.print("\n[bold]Fix[/bold]")
+    acted = False
+
+    # Safe, in-process, reversible: pre-download the keyless local embedding model.
+    if _embeddings_are_local():
+        acted = True
+        from metalworks.errors import MetalworksError
+
+        embeddings = config.resolve_embeddings()
+        model_id = getattr(embeddings, "model_id", embeddings.__class__.__name__)
+        console.print(f"  [bold]warming[/bold] local embedding model: {model_id}")
+        console.print("  [dim]downloading on first use; may take a minute…[/dim]")
+        try:
+            embeddings.embed(["warmup"], task="query")
+            console.print("  [green]embedding model cached locally.[/green]")
+        except MetalworksError as exc:
+            console.print(f"  [yellow]could not warm embeddings: {exc.message}[/yellow]")
+            if exc.fix:
+                console.print(f"  [dim]{exc.fix}[/dim]")
+        except Exception as exc:  # never let a download error crash doctor
+            console.print(f"  [yellow]could not warm embeddings: {exc}[/yellow]")
+
+    # Everything else (pip install / export) is guidance only — print, never run.
+    guidance = [h for h in hints if "pip install" in h or "set one" in h or "set GOOGLE" in h]
+    if guidance:
+        console.print("  [dim]Run these yourself (not auto-run):[/dim]")
+        for h in guidance:
+            console.print(f"    [yellow]•[/yellow] {h}")
+        acted = True
+
+    if not acted:
+        console.print("  [green]nothing to repair.[/green]")
 
 
 @app.command()
@@ -193,6 +277,122 @@ def init(
         env_path.write_text(_ENV_EXAMPLE, encoding="utf-8")
         console.print(f"[green]Wrote[/green] {env_path}")
     console.print("\nNext: set a provider key in your shell, then `metalworks doctor`.")
+
+
+def _present_providers() -> list[tuple[str, str]]:
+    """Providers with a key present in the env → [(provider, found_env_var)].
+
+    Reuses the `_PROVIDER_MATRIX` key logic so `setup` reports exactly what the
+    resolvers can reach. Never reads the secret value — only which var is set.
+    """
+    out: list[tuple[str, str]] = []
+    for provider, env_vars, _module in _PROVIDER_MATRIX:
+        found = next((v for v in env_vars if os.environ.get(v)), None)
+        if found:
+            out.append((provider, found))
+    return out
+
+
+@app.command()
+def setup(
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Non-interactive: accept every default (no project, no warm, no model write).",
+        ),
+    ] = False,
+) -> None:
+    """Interactive onboarding: detect keys, pick a model, scaffold a project, warm embeddings.
+
+    Idempotent and non-destructive. Secrets are never read or written — when no
+    provider key is present it tells you which env var to ``export``. Every
+    prompt has a default, so it is fully scriptable: pipe newlines for the
+    defaults, or pass ``--yes`` to accept them all non-interactively.
+    """
+    console.print("[bold]metalworks setup[/bold]\n")
+
+    # 1. Detect provider keys.
+    present = _present_providers()
+    chosen_provider: str | None = None
+    if not present:
+        console.print("[yellow]No provider key found in the environment.[/yellow]")
+        console.print(
+            "  Set one, e.g.:  [bold]export OPENAI_API_KEY=…[/bold]  "
+            "(or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY)"
+        )
+        console.print(
+            "  [dim]Secrets come from the environment only — setup never writes them.[/dim]"
+        )
+    elif len(present) == 1:
+        chosen_provider, var = present[0]
+        console.print(
+            f"[green]Found[/green] one provider key: {chosen_provider} ({var}). Using it."
+        )
+    else:
+        labels = ", ".join(f"{p} ({v})" for p, v in present)
+        console.print(f"[green]Found[/green] {len(present)} provider keys: {labels}")
+        default = present[0][0]
+        if yes:
+            chosen_provider = default
+            console.print(f"  [dim]--yes → using {chosen_provider}.[/dim]")
+        else:
+            chosen_provider = typer.prompt("Which provider should be the default?", default=default)
+            chosen_provider = (chosen_provider or default).strip()
+
+    # 2. Optionally set a default model ref (writes `model` to the cwd config).
+    write_model = False
+    if not yes:
+        write_model = typer.confirm("Set a default model ref now?", default=False)
+    if write_model:
+        ref = typer.prompt(
+            "Model ref (e.g. openai/gpt-5, anthropic:claude-sonnet-4)", default=""
+        ).strip()
+        if ref:
+            _set_model_setting("model", ref)
+        else:
+            console.print("[dim]No model ref entered — skipping.[/dim]")
+
+    # 3. Offer to create a project (same path as `init` / Project.init).
+    make_project = yes is False and typer.confirm(
+        "Create a .metalworks/ project here?", default=False
+    )
+    if make_project:
+        from metalworks.project import DIRNAME, Project
+
+        existed = (Path.cwd() / DIRNAME / "project.json").is_file()
+        project = Project.init(Path.cwd())
+        if existed:
+            console.print(f"  [yellow]{DIRNAME}/ already exists; left untouched.[/yellow]")
+        else:
+            console.print(f"  [green]Created[/green] {DIRNAME}/ (project '{project.slug}')")
+        if not project.config_path.exists():
+            seed = {"provider": chosen_provider} if chosen_provider else {}
+            config.save_config(seed, path=project.config_path)
+            console.print(f"  [green]Wrote[/green] {project.config_path}")
+
+    # 4. Offer to pre-download the local embedding model (same path as `models warm`).
+    warm = yes is False and typer.confirm(
+        "Pre-download the local embedding model now?", default=False
+    )
+    if warm:
+        from metalworks.errors import MetalworksError
+
+        embeddings = _resolve_embeddings_or_exit()
+        model_id = getattr(embeddings, "model_id", embeddings.__class__.__name__)
+        console.print(f"  [bold]Warming[/bold] embedding model: {model_id}")
+        try:
+            embeddings.embed(["warmup"], task="query")
+            console.print("  [green]Ready.[/green] Cached locally.")
+        except MetalworksError as exc:
+            console.print(f"  [yellow]could not warm: {exc.message}[/yellow]")
+            if exc.fix:
+                console.print(f"  [dim]{exc.fix}[/dim]")
+
+    # 5. Finish with the doctor summary.
+    console.print("\n[bold]── doctor ──[/bold]")
+    doctor(fix=False)
 
 
 # ── config sub-app ──────────────────────────────────────────────────────────

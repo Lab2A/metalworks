@@ -198,6 +198,7 @@ def test_mcp_serve_sse_refuses_without_token(monkeypatch: pytest.MonkeyPatch) ->
 # group is added without help that renders.
 _COMMAND_GROUPS = [
     [],
+    ["setup"],
     ["research"],
     ["reddit"],
     ["reddit", "subreddit"],
@@ -288,6 +289,104 @@ def test_models_warm_embeds_a_warmup_input(monkeypatch: pytest.MonkeyPatch) -> N
     assert result.exit_code == 0, result.output
     assert seen.get("texts") == ["warmup"]
     assert "Ready" in result.output
+
+
+def test_setup_runs_with_no_keys(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # No keys, all prompts defaulted (piped newlines): runs to the doctor summary
+    # and exits 0, telling the user which env var to export. Writes nothing.
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    result = runner.invoke(app, ["setup"], input="\n\n\n\n")
+    assert result.exit_code == 0, result.output
+    assert "export OPENAI_API_KEY" in result.output
+    # Defaulting every prompt is non-destructive.
+    assert not (tmp_path / "metalworks.toml").exists()
+    assert not (tmp_path / ".metalworks").exists()
+
+
+def test_setup_runs_with_a_dummy_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    result = runner.invoke(app, ["setup"], input="\n\n\n\n")
+    assert result.exit_code == 0, result.output
+    assert "anthropic" in result.output.lower()
+
+
+def test_setup_writes_model_when_chosen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Decline provider pick (one key), accept "set a model ref", type the ref,
+    # decline project + warm. The cwd metalworks.toml carries the chosen model.
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    # prompts: set model? -> y, ref -> openai/gpt-5, project? -> n, warm? -> n
+    result = runner.invoke(app, ["setup"], input="y\nopenai/gpt-5\nn\nn\n")
+    assert result.exit_code == 0, result.output
+    assert 'model = "openai/gpt-5"' in (tmp_path / "metalworks.toml").read_text()
+
+
+def test_setup_yes_runs_non_interactively(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    result = runner.invoke(app, ["setup", "--yes"])
+    assert result.exit_code == 0, result.output
+    # --yes accepts defaults: no project, no warm, no model write.
+    assert not (tmp_path / "metalworks.toml").exists()
+    assert not (tmp_path / ".metalworks").exists()
+
+
+def test_doctor_fix_exits_zero_and_warms_when_local(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from metalworks import config
+    from metalworks.embeddings.adapters.fastembed import FastEmbedEmbedding
+
+    monkeypatch.chdir(tmp_path)
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+
+    seen: dict[str, object] = {}
+
+    class _FakeLocal(FastEmbedEmbedding):  # isinstance(.., FastEmbedEmbedding) → local
+        def __init__(self) -> None:  # no real download
+            pass
+
+        model_id = "fake/local-embed"
+
+        def embed(self, texts: list[str], *, task: str = "document") -> list[list[float]]:
+            seen["texts"] = list(texts)
+            return [[0.0]]
+
+    monkeypatch.setattr(config, "resolve_embeddings", lambda: _FakeLocal())
+    result = runner.invoke(app, ["doctor", "--fix"])
+    assert result.exit_code == 0, result.output
+    assert seen.get("texts") == ["warmup"]
+    assert "Fix" in result.output
+
+
+def test_doctor_without_fix_does_not_warm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from metalworks import config
+
+    monkeypatch.chdir(tmp_path)
+    seen: dict[str, object] = {}
+
+    class _FakeEmbed:
+        model_id = "fake/embed"
+
+        def embed(self, texts: list[str], *, task: str = "document") -> list[list[float]]:
+            seen["warmed"] = True
+            return [[0.0]]
+
+    monkeypatch.setattr(config, "resolve_embeddings", lambda: _FakeEmbed())
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    assert "warmed" not in seen  # no --fix → hints only, no in-process action
+    assert "Fix" not in result.output
 
 
 def test_doctor_hints_section_renders_with_no_keys(monkeypatch: pytest.MonkeyPatch) -> None:
