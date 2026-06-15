@@ -83,6 +83,7 @@ class _Resolver:
         comments: CommentSource | None,
         model: str | None,
         fast_model: str | None,
+        fallback_models: list[str] | None = None,
     ) -> None:
         self._chat = chat
         self._fast_chat = fast_chat
@@ -93,6 +94,7 @@ class _Resolver:
         self._comments = comments
         self._model = model
         self._fast_model = fast_model
+        self._fallback_models = fallback_models
         self._search_resolved = False
         self._comments_resolved = False
         self._limiter_obj: RateLimiter | None = None
@@ -102,7 +104,12 @@ class _Resolver:
         if self._chat is None:
             from metalworks import config
 
-            self._chat = config.resolve_chat(self._model)
+            # Opt-in failover: wraps in a FallbackChatModel only when ≥1 fallback
+            # ref is configured (arg here, else the config file). With none, this
+            # returns exactly config.resolve_chat(self._model) — no wrapper.
+            self._chat = config.resolve_chat_chain(
+                self._model, fallback_models=self._fallback_models
+            )
         return self._chat
 
     def fast_chat(self) -> ChatModel | None:
@@ -197,6 +204,11 @@ class Metalworks:
     and the corpus reader as the Hugging Face Arctic mirror. Pass ``model`` /
     ``fast_model`` as ``provider:id`` or ``provider/model`` refs to pick a
     provider explicitly, or pass fully-constructed objects to swap any layer.
+
+    ``fallback_models`` is an opt-in ordered list of additional model refs: when
+    the primary chat model fails with a retryable error (rate limit / transient),
+    the chain tries each fallback in turn. With none configured (the default),
+    the chat model is exactly the single resolved model — no wrapper, no change.
     """
 
     def __init__(
@@ -211,6 +223,7 @@ class Metalworks:
         comments: CommentSource | None = None,
         model: str | None = None,
         fast_model: str | None = None,
+        fallback_models: list[str] | None = None,
     ) -> None:
         self._r = _Resolver(
             chat=chat,
@@ -222,6 +235,7 @@ class Metalworks:
             comments=comments,
             model=model,
             fast_model=fast_model,
+            fallback_models=fallback_models,
         )
         self._reddit_ns: _RedditNamespace | None = None
         self._discovery_ns: _DiscoveryNamespace | None = None
