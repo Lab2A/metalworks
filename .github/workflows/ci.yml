@@ -15,10 +15,13 @@ jobs:
         python: ["3.11", "3.12", "3.13"]
         extras: ["bare", "all"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ matrix.python }}
+          # This repo doesn't commit uv.lock; key the cache off pyproject.toml
+          # so it actually invalidates (default **/uv.lock glob never matches).
+          cache-dependency-glob: "pyproject.toml"
       - run: uv venv --clear
       - name: Install (bare)
         if: matrix.extras == 'bare'
@@ -35,10 +38,13 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: "3.12"
+          # This repo doesn't commit uv.lock; key the cache off pyproject.toml
+          # so it actually invalidates (default **/uv.lock glob never matches).
+          cache-dependency-glob: "pyproject.toml"
       - run: uv venv --clear
       # All extras so pyright resolves real provider SDK imports (crypto,
       # supabase, etc.). Adapters keep SDK objects behind Any regardless, but
