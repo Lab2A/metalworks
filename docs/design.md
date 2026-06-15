@@ -13,7 +13,14 @@ the same report, so nothing is made up.
 
 ## Surface & screens — what to build
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/demand-report an affordable, jitter-free focus supplement for developers
+/surface-and-ux
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()
@@ -33,11 +40,11 @@ for s in ux.screens:
     print(f"  {s.name}: {s.purpose} [{flag}] {star}")
 ```
 
-From the command line:
-
-```bash
+```bash CLI
 metalworks research surface <report-id>
 ```
+
+</CodeGroup>
 
 `mw.surface(...)` picks the right kind of product to build — `web`, `mobile`, `cli`,
 `browser_extension`, and so on — with a runner-up and the trade-offs. It judges the
@@ -72,7 +79,14 @@ confident "the users are here" on a loosely related comment.
 
 ## Marketing site — every claim is a real quote
 
-```python
+<CodeGroup>
+
+```text Claude Code
+# uses the report you already made above
+/generate-site
+```
+
+```python Python
 site = mw.site(research, positioning)             # marketing copy, every line a real quote
 for sec in site.sections:
     print(sec.role, f"[{sec.provenance}]", "→", sec.copy[:60])
@@ -81,11 +95,11 @@ html = mw.render_site(site, research)             # a self-contained index.html
 open("index.html", "w").write(html)
 ```
 
-From the command line:
-
-```bash
+```bash CLI
 metalworks research site <report-id>
 ```
+
+</CodeGroup>
 
 `mw.site(...)` drafts a small marketing page; `mw.render_site(...)` turns it into one
 self-contained `index.html` you can open. The copy isn't AI prose — **every
