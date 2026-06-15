@@ -1,15 +1,19 @@
 ---
 title: "Content & SEO"
-description: "Project your demand report into a content plan — one page per real demand cluster, formatted answer-first and citing the actual Reddit threads, so AI search engines (ChatGPT, Perplexity, Google's AI answers) cite you."
+description: "Turn your demand report into a content plan — one page per real demand theme, formatted answer-first and citing the actual Reddit threads, so AI search engines (ChatGPT, Perplexity, Google's AI answers) cite you."
 ---
 
-Turn your demand report into a content plan: one page per real demand cluster, each one the
+Turn your demand report into a content plan: **one page per real demand theme, written so AI
+search engines (ChatGPT, Perplexity, Google's AI answers) cite you.** Each page is the
 genuinely-best answer to a question people actually asked, citing the real Reddit threads that
-surfaced it. It's formatted so AI search engines (ChatGPT, Perplexity, Google's AI answers) cite
-you.
+surfaced it.
 
-`content_plan` is fully deterministic — **no model, no embeddings, no network, no API key.** It's
-a pure projection of the report, so nothing is invented and no ranking is promised.
+To be clear up front: this is a structural plan for citable content, **not an SEO ranking
+guarantee.**
+
+`content_plan` is fully deterministic — it's instant, free, and gives the same result every time
+(no AI guessing): **no model, no embeddings, no network, no API key.** It's a pure projection of
+the report, so nothing is invented and no ranking is promised.
 
 ```python
 from metalworks import Metalworks
@@ -40,10 +44,11 @@ keys, no model.
 `CitationStrategy`. Every field is taken straight from the report:
 
 - **`target_phrase`** — the cluster's own claim, normalized. Never a conjured keyword.
-- **`page_kind`** — a deterministic read of that phrase: `comparison` (vs/versus/or/best),
-  `guide` (how/guide/tips), otherwise `answer`.
-- **`stat_anchors`** — the cluster's *real* distinct-author and mention counts, so the page brief
-  is as honest as the demand behind it.
+- **`page_kind`** — the page template (comparison, guide, or answer), read from that phrase:
+  `comparison` (vs/versus/or/best), `guide` (how/guide/tips), otherwise `answer`.
+- **`stat_anchors`** — the real numbers to cite (how many people, how many mentions): the
+  cluster's distinct-author and mention counts, so the page brief is as honest as the demand
+  behind it.
 - **`faq`** — built verbatim from the report brief's sub-questions, each with an empty answer slot
   for a citable answer to fill. The plan marks the slot; it never fabricates the answer.
 - **`outline`** — a fixed, answer-first section list: *What people actually want → Common
@@ -55,8 +60,8 @@ Reddit is one of the most heavily cited sources in AI search engines, so the leg
 to write the genuinely-best answer to a real question and cite the real threads that surfaced it.
 Two choices make a page citable:
 
-- **Answer-first formatting** plus a **FAQPage JSON-LD** stub, so an assistant can lift a clean,
-  self-contained answer.
+- **Answer-first formatting** plus a **FAQPage JSON-LD** stub (structured data that helps AI
+  search engines quote you), so an assistant can lift a clean, self-contained answer.
 - A `CitationStrategy` whose `reddit_targets` are the **actual permalinks** from your report's top
   clusters — disclosed, real sources to cite, not placeholders. Its `prompt_set` holds example
   citability prompts derived from the target phrases.
@@ -79,8 +84,7 @@ permalinks — the plan is exactly as defensible as the demand research.
 This is the legitimate way to get cited — the opposite of astroturf. Citing real permalinks and
 writing the best answer is authentic, disclosed work. Fake personas and invented backstories are
 excluded by design and prohibited by the
-[usage policy](https://github.com/Lab2A/metalworks/blob/main/USAGE_POLICY.md). And note: this is a
-structural plan for citable content, **not an SEO ranking guarantee.**
+[usage policy](https://github.com/Lab2A/metalworks/blob/main/USAGE_POLICY.md).
 
 ---
 

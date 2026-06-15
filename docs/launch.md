@@ -1,6 +1,6 @@
 ---
 title: "Launch assets"
-description: "Draft channel-native launch copy — Product Hunt, Show HN, an X thread — every claim backed by a real quote. Plus a human-run channel plan. metalworks drafts; you post."
+description: "Draft launch copy written in each platform's voice — Product Hunt, Show HN, an X thread — every claim backed by a real quote. Plus a human-run channel plan. metalworks drafts; you post."
 ---
 
 Turn your demand report into launch copy you can post. `launch` drafts one asset per channel —
@@ -41,7 +41,8 @@ optional — pass it to keep the copy consistent with your
 [positioning statement](/docs/positioning).
 
 **You get back:** a `list[LaunchAsset]`, one per channel. Each asset carries a `title` (the hook),
-a channel-native `body`, alternate `variants`, and `claim_citations` — the claims it could back.
+a `body` written in that channel's voice, alternate `variants`, and `claim_citations` — the
+claims it could back.
 
 Launch copy is the easiest place to over-claim, so every factual, quantified, or attitudinal
 claim is backed by a real quote. The model writes the body and lists each claim with the verbatim
@@ -62,9 +63,10 @@ for c in asset.claim_citations:
 
 ## The channel plan
 
-`mw.channel_plan(research)` returns a `ChannelPlan`: a fully deterministic sequence, no model
-involved. One step per channel, each marked `requires_human` and `posting_gated` — the library
-plans, you post.
+`mw.channel_plan(research)` returns a `ChannelPlan`: a fully deterministic sequence — the
+*sequencing* of the plan is model-free, even though the copy in `launch(...)` above is
+model-written. One step per channel, each marked `requires_human` and `posting_gated` — the
+library plans, you post.
 
 **Show HN is never automated.** Its step says to post it manually and answer replies yourself —
 the HN audience expects a human, and the plan encodes that. Holding a `LaunchAsset` or a

@@ -1,16 +1,17 @@
 ---
 title: "Build spec"
-description: "Turn a validated demand report into a feature spec and a ready-to-build project. metalworks writes the spec and scaffolds the repo — your own coding agent writes the product code."
+description: "Turn the demand report you already ran into a feature spec and a ready-to-build project. metalworks writes the spec and scaffolds the repo — your own coding agent writes the product code."
 ---
 
 You proved the demand. Now turn it into a plan your coding agent can build from. `build_spec`
-maps the demand report to a feature list — every feature backed by a real quote — and
-`scaffold` writes a project on disk for your agent (Claude Code, Cursor, etc.) to build inside.
+maps the demand report you already ran to a feature list — every feature *grounded* (backed by a
+real quote) — and `scaffold` writes a project on disk for your agent (Claude Code, Cursor, etc.)
+to build inside.
 
 **metalworks writes the spec and scaffolds the project. It does not write your product code.**
-No React components, no API routes, no migrations. It carries the validated demand forward — as
-a spec and a frozen quote table — so the agent that *does* write the code can't drift from what
-real users asked for.
+No React components, no API routes, no migrations. It carries the demand forward — as a spec and
+a frozen quote table — so the agent that *does* write the code can't drift from what real users
+asked for.
 
 ```python
 from metalworks import Metalworks
@@ -77,7 +78,7 @@ build/
     EVIDENCE.md                    FROZEN quote + permalink table — the ground truth
   .claude/
     skills/                        scaffold-startup, spec-from-report, the citation rule
-    scripts/cite_or_die.py         the lint that drops any claim it can't back
+    scripts/cite_or_die.py         a check that blocks your agent from shipping a claim with no quote behind it
     hooks.json                     runs the lint on every Edit/Write
   .mcp.json                        points the agent back at metalworks' MCP server
 ```
