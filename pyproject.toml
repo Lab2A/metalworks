@@ -95,3 +95,6 @@ pythonVersion = "3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--disable-socket"
+markers = [
+  "network: test needs real network/sockets (not run under --disable-socket)",
+]

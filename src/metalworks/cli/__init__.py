@@ -94,6 +94,15 @@ def doctor() -> None:
         status = f"[green]set[/green] ({found})" if found else "[dim]unset[/dim]"
         console.print(f"  {label:<14} {status}")
 
+    console.print("\n[bold]Resolved models[/bold]")
+    model_ref = config.setting("model")
+    for label, resolver in (
+        ("chat", lambda: config.resolve_chat(model_ref)),
+        ("embedding", config.resolve_embeddings),
+    ):
+        markup, _ = _resolved_model_id(label, resolver)
+        console.print(f"  {label:<10} {markup}")
+
     store_path = config.setting("store") or str(Path.home() / ".metalworks" / "store.db")
     console.print("\n[bold]Store[/bold]")
     console.print(f"  path  {store_path}")
@@ -111,6 +120,37 @@ def doctor() -> None:
             console.print("  [dim]no connected accounts[/dim] (run: metalworks reddit auth login)")
     except Exception as exc:
         console.print(f"  [yellow]could not read store: {exc}[/yellow]")
+
+    console.print("\n[bold]Hints[/bold]")
+    # openrouter shares the openai SDK, so its missing-extra hint points at [openai].
+    _extra_for = {"openrouter": "openai"}
+    hints: list[str] = []
+    for provider, env_vars, module in _PROVIDER_MATRIX:
+        found = next((v for v in env_vars if os.environ.get(v)), None)
+        if found and not _module_available(module):
+            extra = _extra_for.get(provider, provider)
+            hints.append(
+                f"{found} is set but `{module}` is not installed → "
+                f'pip install "metalworks[{extra}]"'
+            )
+    if not any(os.environ.get(v) for _, evs, _ in _PROVIDER_MATRIX for v in evs):
+        hints.append("No provider key found → set one (e.g. OPENAI_API_KEY) to run the pipeline.")
+    if not any(os.environ.get(v) for v in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")):
+        if _module_available("fastembed"):
+            hints.append(
+                "No embedding key → using the local model (no key needed). "
+                "Run `metalworks models warm` to pre-download it."
+            )
+        else:
+            hints.append(
+                'No embedding key and fastembed not installed → pip install "metalworks[research]" '
+                "(or set GOOGLE_API_KEY / OPENAI_API_KEY)."
+            )
+    if hints:
+        for h in hints:
+            console.print(f"  [yellow]•[/yellow] {h}")
+    else:
+        console.print("  [green]all set[/green]")
 
 
 @app.command()
@@ -306,6 +346,30 @@ def models_set_fast(
 ) -> None:
     """Set the fast model (writes ``fast_model`` to the cwd metalworks.toml)."""
     _set_model_setting("fast_model", ref)
+
+
+@models_app.command("warm")
+def models_warm() -> None:
+    """Pre-download the embedding model so the first research run isn't blocked.
+
+    Resolves the embedding provider (the local fastembed model when no
+    Google/OpenAI key is set) and embeds a tiny input, which fetches the model
+    on first use. A no-op for hosted embedding providers (nothing to download).
+    """
+    from metalworks.errors import MetalworksError
+
+    embeddings = _resolve_embeddings_or_exit()
+    model_id = getattr(embeddings, "model_id", embeddings.__class__.__name__)
+    console.print(f"[bold]Warming[/bold] embedding model: {model_id}")
+    console.print("[dim]Downloading on first use (local models only); may take a minute…[/dim]")
+    try:
+        embeddings.embed(["warmup"], task="query")
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+    console.print("[green]Ready.[/green] The embedding model is cached locally.")
 
 
 # ── research sub-app ────────────────────────────────────────────────────────
@@ -1147,15 +1211,14 @@ def _resolve_chat_or_exit() -> ChatModel:
 def _resolve_embeddings_or_exit() -> EmbeddingProvider:
     """Resolve embeddings, or exit cleanly with guidance (never a raw traceback).
 
-    The research pipeline needs an embeddings provider in addition to the chat
-    model. Anthropic has no embeddings API, so an Anthropic-only key is not
-    enough — this surfaces that as a one-line message + fix rather than a stack
-    trace.
+    The research pipeline needs an embeddings provider. With no Google/OpenAI key
+    it falls back to the local fastembed model; this surfaces any resolution error
+    (e.g. the model's extra missing) as a one-line message + fix, not a stack trace.
     """
     from metalworks.errors import MetalworksError
 
     try:
-        return _resolve_embeddings_or_exit()
+        return config.resolve_embeddings()
     except MetalworksError as exc:
         err_console.print(f"[red]{exc.message}[/red]")
         if exc.fix:

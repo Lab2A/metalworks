@@ -253,3 +253,52 @@ def test_research_list_is_in_help() -> None:
     result = runner.invoke(app, ["research", "--help"])
     assert result.exit_code == 0
     assert "list" in result.output
+
+
+def test_resolve_embeddings_or_exit_does_not_recurse(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Regression: the helper once called itself instead of config.resolve_embeddings,
+    # infinite-looping on the exact CLI path it was meant to make fail cleanly.
+    monkeypatch.chdir(tmp_path)
+    for key in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    from metalworks.cli import _resolve_embeddings_or_exit
+    from metalworks.embeddings.adapters.fastembed import FastEmbedEmbedding
+
+    # No keys → local fallback; must return (not recurse) and not need fastembed
+    # installed (construction is lazy).
+    assert isinstance(_resolve_embeddings_or_exit(), FastEmbedEmbedding)
+
+
+def test_models_warm_embeds_a_warmup_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+
+    seen: dict[str, object] = {}
+
+    class _FakeEmbed:
+        model_id = "fake/embed"
+
+        def embed(self, texts: list[str], *, task: str = "document") -> list[list[float]]:
+            seen["texts"] = list(texts)
+            return [[0.0]]
+
+    monkeypatch.setattr(config, "resolve_embeddings", lambda: _FakeEmbed())
+    result = runner.invoke(app, ["models", "warm"])
+    assert result.exit_code == 0, result.output
+    assert seen.get("texts") == ["warmup"]
+    assert "Ready" in result.output
+
+
+def test_doctor_hints_section_renders_with_no_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "Hints" in result.output  # actionable guidance section is present
