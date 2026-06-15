@@ -8,9 +8,11 @@
 
 Core is dependency-light (pydantic, httpx, typer, rich). Provider SDKs live
 behind extras and are lazy-imported; a bare `import metalworks` pulls in no
-provider modules. Install only what matches the API key you have:
-`pip install "metalworks[google]"` (or `[anthropic]`, `[openai]`, `[reddit]`,
-`[research]`, `[all]`).
+provider modules. Install the pipeline + one provider:
+`pip install "metalworks[research,openai]"` (or `[research,anthropic]`,
+`[research,google]`). One chat key is enough — embeddings resolve from a Google
+or OpenAI key when present, else fall back to a bundled local model (`fastembed`,
+no key). So Anthropic/OpenRouter/local chat all work standalone.
 
 ## Entry points
 

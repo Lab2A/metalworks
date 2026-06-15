@@ -15,12 +15,12 @@ It's a Python library you install (also a CLI, an MCP server, and a Claude Code 
 
 ## Your first report
 
-Install metalworks with a provider SDK, and set its key. OpenAI or Google is simplest —
-one key covers both the chat model and the embeddings the pipeline needs:
+Install metalworks with a provider SDK, and set **one** key — any provider works (embeddings
+default to a local model, so there's no second key to set):
 
 ```bash
-pip install "metalworks[research,openai]"     # or [research,google]
-export OPENAI_API_KEY=...
+pip install "metalworks[research,openai]"     # or [research,google], [research,anthropic]
+export OPENAI_API_KEY=...                      # or ANTHROPIC_API_KEY / GOOGLE_API_KEY
 ```
 
 ```python

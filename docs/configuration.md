@@ -98,8 +98,42 @@ Metalworks(model="anthropic/claude-opus-4-6", fast_model="anthropic/claude-haiku
 If you set only `model`, the fast slot falls back to it. Resolve a pair directly
 with `metalworks.config.resolve_models(model, fast_model)`.
 
+## Embeddings
+
+The pipeline embeds Reddit comments to cluster demand. You don't configure this
+separately — it resolves from your environment, and **never requires its own key**:
+
+| Present | Embeddings used |
+| --- | --- |
+| `GOOGLE_API_KEY` / Vertex | Google embeddings |
+| else `OPENAI_API_KEY` | OpenAI embeddings |
+| neither | **local model** — `fastembed` (`BAAI/bge-small-en-v1.5`, 384-dim), no key |
+
+So a chat-only provider (Anthropic, OpenRouter, a local LLM) just works: embeddings fall back
+to the local model, downloaded once to the Hugging Face cache, then fully offline. A Google
+or OpenAI key is used automatically when present (higher quality, no download).
+
+```bash
+metalworks models warm          # pre-download the local model before your first run
+```
+
+Override explicitly by injecting a provider:
+
+```python
+from metalworks.embeddings.adapters.openai import OpenAIEmbedding
+Metalworks(embeddings=OpenAIEmbedding())     # force a specific embedding backend
+```
+
+<Note>
+Embedding vectors from different models live in incompatible spaces. metalworks stamps each
+cached index with an identity and refuses to mix them — switching embedding backend on an
+existing `.metalworks/` project triggers a clear `EmbeddingModelMismatch` rather than silently
+degrading retrieval. Re-run research to rebuild the index under the new model.
+</Note>
+
 ## Check the resolution
 
 ```bash
-metalworks doctor      # prints the resolved provider/model and which keys are set
+metalworks doctor        # resolved chat + embedding models, keys found, actionable hints
+metalworks models list   # the same, plus a provider × key × extra reachability matrix
 ```

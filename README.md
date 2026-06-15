@@ -24,16 +24,17 @@ manipulation, no coordinated inauthentic behavior.
 
 ## Quickstart
 
-Install metalworks with a provider SDK and set its key. Google or OpenAI is simplest — one
-key covers both the chat model and the embeddings the pipeline needs:
+Install metalworks with a provider SDK and set **one** key — any provider works:
 
 ```bash
-pip install "metalworks[google,research]"   # or [openai,research]
-export GOOGLE_API_KEY=...                    # chat + embeddings
+pip install "metalworks[openai,research]"   # or [google,research], [anthropic,research]
+export OPENAI_API_KEY=...                    # or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
 ```
 
-Anthropic is chat-only (no embeddings API), so an `ANTHROPIC_API_KEY` must be paired with a
-`GOOGLE_API_KEY` or `OPENAI_API_KEY`.
+Embeddings need no separate key: with a Google or OpenAI key metalworks uses theirs, otherwise
+it falls back to a small local model (`fastembed`, bundled with `[research]`, downloaded once).
+So a single chat key — Anthropic, OpenRouter, anything — gets you a full run.
+`metalworks models warm` pre-downloads the local model.
 
 Prefer Vertex AI over an API key? Set `GOOGLE_GENAI_USE_VERTEXAI=true` plus
 `VERTEX_PROJECT_ID` and `VERTEX_LOCATION` and the Google adapters authenticate
