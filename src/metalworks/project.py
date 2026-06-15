@@ -11,13 +11,19 @@ Layout (see re-plan §10.1)::
     └─ .metalworks/
         ├─ project.json          # manifest: id, slug, idea, created_at, runs[]   [committed]
         ├─ config.toml           # non-secret provider/model settings             [committed]
-        ├─ corpus.db             # sqlite: corpus + runs + embeddings             [gitignored]
+        ├─ corpus.db             # sqlite: durable corpus + runs + embeddings     [gitignored]
         ├─ runs/<id>/research.{md,json}                                           [committed]
         └─ artifacts/            # Tier-2 pillar outputs (positioning/site/…)     [committed]
 
+The ``corpus.db`` is the project's DURABLE corpus — the authoritative store of
+the source-neutral records/comments + embeddings, accumulated across runs and
+meant to survive (you grow it, you don't throw it away). It is still gitignored,
+and deliberately so: it holds verbatim user text, salted author hashes, and
+embedding vectors, none of which belong in git history. "Durable but local."
+
 :meth:`Project.find` walks up from a start directory looking for ``.metalworks/``
 (the way git discovers ``.git``). :meth:`Project.init` creates the directory,
-writes the manifest, and gitignores the re-pullable corpus cache. Casual use
+writes the manifest, and gitignores the durable corpus store. Casual use
 (no ``.metalworks/``) leaves zero footprint — the project layer is opt-in,
 created only by ``metalworks init``.
 """
@@ -34,7 +40,9 @@ from pydantic import BaseModel, Field
 
 DIRNAME = ".metalworks"
 _CORPUS_GITIGNORE = (
-    "# Re-pullable corpus cache — rebuilt from source, never committed.\ncorpus.db\n"
+    "# Durable corpus store (authoritative, survives across runs) — but never\n"
+    "# committed: it holds verbatim user text, salted author hashes, and embedding\n"
+    "# vectors. Durable but local.\ncorpus.db\n"
 )
 
 
@@ -95,7 +103,9 @@ class Project:
 
     @property
     def corpus_db(self) -> Path:
-        """The sqlite memory substrate (corpus + runs + embeddings) — gitignored."""
+        """The sqlite substrate for the durable corpus (records/comments + runs +
+        embeddings). Authoritative and survives across runs, but gitignored —
+        verbatim text, author hashes, and vectors must not enter git history."""
         return self.root / "corpus.db"
 
     @property
@@ -155,8 +165,9 @@ class Project:
 
         Idempotent: if the project already exists it is returned untouched (never
         clobbered). ``slug`` derives from ``idea`` when given, else from the repo
-        directory name. The corpus cache is gitignored via ``.metalworks/.gitignore``
-        so the project dir is committable without the noisy re-pullable db.
+        directory name. The durable corpus store is gitignored via
+        ``.metalworks/.gitignore`` so the project dir is committable without the
+        verbatim-text / author-hash / embedding-vector db.
         """
         base = (repo_root or Path.cwd()).resolve()
         project = cls(base / DIRNAME)

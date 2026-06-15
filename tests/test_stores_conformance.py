@@ -18,6 +18,8 @@ from typing import Protocol
 import pytest
 
 from metalworks.contract import (
+    CorpusComment,
+    CorpusRecord,
     InboxItem,
     Opportunity,
     RedditComment,
@@ -138,6 +140,92 @@ def test_corpus_returns_all_rows_beyond_1000(stores: AllRepos) -> None:
 
     got_posts = stores.get_posts(["p0", "p2", "missing"])
     assert {p.post_id for p in got_posts} == {"p0", "p2"}
+
+
+def test_reddit_shims_round_trip_through_generic_spine(stores: AllRepos) -> None:
+    """The Reddit-named shims map onto the generic CorpusRecord/CorpusComment
+    store and reconstruct the Reddit contract on read — every Reddit field that
+    matters survives the trip through the spine + `extra` tail."""
+    post = RedditPost(
+        post_id="px",
+        subreddit="Supplements",
+        title="t",
+        selftext="body",
+        url="https://reddit.com/r/Supplements/comments/px/",
+        author="u_hash",
+        score=99,
+        num_comments=7,
+        flair="Discussion",
+    )
+    stores.upsert_posts([post])
+    got = stores.get_posts(["px"])
+    assert len(got) == 1
+    p = got[0]
+    assert (p.post_id, p.subreddit, p.selftext, p.score, p.num_comments, p.flair, p.author) == (
+        "px",
+        "Supplements",
+        "body",
+        99,
+        7,
+        "Discussion",
+        "u_hash",
+    )
+
+    comment = RedditComment(
+        comment_id="cx",
+        post_id="px",
+        subreddit="Supplements",
+        body="signal",
+        permalink="https://reddit.com/r/Supplements/comments/px/_/cx/",
+        author_hash="ah",
+        score=12,
+        parent_id="t1_parent",
+    )
+    stores.upsert_comments([comment])
+    cgot = stores.get_comments_for_posts(["px"])
+    assert len(cgot) == 1
+    c = cgot[0]
+    assert (c.comment_id, c.post_id, c.subreddit, c.body, c.score, c.parent_id) == (
+        "cx",
+        "px",
+        "Supplements",
+        "signal",
+        12,
+        "t1_parent",
+    )
+
+
+def test_generic_corpus_surface_round_trips(stores: AllRepos) -> None:
+    """The authoritative generic surface stores a non-Reddit record + comment."""
+    rec = CorpusRecord(
+        id="hn1",
+        source="hackernews",
+        source_id="40001",
+        url="https://news.ycombinator.com/item?id=40001",
+        title="Show HN",
+        text="built it",
+        engagement=88,
+        extra={"site": "example.com"},
+    )
+    cc = CorpusComment(
+        id="hnc1",
+        parent_id="hn1",
+        source="hackernews",
+        url="https://news.ycombinator.com/item?id=50001",
+        text="we churned after the price hike",
+        author_hash="hn_a",
+        engagement=20,
+    )
+    stores.upsert_records([rec])
+    stores.upsert_corpus_comments([cc])
+
+    recs = stores.get_records(["hn1", "missing"])
+    assert [r.id for r in recs] == ["hn1"]
+    assert recs[0].source == "hackernews" and recs[0].extra["site"] == "example.com"
+
+    cmts = stores.get_comments_for_records(["hn1"])
+    assert [c.id for c in cmts] == ["hnc1"]
+    assert cmts[0].source == "hackernews"
 
 
 # ── Accounts ──

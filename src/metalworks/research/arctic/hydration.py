@@ -7,17 +7,19 @@ subset is hydrated; the raw corpus stays in object storage.
 Two stages, deliberately separate so they can be parallelized or skipped:
 
 1. :func:`hydrate_submissions` — pulls matching rows via
-   ``deps.reader.fetch_submissions_by_ids`` (the new PUBLIC reader method) and
-   upserts ``RedditPost`` rows through ``deps.corpus``.
+   ``deps.reader.fetch_submissions_by_ids`` (the new PUBLIC reader method),
+   builds Reddit ``RedditPost`` models, maps them onto the source-neutral
+   :class:`CorpusRecord` spine, and upserts records through ``deps.corpus``.
 
 2. :func:`hydrate_comments` — fans out to the live Arctic Shift API via
    ``deps.comments.comments_for_links`` (the HF comment tree is stale) and
-   upserts ``RedditComment`` rows.
+   upserts :class:`CorpusComment` rows (mapped from ``RedditComment``).
 
 Port changes vs. the source:
 
-- Writes go through ``deps.corpus.upsert_posts`` / ``.upsert_comments`` against
-  the contract models, not Supabase tables.
+- Writes go through ``deps.corpus.upsert_records`` /
+  ``.upsert_corpus_comments`` against the source-neutral corpus contract, not
+  Supabase tables. Reddit is mapped onto the generic spine HERE, at ingest.
 - Author hashing uses ``deps.author_salt`` (NOT a hardcoded constant); Reddit's
   ``[deleted]`` / ``[removed]`` sentinels are preserved.
 - ``HydrationResult.skipped`` / ``.errors`` are populated from the API client's
@@ -33,7 +35,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from metalworks.contract import RedditComment, RedditPost
+from metalworks.contract import CorpusComment, CorpusRecord, RedditComment, RedditPost
 from metalworks.research.types import HydrationResult
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -51,6 +53,10 @@ def _hash_author(author: str | None, *, salt: str) -> str | None:
 
     Reddit's ``[deleted]`` / ``[removed]`` sentinels are preserved as-is so the
     pipeline can reason about them; real usernames are sha256-truncated.
+
+    NOTE: this sentinel handling is Reddit-specific and should move into a
+    per-source ingest adapter once a second source lands — the corpus spine
+    itself is source-neutral.
     """
     if not author or author in ("[deleted]", "[removed]"):
         return author or None
@@ -127,7 +133,9 @@ def hydrate_submissions(
             )
         )
 
-    deps.corpus.upsert_posts(posts)
+    # Map Reddit onto the source-neutral spine at ingest, then store records.
+    records: list[CorpusRecord] = [CorpusRecord.from_reddit_post(p) for p in posts]
+    deps.corpus.upsert_records(records)
     return HydrationResult(
         requested=requested,
         fetched=fetched,
@@ -183,7 +191,8 @@ def hydrate_comments(
                 )
             )
 
-    deps.corpus.upsert_comments(comments)
+    corpus_comments: list[CorpusComment] = [CorpusComment.from_reddit_comment(c) for c in comments]
+    deps.corpus.upsert_corpus_comments(corpus_comments)
 
     # Pull the per-link failure accumulation off the client if it exposes it.
     skipped = int(getattr(source, "last_skipped", 0) or 0)
