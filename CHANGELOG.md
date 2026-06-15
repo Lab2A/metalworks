@@ -6,6 +6,46 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [0.0.2] - 2026-06-15
+
+Multi-source corpus-as-core, live versioned reports, and keyless-by-default
+providers. Pre-1.0, so anything outside `metalworks.contract` may still change.
+
+### Added
+
+- **Corpus-as-core.** A durable, multi-source corpus is now the core. Sources are
+  `ItemSource` connectors that ingest source-neutral `CorpusRecord` /
+  `CorpusComment` into one shared store: Reddit, Hacker News (keyless), web
+  search, and bring-your-own (copy the template, `register_source`). CLI:
+  `metalworks corpus add/sync/stats`, `metalworks sources list/enable/disable`,
+  and a `--source` flag on `research run`; a `[sources]` config table.
+- **Live, versioned reports.** A report is a refreshable view over the corpus:
+  `metalworks research refresh <id>` re-synthesizes against the now-larger corpus
+  and pins a new version in the same lineage, with a `ReportDiff` of what moved;
+  `research versions` / `research diff` and `Metalworks.refresh()`. Prior versions
+  stay frozen (citations are materialized inline).
+- **Web as a flat peer source.** `WebItemSource`; comment-less records enter
+  synthesis as their own units (`yields_units`); ranking uses a source-neutral
+  **breadth** (distinct authors + distinct domains) so authored, web, and mixed
+  clusters rank comparably (`InsightCluster.breadth_count` / `breadth_unit`).
+- **First-class providers.** Local keyless embeddings (`fastembed` bge-small) as
+  the default floor — any chat-only key (Anthropic included) works end to end;
+  OpenAI bundled as a universal client; `metalworks models` / `doctor` / `setup`;
+  opt-in chat fallback chains.
+
+### Changed
+
+- **Source-neutral citations (breaking, pre-1.0).** `QuoteCitation` →
+  `ResolvedCitation`: `permalink` → `source_url`, `subreddit` → `source` /
+  `source_name`, `upvotes` → `engagement`, plus `record_id` and a thin live-view
+  `CitationRef`. The materialized `ResolvedCitation` is what serializes to disk
+  and over MCP, so reports stay readable detached from the corpus.
+
+### Removed
+
+- The fake-data, no-API-key demo — metalworks is for grounded output; the demo
+  has no place.
+
 ## [Unreleased]
 
 Pre-release foundations. Nothing here is stable yet.
