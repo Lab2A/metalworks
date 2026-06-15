@@ -235,8 +235,14 @@ def resolve_models(
 def resolve_embeddings() -> EmbeddingProvider:
     """Resolve an :class:`~metalworks.embeddings.EmbeddingProvider`.
 
-    Google (``GOOGLE_API_KEY`` / ``GEMINI_API_KEY``) is preferred, then OpenAI.
-    Raises :class:`~metalworks.errors.MissingKeyError` when neither is set.
+    A present Google (``GOOGLE_API_KEY`` / ``GEMINI_API_KEY`` / Vertex) key wins,
+    then OpenAI (``OPENAI_API_KEY``). With no embeddings-capable key, falls back
+    to a local, keyless fastembed model — so a chat-only setup (including an
+    Anthropic-only one, since Anthropic ships no embeddings API) still works end
+    to end. The local model is the floor, never a forced downgrade: this never
+    raises for a missing key. (The fastembed weights install via the ``research``
+    extra; :class:`~metalworks.errors.MissingExtraError` surfaces only on first
+    embed if the extra is absent.) The adapter is imported lazily.
     """
     if vertex_enabled() or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         from metalworks.embeddings.adapters.google import GoogleEmbedding
@@ -246,14 +252,9 @@ def resolve_embeddings() -> EmbeddingProvider:
         from metalworks.embeddings.adapters.openai import OpenAIEmbedding
 
         return OpenAIEmbedding()
-    raise MissingKeyError(
-        "GOOGLE_API_KEY (or GEMINI_API_KEY) / OPENAI_API_KEY",
-        provider="embeddings",
-        detail=(
-            "The research pipeline needs an embeddings provider, and Anthropic has no "
-            "embeddings API — so an Anthropic-only setup must also set a Google or OpenAI key."
-        ),
-    )
+    from metalworks.embeddings.adapters.fastembed import FastEmbedEmbedding
+
+    return FastEmbedEmbedding()
 
 
 def resolve_search() -> SearchProvider | None:

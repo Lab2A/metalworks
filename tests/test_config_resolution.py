@@ -88,11 +88,30 @@ def test_resolve_embeddings_prefers_google(monkeypatch: pytest.MonkeyPatch) -> N
     assert type(config.resolve_embeddings()).__name__ == "GoogleEmbedding"
 
 
-def test_resolve_embeddings_none_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_embeddings_prefers_openai_over_local(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("openai")  # adapter needs the provider SDK
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(config, "vertex_enabled", lambda: False)
+    for key in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "o")
+    assert type(config.resolve_embeddings()).__name__ == "OpenAIEmbedding"
+
+
+def test_resolve_embeddings_falls_back_to_local_when_no_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # No embeddings-capable key → the keyless local fastembed adapter. This must
+    # construct OFFLINE and WITHOUT fastembed installed (construction does not
+    # import the SDK), so the chat-only / Anthropic-only setup works end to end.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(config, "vertex_enabled", lambda: False)
     for key in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.delenv(key, raising=False)
-    with pytest.raises(MissingKeyError):
-        config.resolve_embeddings()
+    provider = config.resolve_embeddings()
+    assert type(provider).__name__ == "FastEmbedEmbedding"
 
 
 def test_resolve_search_none_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
