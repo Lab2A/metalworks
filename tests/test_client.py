@@ -61,6 +61,8 @@ def test_demo_runs_fully_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     )
     assert isinstance(result, Research)
     assert isinstance(result.demand, DemandReport)
+    # The whole point: the offline demo produces a NON-EMPTY report.
+    assert result.demand.ranked_clusters, "demo report must not be empty"
     assert result.evidence == result.demand.evidence
     assert result.competitors is None
     assert result.positioning is None

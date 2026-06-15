@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import html
 import re
+import warnings
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
@@ -50,6 +51,12 @@ from metalworks.contract.site import MarketingSite, SiteSection
 if TYPE_CHECKING:
     from metalworks.contract.positioning import PositioningBrief
     from metalworks.research.deps import ResearchDeps
+
+# `_SectionPhrasing` / `_ConnectivePhrasing` (defined below) carry a deliberate
+# `copy` field (the wire-contract name), which shadows the deprecated
+# BaseModel.copy attribute; suppress pydantic's shadow warning narrowly rather
+# than renaming. Set before those classes are defined, after the imports.
+warnings.filterwarnings("ignore", message=r'Field name "copy".*', category=UserWarning)
 
 _TOP_N = 3
 _SITE_ROLES = ("hero", "feature", "objection", "pricing", "social_proof", "cta")

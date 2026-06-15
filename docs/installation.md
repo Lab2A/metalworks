@@ -10,11 +10,19 @@ install what you use.
 ## Most people want this
 
 ```bash
-pip install "metalworks[research]"
+pip install "metalworks[research,openai]"     # or [research,google]
 ```
 
-That gives you the full demand-research pipeline (the local corpus reader + the triage and
-clustering it needs). Then set one provider key (next section) and you're ready.
+That gives you the demand-research pipeline (the local corpus reader + the triage and
+clustering it needs) **and** a provider SDK. The `[research]` extra alone has no provider
+SDK — pair it with `openai`, `google`, or `anthropic`. Then set the matching key (next
+section) and you're ready.
+
+<Note>
+Use **OpenAI** or **Google** for the simplest setup: one key covers both the chat model and
+the embeddings the pipeline needs. **Anthropic** has no embeddings API, so an Anthropic key
+must be paired with a Google or OpenAI key — see [Set a provider key](#set-a-provider-key).
+</Note>
 
 ## Pick your extras
 
@@ -26,7 +34,7 @@ Install only what your workflow needs — combine them like `"metalworks[researc
 | `reddit` | Search Reddit, pull subreddit intel, or post replies (the engagement loop). |
 | `arctic` | Read the historical Reddit corpus directly (a subset of `research`). |
 | `mcp` | Run the MCP server (`metalworks mcp serve`). |
-| `anthropic` / `openai` / `google` | Use that provider's models. (Any one is enough.) |
+| `anthropic` / `openai` / `google` | Use that provider's models. `openai` or `google` cover chat **and** embeddings; `anthropic` is chat-only (pair it with one of the others). |
 | `exa` / `tavily` | Add live web search to ground findings against the web. |
 | `all` | Everything above. |
 
@@ -35,11 +43,24 @@ instead of crashing.
 
 ## Set a provider key
 
-The real pipeline needs one LLM provider. metalworks picks the provider automatically from
-whichever key is in your environment (Anthropic → OpenAI → Google):
+The pipeline needs two things: a **chat** model and an **embeddings** model (for the
+clustering). metalworks resolves the chat provider from whichever key is present
+(Anthropic → OpenAI → Google), and embeddings from a Google or OpenAI key.
+
+The simplest setup is one key that covers both:
 
 ```bash
-export ANTHROPIC_API_KEY=...     # or OPENAI_API_KEY, or GOOGLE_API_KEY / GEMINI_API_KEY
+export OPENAI_API_KEY=...        # chat + embeddings
+# or
+export GOOGLE_API_KEY=...        # chat + embeddings  (GEMINI_API_KEY also works)
+```
+
+Using Anthropic for chat? Anthropic has no embeddings API, so set a Google or OpenAI key
+**as well** — otherwise `research run` stops with a clear message telling you so:
+
+```bash
+export ANTHROPIC_API_KEY=...     # chat
+export OPENAI_API_KEY=...        # embeddings (or GOOGLE_API_KEY)
 ```
 
 Want to use Google Vertex AI, a local model, or an OpenAI-compatible endpoint instead? See

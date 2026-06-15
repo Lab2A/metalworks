@@ -44,12 +44,16 @@ for cluster in report.ranked_clusters:
 
 ### Then: a real demand report
 
-Set one provider key — the provider is inferred from whichever key is present:
+Install a provider SDK and set its key. Google or OpenAI is simplest — one key covers both
+the chat model and the embeddings the pipeline needs:
 
 ```bash
-pip install "metalworks[google,research]"
-export GOOGLE_API_KEY=...     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+pip install "metalworks[google,research]"   # or [openai,research]
+export GOOGLE_API_KEY=...                    # chat + embeddings
 ```
+
+Anthropic is chat-only (no embeddings API), so an `ANTHROPIC_API_KEY` must be paired with a
+`GOOGLE_API_KEY` or `OPENAI_API_KEY`.
 
 Prefer Vertex AI over an API key? Set `GOOGLE_GENAI_USE_VERTEXAI=true` plus
 `VERTEX_PROJECT_ID` and `VERTEX_LOCATION` and the Google adapters authenticate

@@ -29,11 +29,16 @@ output shape. (Same thing on the CLI: `metalworks quickstart`.)
 
 ## 2. A real report on your own idea
 
-Set one provider key — metalworks picks the provider from whichever key is present:
+Install a provider SDK alongside `[research]`, then set the key. The simplest path is OpenAI
+or Google — **one key covers both the chat model and the embeddings** the pipeline needs:
 
 ```bash
-export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY / GOOGLE_API_KEY
+pip install "metalworks[research,openai]"     # or [research,google]
+export OPENAI_API_KEY=...                      # chat + embeddings
 ```
+
+Using Anthropic? It has no embeddings API, so set a Google or OpenAI key as well
+(`export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...`). See [Installation](/docs/installation).
 
 ```python
 from metalworks import Metalworks

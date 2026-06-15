@@ -245,9 +245,9 @@ class Metalworks:
         import tempfile
         from pathlib import Path
 
+        from metalworks.cli._demo import DemoComments, build_demo_chat
         from metalworks.embeddings import FakeEmbedding
         from metalworks.errors import MissingExtraError
-        from metalworks.llm.fake import FakeChatModel
         from metalworks.stores import MemoryStores
 
         try:
@@ -260,12 +260,16 @@ class Metalworks:
         except ImportError as exc:  # duckdb missing
             raise MissingExtraError("arctic", package="duckdb") from exc
 
+        # One scripted chat drives the whole arc (research → every pillar); the
+        # fake comment source makes `.research()` produce a non-empty report.
+        chat = build_demo_chat()
         return cls(
-            chat=FakeChatModel(),
-            fast_chat=FakeChatModel(),
+            chat=chat,
+            fast_chat=chat,
             embeddings=FakeEmbedding(),
             store=MemoryStores(),
             reader=reader,
+            comments=DemoComments(),
             _offline=True,
         )
 

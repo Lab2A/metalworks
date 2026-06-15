@@ -112,4 +112,18 @@ def write_demo_corpus(root: Path) -> Path:
     return root
 
 
-__all__ = ["DEMO_MONTH", "DEMO_SUBREDDIT", "DEMO_YEAR", "write_demo_corpus"]
+from metalworks.cli._demo.scripted import (  # noqa: E402
+    DemoChatModel,
+    DemoComments,
+    build_demo_chat,
+)
+
+__all__ = [
+    "DEMO_MONTH",
+    "DEMO_SUBREDDIT",
+    "DEMO_YEAR",
+    "DemoChatModel",
+    "DemoComments",
+    "build_demo_chat",
+    "write_demo_corpus",
+]
