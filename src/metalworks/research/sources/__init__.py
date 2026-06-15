@@ -121,15 +121,21 @@ def register_source(source_id: str, factory: SourceFactory) -> None:
 def get_source(source_id: str, **kwargs: object) -> ItemSource:
     """Construct the registered source for ``source_id``.
 
-    Triggers a lazy import of the built-in Arctic connector for the
-    ``"reddit"`` / ``"arctic"`` ids so a bare ``import`` of this package stays
-    free of ``duckdb`` / ``httpx``. Unknown ids raise ``KeyError``.
+    Triggers a lazy import of a built-in connector for known ids so a bare
+    ``import`` of this package stays free of ``duckdb`` / ``httpx``: the Arctic
+    connector for ``"reddit"`` / ``"arctic"``, the Hacker News connector for
+    ``"hackernews"``. Unknown ids raise ``KeyError``.
     """
-    if source_id not in SOURCES and source_id in ("reddit", "arctic"):
+    _BUILTIN_MODULES = {
+        "reddit": "metalworks.research.sources.arctic",
+        "arctic": "metalworks.research.sources.arctic",
+        "hackernews": "metalworks.research.sources.hackernews",
+    }
+    if source_id not in SOURCES and source_id in _BUILTIN_MODULES:
         # Lazy self-registration: importing the module runs its register_source.
         import importlib
 
-        importlib.import_module("metalworks.research.sources.arctic")
+        importlib.import_module(_BUILTIN_MODULES[source_id])
     try:
         factory = SOURCES[source_id]
     except KeyError as exc:
