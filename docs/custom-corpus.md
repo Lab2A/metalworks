@@ -1,6 +1,6 @@
 ---
-title: "Use your own corpus"
-description: "Feed research from your own data: write an ItemSource for a new source, or implement CorpusReader / CommentSource to swap the Reddit archive backend."
+title: "Use your own data"
+description: "Run research over data you already have: add a source for anything new, or implement CorpusReader and CommentSource to use your own Reddit data."
 ---
 
 metalworks can run research over data you already have. Which path you use depends
@@ -50,8 +50,8 @@ mw = Metalworks(reader=MyReader(), comments=MyComments())
 mw.research("...", subreddits=["..."])
 ```
 
-That's the whole "no Arctic Shift" story — the rest of the pipeline (triage,
-synthesis, web, triangulation) is unchanged.
+That's all you change — the rest of the pipeline (triage, synthesis, web,
+triangulation) works exactly the same.
 
 ## Comments are optional
 
