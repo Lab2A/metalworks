@@ -51,8 +51,7 @@ def render_run_markdown(research: Research) -> str:
                 else f"{cluster.breadth_count} {cluster.breadth_unit}"
             )
             lines.append(
-                f"_signal: {cluster.signal} · {breadth_str} · "
-                f"{cluster.mention_count} mentions_"
+                f"_signal: {cluster.signal} · {breadth_str} · {cluster.mention_count} mentions_"
             )
             if cluster.quotes:
                 quote = cluster.quotes[0]
