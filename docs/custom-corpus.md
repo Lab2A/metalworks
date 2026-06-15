@@ -1,13 +1,22 @@
 ---
-title: "Use your own corpus (no Arctic Shift)"
-description: "Run research over any Reddit data — local parquet, a database, a cache — by implementing CorpusReader and CommentSource."
+title: "Use your own corpus"
+description: "Feed research from your own data: write an ItemSource for a new source, or implement CorpusReader / CommentSource to swap the Reddit archive backend."
 ---
 
-Run research over any Reddit data in three steps: implement `CorpusReader` for
-submissions, implement `CommentSource` for comments, and wire them in. Arctic
-Shift is the default path, not a requirement — once those two small protocols are
-satisfied, you can feed research from anything: local parquet, your own database,
-an internal API, or a cache.
+There are two ways to feed research from your own data, depending on what you have:
+
+- **A new source** (a forum, a reviews API, an internal dataset, anything not
+  Reddit-shaped) → write an **`ItemSource`** connector. It's the modern,
+  source-neutral path: you map your items onto `CorpusRecord` / `CorpusComment`
+  and they ingest into the shared corpus alongside Reddit, Hacker News, and the
+  web. See [Sources → bring your own source](/docs/sources#bring-your-own-source).
+- **Your own Reddit data** (local parquet, a database, a cache instead of the
+  Arctic Shift archive) → implement **`CorpusReader`** + **`CommentSource`**, the
+  Reddit-archive backend seam covered below.
+
+This page covers the second path. Arctic Shift is the default Reddit backend, not
+a requirement — once those two small protocols are satisfied, the `reddit` /
+`arctic` connectors read from your data instead.
 
 ## The protocols
 
@@ -58,6 +67,10 @@ Point a local reader at committed parquet and use fake models and an in-memory
 store, and the whole pipeline runs with no network. This is the pattern for
 tests and air-gapped runs.
 
-> Heads up: a true *non-Reddit* corpus (arbitrary documents, no subreddits or
-> permalinks) is a planned future seam — today the data *shape* is still
-> Reddit-flavored even though the data *source* is fully swappable.
+## Arbitrary, non-Reddit data
+
+If your data isn't Reddit-shaped, don't use `CorpusReader` — write an
+[`ItemSource`](/docs/sources#bring-your-own-source) instead. It maps any items
+onto the source-neutral `CorpusRecord` / `CorpusComment` spine, so they ingest,
+triage, cluster, and rank exactly like every built-in source. That's the
+shipped path for a true non-Reddit corpus.

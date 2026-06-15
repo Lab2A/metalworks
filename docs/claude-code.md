@@ -5,7 +5,7 @@ description: "Run the whole metalworks workflow inside Claude Code as slash comm
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
 `/demand-report can I sell a focus supplement to developers?` and you get the same grounded
-report the library produces — every claim linked to a real Reddit thread — right in your chat,
+report the library produces — every claim linked to a real quote you can open — right in your chat,
 then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls

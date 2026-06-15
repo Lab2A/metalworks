@@ -1,11 +1,11 @@
 ---
 title: "Launch assets"
-description: "Draft channel-native launch copy — Product Hunt, Show HN, an X thread — every claim backed by a real Reddit quote. Plus a human-run channel plan. metalworks drafts; you post."
+description: "Draft channel-native launch copy — Product Hunt, Show HN, an X thread — every claim backed by a real quote. Plus a human-run channel plan. metalworks drafts; you post."
 ---
 
 Turn your demand report into launch copy you can post. `launch` drafts one asset per channel —
 Product Hunt, Show HN, an X thread — each in that channel's voice, with every claim backed by a
-real Reddit quote. `channel_plan` gives you a step-by-step checklist to run by hand.
+real quote. `channel_plan` gives you a step-by-step checklist to run by hand.
 
 **Drafting only. metalworks never posts.** `launch(...)` returns drafts; `channel_plan(...)`
 returns a checklist you execute yourself. Nothing here touches a network.

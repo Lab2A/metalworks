@@ -5,8 +5,8 @@ description: "Walk one real idea from a single sentence to a launch plan — dem
 
 This is the whole thing in one page: take an idea, find out if people want it, and turn it
 into everything you need to launch. Each step is one call. They all read from the **one
-demand report** you produce first, so every recommendation traces back to a real Reddit
-comment.
+demand report** you produce first, so every recommendation traces back to a real quote you
+can open.
 
 Set a provider key first (see [Installation](/docs/installation)), then:
 
@@ -18,8 +18,9 @@ mw = Metalworks()
 
 ## 1. Is there demand?
 
-Start with one sentence about your idea. metalworks reads real Reddit threads and gives you
-a go/no-go plus the actual needs people voiced.
+Start with one sentence about your idea. metalworks reads real conversations — Reddit by
+default, and [Hacker News, the web, or your own data](/docs/sources) when you add them — and
+gives you a go/no-go plus the actual needs people voiced.
 
 ```python
 research = mw.research(
@@ -34,7 +35,9 @@ for c in report.ranked_clusters:
 ```
 
 If the demand is thin, it says so here — and the later steps stay honest about it instead of
-inventing an opportunity. Everything below runs on this `report`. → [Demand research](/docs/demand-research)
+inventing an opportunity. Everything below runs on this `report`. The run also builds up a
+durable [corpus](/docs/corpus) you can grow and **refresh** this report against later.
+→ [Demand research](/docs/demand-research)
 
 ## 2. Find your angle and your competitors
 
@@ -97,7 +100,7 @@ engines find you. → [Launch assets](/docs/launch) · [Content & SEO](/docs/con
 ## That's the loop
 
 One idea → one grounded report → positioning, design, a build plan, launch copy. Because it
-all reads from the same report, **every recommendation links back to a real comment you can
+all reads from the same report, **every recommendation links back to a real quote you can
 open and read for yourself.** That's the difference between this and a tool that just makes
 things up — see [why you can trust the output](/docs/how-it-works).
 

@@ -9,7 +9,7 @@ it returns. New to the library? Start with the [walkthrough](/docs/walkthrough);
 you need the exact surface.
 
 The one rule that shapes every return type: **nothing is invented.** Every claim carries an
-`EvidenceRef` that resolves to a real Reddit quote or web finding on the report's evidence
+`EvidenceRef` that resolves to a real quote or web finding on the report's evidence
 list. When a method can't ground something, it drops it or marks the result `partial` — it
 does not fill the gap with plausible text.
 

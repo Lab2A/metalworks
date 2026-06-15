@@ -34,7 +34,7 @@ your-startup/
 └─ .metalworks/
     ├─ project.json          # manifest: id, slug, idea, created_at, runs[]   [commit]
     ├─ config.toml           # non-secret provider/model settings             [commit]
-    ├─ corpus.db             # sqlite: corpus + runs + embeddings             [gitignored]
+    ├─ corpus.db             # sqlite: durable multi-source corpus + runs      [gitignored]
     ├─ runs/<report_id>/research.{md,json}                                    [commit]
     └─ artifacts/            # later-stage outputs (positioning, site, …)     [commit]
 ```
@@ -43,7 +43,7 @@ your-startup/
 | --- | --- | --- |
 | `project.json` | The manifest — project id, slug, idea, and a list of every run. | Yes |
 | `config.toml` | Non-secret settings (provider, model). **Secrets only ever come from env vars.** | Yes |
-| `corpus.db` | The pulled Reddit corpus, finished reports, and embedding cache. Re-pullable, so it's gitignored automatically. | No |
+| `corpus.db` | The durable, multi-source [corpus](/docs/corpus) — records, comments, and embeddings — plus finished reports. Gitignored because it holds verbatim text, salted author hashes, and vectors (not because it's a throwaway cache — it's the authoritative store you grow). | No |
 | `runs/<report_id>/research.json` | The full `Research` bundle for one run — the durable, committable artifact. | Yes |
 | `runs/<report_id>/research.md` | A human-readable summary of the same run. | Yes |
 | `artifacts/<kind>.json` | The latest output of each later stage (positioning, marketing site, content plan, …). | Yes |
@@ -72,6 +72,11 @@ is the set of run directories plus git, nothing is overwritten. Later-stage arti
 the `report_id` they were built from, so a stale positioning brief is detectable by comparing
 its stamp to your latest run.
 
+Because the [corpus](/docs/corpus) is durable, you can also **refresh** a report instead of
+starting fresh — `metalworks research refresh <report_id>` re-synthesizes against the
+now-larger corpus and pins a new *version* in the same lineage, with a `diff` of what moved.
+`metalworks research versions <report_id>` lists the lineage; the prior versions stay frozen.
+
 In Python the chaining is implicit — you hold the bundle and pass it along — but the same
 persistence happens underneath when a project exists:
 
@@ -96,9 +101,9 @@ and that's where the Reddit `post-log.jsonl` audit trail and any connected-accou
 
 ## Under the hood: the stores
 
-The corpus database is backed by a set of typed repositories — `CorpusRepo` (posts, comments,
-embeddings), `RunRepo` (runs + finished reports), `OpportunityRepo`, `InboxRepo`, `AccountRepo`,
-`BriefRepo`. Two backends ship in core: `MemoryStores` (the zero-footprint default) and
+The corpus database is backed by a set of typed repositories — `CorpusRepo` (source-neutral
+records, comments, embeddings), `RunRepo` (runs + finished reports), `OpportunityRepo`,
+`InboxRepo`, `AccountRepo`, `BriefRepo`. Two backends ship in core: `MemoryStores` (the zero-footprint default) and
 `SqliteStores` (the project file). They're protocols, so you can point metalworks at a hosted
 backend (Postgres/PostgREST) — see [Bring your own store](/docs/custom-store).
 

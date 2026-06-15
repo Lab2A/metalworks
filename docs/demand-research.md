@@ -1,14 +1,15 @@
 ---
 title: "Demand research"
-description: "Give metalworks one sentence about your idea. It reads real Reddit threads and tells you whether people actually want it — a go/no-go verdict plus the real needs people voiced, each backed by a quote you can click."
+description: "Give metalworks one sentence about your idea. It reads real conversations — Reddit, Hacker News, the web — and tells you whether people actually want it: a go/no-go verdict plus the real needs people voiced, each backed by a quote you can click."
 ---
 
 **Find out whether people actually want your idea — backed by real conversations, not a guess.**
 
-Give metalworks one sentence about what you want to build. It reads real Reddit
-threads and hands back a go/no-go verdict plus the specific needs people voiced,
-each one backed by a real comment you can open and read. This is the report every
-other step runs on, so do it first.
+Give metalworks one sentence about what you want to build. It reads real
+conversations across your [sources](/docs/sources) — Reddit, Hacker News, the web,
+your own data — and hands back a go/no-go verdict plus the specific needs people
+voiced, each one backed by a real quote you can open and read. This is the report
+every other step runs on, so do it first.
 
 ## Run it
 
@@ -52,7 +53,7 @@ report on `research.demand`:
 | Field | What it is |
 | --- | --- |
 | `report.verdict` | A one-line go / no-go summary. |
-| `report.ranked_clusters` | The real needs people voiced, ranked by how many distinct people raised each. Each cluster has a `claim`, a `distinct_author_count`, and its `quotes`. |
+| `report.ranked_clusters` | The real needs people voiced, ranked by **breadth** — how many distinct voices raised each (distinct authors, plus distinct domains for authorless web). Each cluster has a `claim`, a `distinct_author_count`, a `breadth_count` / `breadth_unit`, and its `quotes`. |
 | `report.web_findings` | Supporting facts pulled from the web, each carrying its real source URL. |
 | `report.partial`, `report.caveat` | Set when part of the run came up short (see below). |
 
@@ -84,8 +85,33 @@ mw.research(
 )
 ```
 
-By default metalworks reads from public Reddit archives. To point it at your own
-data instead, see [bring your own corpus](/docs/configuration).
+### Read from more sources
+
+By default metalworks reads from Reddit, but it's multi-source. Pick what to read
+from per run, or persistently:
+
+```python
+mw.research("...", )            # uses your configured sources (Reddit by default)
+```
+
+```bash
+metalworks research run --question "..." --source reddit --source hackernews
+```
+
+See [Sources](/docs/sources) for the shipped connectors (Reddit, Hacker News,
+web, your own) and [bring your own corpus](/docs/custom-corpus) to load data
+directly.
+
+### Refresh as the corpus grows
+
+Each run ingests its sources into a durable [corpus](/docs/corpus) that survives
+across runs. Add more to it, then refresh the report to see what changed — the
+report is a live view, not a frozen one-shot:
+
+```bash
+metalworks corpus add --source hackernews -q "..."
+metalworks research refresh <report-id>     # a new version + a diff of what moved
+```
 
 ## When the result is thin
 
