@@ -18,7 +18,13 @@ Anthropic or OpenRouter included, is enough. See [Installation](/docs/installati
 
 ## 2. Your first report
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/demand-report an affordable, jitter-free focus supplement for developers
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()                  # provider inferred from the env key
@@ -34,6 +40,8 @@ for cluster in report.ranked_clusters:
     for quote in cluster.quotes:                # the real comments behind it
         print("  ", quote.source_url, "→", quote.text[:80])
 ```
+
+</CodeGroup>
 
 Every cluster is a real demand theme, and every quote is a verbatim comment you can open —
 nothing is invented. That report is the input to everything else: positioning, a marketing
