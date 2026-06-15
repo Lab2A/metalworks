@@ -5,9 +5,8 @@ Everything in metalworks is composable from the underlying functions
 the protocols, the typed repos). This facade is the easy path on top of them:
 construct one object and call ``.research(...)``, ``.reddit.search(...)``,
 ``.discovery.run(...)``. Nothing is constructed until a call needs it, so a
-bare ``Metalworks()`` with no API keys still serves the zero-key surfaces, and
-``Metalworks.demo()`` runs the whole research pipeline offline with no keys and
-no network.
+bare ``Metalworks()`` with no API keys still serves the zero-key surfaces (the
+Reddit reads and the deterministic compliance gate).
 
 This module imports no provider SDK, ``duckdb``, ``redditwarp``, or ``mcp`` at
 top level — every such symbol is imported inside the method that needs it, so
@@ -84,7 +83,6 @@ class _Resolver:
         comments: CommentSource | None,
         model: str | None,
         fast_model: str | None,
-        offline: bool,
     ) -> None:
         self._chat = chat
         self._fast_chat = fast_chat
@@ -95,7 +93,6 @@ class _Resolver:
         self._comments = comments
         self._model = model
         self._fast_model = fast_model
-        self.offline = offline
         self._search_resolved = False
         self._comments_resolved = False
         self._limiter_obj: RateLimiter | None = None
@@ -148,7 +145,7 @@ class _Resolver:
         return self._reader
 
     def search(self) -> SearchProvider | None:
-        if not self._search_resolved and self._search is None and not self.offline:
+        if not self._search_resolved and self._search is None:
             from metalworks import config
 
             self._search = config.resolve_search()
@@ -156,7 +153,7 @@ class _Resolver:
         return self._search
 
     def comments(self) -> CommentSource | None:
-        if not self._comments_resolved and self._comments is None and not self.offline:
+        if not self._comments_resolved and self._comments is None:
             from metalworks.research.arctic import ArcticShiftApiClient
 
             self._comments = ArcticShiftApiClient()
@@ -214,7 +211,6 @@ class Metalworks:
         comments: CommentSource | None = None,
         model: str | None = None,
         fast_model: str | None = None,
-        _offline: bool = False,
     ) -> None:
         self._r = _Resolver(
             chat=chat,
@@ -226,52 +222,9 @@ class Metalworks:
             comments=comments,
             model=model,
             fast_model=fast_model,
-            offline=_offline,
         )
         self._reddit_ns: _RedditNamespace | None = None
         self._discovery_ns: _DiscoveryNamespace | None = None
-
-    @classmethod
-    def demo(cls) -> Metalworks:
-        """A fully offline facade — fake models + a bundled local corpus.
-
-        ``Metalworks.demo().research("...", subreddits=["Supplements"])`` runs the
-        whole pipeline with **zero API keys and zero network** and returns a
-        small :class:`~metalworks.contract.Research` bundle (its ``.demand`` is a
-        :class:`~metalworks.contract.research.DemandReport`), so you can see the
-        output shape before plugging in a provider. Requires the ``[arctic]``
-        extra (duckdb) for the local corpus.
-        """
-        import tempfile
-        from pathlib import Path
-
-        from metalworks.cli._demo import DemoComments, build_demo_chat
-        from metalworks.embeddings import FakeEmbedding
-        from metalworks.errors import MissingExtraError
-        from metalworks.stores import MemoryStores
-
-        try:
-            from metalworks.cli._demo import write_demo_corpus
-            from metalworks.research.arctic import ArcticReader
-
-            root = Path(tempfile.mkdtemp(prefix="metalworks-demo-"))
-            write_demo_corpus(root)
-            reader = ArcticReader(data_root=str(root), probe_sleep_s=0.0)
-        except ImportError as exc:  # duckdb missing
-            raise MissingExtraError("arctic", package="duckdb") from exc
-
-        # One scripted chat drives the whole arc (research → every pillar); the
-        # fake comment source makes `.research()` produce a non-empty report.
-        chat = build_demo_chat()
-        return cls(
-            chat=chat,
-            fast_chat=chat,
-            embeddings=FakeEmbedding(),
-            store=MemoryStores(),
-            reader=reader,
-            comments=DemoComments(),
-            _offline=True,
-        )
 
     # ── research ────────────────────────────────────────────────────────────
 
@@ -289,8 +242,7 @@ class Metalworks:
         Pass a plain ``question`` (and optionally the ``subreddits`` to cover; if
         omitted, the planner picks them) or a fully-formed
         :class:`~metalworks.contract.ResearchBrief` for full control. The corpus
-        window defaults to 12 months (1 month in ``demo()`` mode, where the
-        bundled corpus is a single month).
+        window defaults to 12 months.
 
         The demand report is on ``.demand``; ``.evidence`` surfaces its grounded
         evidence on the bundle. ``.competitors`` / ``.positioning`` are reserved
@@ -307,11 +259,7 @@ class Metalworks:
         if isinstance(question, ResearchBrief):
             brief = question
         else:
-            window = (
-                time_window_months
-                if time_window_months is not None
-                else (1 if self._r.offline else 12)
-            )
+            window = time_window_months if time_window_months is not None else 12
             brief = brief_from_question(
                 deps, question, subreddits=subreddits, time_window_months=window
             )
@@ -319,16 +267,15 @@ class Metalworks:
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )
         result = Research(demand=report)
-        # Persist as committed files inside a project (real runs only — demo()
-        # is offline and stays footprint-free).
-        if not self._r.offline:
-            from metalworks.project import Project
+        # Persist as committed files when run inside a `.metalworks/` project;
+        # casual use (no project) leaves no footprint.
+        from metalworks.project import Project
 
-            project = Project.find()
-            if project is not None:
-                from metalworks.runs import write_run
+        project = Project.find()
+        if project is not None:
+            from metalworks.runs import write_run
 
-                write_run(project, result, question=brief.question)
+            write_run(project, result, question=brief.question)
         return result
 
     def plan(self, prompt: str) -> ResearchBrief:

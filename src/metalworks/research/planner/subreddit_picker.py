@@ -114,7 +114,7 @@ def pick_target_subreddits(
         )
         suggestions = out.suggestions
     except Exception as exc:
-        # Expected, handled degradation (e.g. offline/demo with an unscripted fake):
+        # Expected, handled degradation (e.g. a fake model in tests, or any model error):
         # fall back to the user's list. This is NOT an error path, so log it at debug
         # without a stack trace — a traceback on a clean happy path reads as "broken".
         logger.debug(

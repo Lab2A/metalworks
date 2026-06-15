@@ -270,7 +270,6 @@ def test_client_resolver_selects_mirror(monkeypatch: pytest.MonkeyPatch) -> None
         comments=None,
         model=None,
         fast_model=None,
-        offline=False,
     )
     # Construct lazily; a bare ArcticMirrorReader needs no creds until a call.
     assert isinstance(resolver.reader(), ArcticMirrorReader)

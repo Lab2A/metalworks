@@ -188,10 +188,10 @@ def test_research_background_job_completes(tmp_path: Path) -> None:
     from metalworks.stores import MemoryStores
 
     pytest.importorskip("duckdb")
-    from metalworks.cli._demo import DEMO_SUBREDDIT, write_demo_corpus
     from metalworks.research.arctic import ArcticReader
+    from sample_corpus import SAMPLE_SUBREDDIT, write_sample_corpus
 
-    root = write_demo_corpus(tmp_path / "corpus")
+    root = write_sample_corpus(tmp_path / "corpus")
     store = MemoryStores()
     reader = ArcticReader(data_root=str(root), probe_sleep_s=0.0)
     deps = ResearchDeps(
@@ -203,7 +203,7 @@ def test_research_background_job_completes(tmp_path: Path) -> None:
         decision_context="ctx",
         success_criteria=["s"],
         must_address=["m"],
-        target_subreddits=[TargetSubreddit(name=DEMO_SUBREDDIT, rationale="core")],
+        target_subreddits=[TargetSubreddit(name=SAMPLE_SUBREDDIT, rationale="core")],
         web_research_directions=[],
         time_window_months=1,
         relevance_rubric="r",

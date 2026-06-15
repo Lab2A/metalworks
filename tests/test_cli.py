@@ -80,17 +80,6 @@ def test_config_set_refuses_secret(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert not (tmp_path / "metalworks.toml").exists()
 
 
-def test_quickstart_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    pytest.importorskip("duckdb")
-    # Zero keys: quickstart must succeed with Fake models + local corpus.
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"):
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["quickstart"])
-    assert result.exit_code == 0, result.output
-    assert "Report" in result.output
-
-
 def test_reddit_post_dry_run_passes_compliance(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -13,18 +13,21 @@ nothing is invented.**
 
 It's a Python library you install (also a CLI, an MCP server, and a Claude Code plugin).
 
-## See it in 60 seconds
+## Your first report
 
-No API key, no setup — run the bundled offline demo:
+Install metalworks with a provider SDK, and set its key. OpenAI or Google is simplest —
+one key covers both the chat model and the embeddings the pipeline needs:
 
 ```bash
-pip install "metalworks[research]"
+pip install "metalworks[research,openai]"     # or [research,google]
+export OPENAI_API_KEY=...
 ```
 
 ```python
 from metalworks import Metalworks
 
-research = Metalworks.demo().research(
+mw = Metalworks()                  # provider inferred from your env key
+research = mw.research(
     "an affordable, jitter-free focus supplement for developers",
     subreddits=["Nootropics", "Supplements"],
 )
@@ -33,11 +36,12 @@ report = research.demand           # .research() returns a report
 print(report.verdict)              # is there real demand? a one-line go / no-go
 for cluster in report.ranked_clusters:
     print(cluster.distinct_author_count, "people:", cluster.claim)
+    for quote in cluster.quotes:   # the real comments behind it — nothing invented
+        print("  ", quote.permalink)
 ```
 
-Then install a provider SDK and set its key — `pip install "metalworks[research,openai]"`
-with `OPENAI_API_KEY` (or Google) is the simplest, since one key covers both chat and
-embeddings — and point it at your own idea. See [Quickstart](/docs/quickstart).
+That's a real report grounded in real Reddit threads — see the full
+[Quickstart](/docs/quickstart).
 
 ## What you can do with it
 

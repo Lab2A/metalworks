@@ -55,8 +55,8 @@ submission-level signal only.
 ## Fully offline
 
 Point a local reader at committed parquet and use fake models and an in-memory
-store, and the whole pipeline runs with no network — exactly what `Metalworks.demo()`
-does internally. This is the pattern for tests and air-gapped runs.
+store, and the whole pipeline runs with no network. This is the pattern for
+tests and air-gapped runs.
 
 > Heads up: a true *non-Reddit* corpus (arbitrary documents, no subreddits or
 > permalinks) is a planned future seam — today the data *shape* is still

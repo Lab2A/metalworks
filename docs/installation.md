@@ -79,12 +79,4 @@ metalworks doctor
 This reports which extras are installed, which keys it found, where your data is stored,
 and any connected Reddit accounts — so you know you're ready before you spend a token.
 
-## No keys yet? Try the offline demo
-
-```bash
-metalworks quickstart
-```
-
-Runs the whole pipeline on a small bundled corpus with fake models — zero keys, zero
-network — so you can see the output shape first. Needs the `[research]` extra. Next:
-[Quickstart](/docs/quickstart).
+Next: run your first real report in the [Quickstart](/docs/quickstart).

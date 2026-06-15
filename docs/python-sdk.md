@@ -38,7 +38,6 @@ The common cases:
 mw = Metalworks()                       # provider inferred from your env key
 mw = Metalworks(model="anthropic/claude-opus-4-8")   # pin a provider/model
 mw = Metalworks(model="openai/gpt-5", fast_model="openai/gpt-5-mini")  # cheap triage model
-mw = Metalworks.demo()                  # fully offline, zero keys (see below)
 ```
 
 | Argument | What it does |
@@ -52,18 +51,6 @@ Provider refs route by namespace: `anthropic`, `openai`, `google`/`gemini` are n
 else (`openrouter/...`, `meta-llama/...`) routes through an OpenAI-compatible endpoint. To point
 at a local or custom endpoint, construct an `OpenAIChatModel(base_url=..., api_key_env=...)` and
 pass it as `chat=`.
-
-### `Metalworks.demo()`
-
-```python
-@classmethod
-def demo(cls) -> Metalworks: ...
-```
-
-Returns a client wired to fake models and a small bundled Reddit corpus — the whole pipeline
-runs in seconds with **zero API keys and zero network**, and writes nothing to disk. For
-seeing the output shape only. Requires the `[arctic]` extra (`duckdb`); raises
-`MissingExtraError` otherwise.
 
 ## Research
 
@@ -87,7 +74,7 @@ Runs the demand pipeline and returns a frozen [`Research`](#the-research-bundle)
 | --- | --- | --- |
 | `question` | — | A plain sentence, or a fully-built `ResearchBrief` (from `.plan()`) for full control. |
 | `subreddits` | planner picks | Names without `r/`. Omit to let the planner choose. |
-| `time_window_months` | `12` (`1` in demo) | How far back the corpus window reaches. |
+| `time_window_months` | `12` | How far back the corpus window reaches. |
 | `per_sub_limit` | pipeline default | Cap submissions pulled per subreddit. |
 | `max_findings` | `10` | Max demand clusters to surface. |
 

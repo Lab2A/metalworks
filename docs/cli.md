@@ -20,7 +20,6 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 | `metalworks version` | Print the installed metalworks version. | zero-key |
 | `metalworks doctor` | Report installed extras, configured keys (from env), the store path, and connected Reddit accounts. | zero-key |
 | `metalworks init` | Create a `.metalworks/` project in the cwd (like `git init`) — a `project.json` manifest, a `config.toml`, a gitignored `corpus.db`, and a `.env.example`. Idempotent. | zero-key |
-| `metalworks quickstart` | Run an **offline demo report** (zero keys, zero network) over a local corpus with Fake models. Needs the `[research]` extra. | zero-key |
 
 **`metalworks init`** option: `--idea TEXT` — one line on what you're building (seeds the project slug).
 
