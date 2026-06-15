@@ -207,6 +207,8 @@ _COMMAND_GROUPS = [
     ["discovery"],
     ["config"],
     ["models"],
+    ["sources"],
+    ["corpus"],
     ["mcp"],
 ]
 
@@ -322,8 +324,8 @@ def test_setup_writes_model_when_chosen(monkeypatch: pytest.MonkeyPatch, tmp_pat
     for key in _PROVIDER_KEYS:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    # prompts: set model? -> y, ref -> openai/gpt-5, project? -> n, warm? -> n
-    result = runner.invoke(app, ["setup"], input="y\nopenai/gpt-5\nn\nn\n")
+    # prompts: set model? -> y, ref -> openai/gpt-5, sources -> (default), project? -> n, warm? -> n
+    result = runner.invoke(app, ["setup"], input="y\nopenai/gpt-5\n\nn\nn\n")
     assert result.exit_code == 0, result.output
     assert 'model = "openai/gpt-5"' in (tmp_path / "metalworks.toml").read_text()
 
@@ -401,3 +403,174 @@ def test_doctor_hints_section_renders_with_no_keys(monkeypatch: pytest.MonkeyPat
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     assert "Hints" in result.output  # actionable guidance section is present
+
+
+# ── sources / corpus sub-apps (Phase 2d) ─────────────────────────────────────
+
+
+def test_sources_list_runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Lists the registered sources; Reddit (the default) is enabled out of the box.
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["sources", "list"])
+    assert result.exit_code == 0, result.output
+    assert "reddit" in result.output
+    assert "enabled order" in result.output.lower()
+
+
+def test_sources_enable_writes_config_and_is_reflected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    enable = runner.invoke(app, ["sources", "enable", "hackernews"])
+    assert enable.exit_code == 0, enable.output
+    # The cwd metalworks.toml now carries the [sources] table with the new id.
+    toml = (tmp_path / "metalworks.toml").read_text()
+    assert "[sources]" in toml
+    assert "hackernews" in toml
+    # `sources list` shows it enabled; `config list` reflects the sources table.
+    listed = runner.invoke(app, ["sources", "list"])
+    assert listed.exit_code == 0
+    assert "hackernews" in listed.output
+    cfg = runner.invoke(app, ["config", "list"])
+    assert cfg.exit_code == 0
+    assert "hackernews" in cfg.output
+
+
+def test_sources_disable_removes_from_enabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["sources", "enable", "hackernews"])
+    disable = runner.invoke(app, ["sources", "disable", "hackernews"])
+    assert disable.exit_code == 0, disable.output
+    from metalworks import config
+
+    assert "hackernews" not in config.enabled_source_ids()
+
+
+def test_sources_disable_refuses_last_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    # Only reddit is enabled by default; disabling it would empty the set.
+    result = runner.invoke(app, ["sources", "disable", "reddit"])
+    assert result.exit_code == 1
+    assert "last source" in result.output.lower()
+
+
+def test_corpus_stats_runs_on_empty_store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from metalworks import config
+    from metalworks.stores import MemoryStores
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(config, "default_store", lambda *a, **k: MemoryStores())
+    result = runner.invoke(app, ["corpus", "stats"])
+    assert result.exit_code == 0, result.output
+    assert "records" in result.output.lower()
+    assert "empty store" in result.output.lower()
+
+
+def test_corpus_add_ingests_from_a_fake_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`corpus add` resolves a monkeypatched source and ingests it into an
+    in-memory store with no network."""
+    from metalworks import config
+    from metalworks.contract import CorpusComment, CorpusRecord
+    from metalworks.research.sources import SourceWindow
+    from metalworks.stores import MemoryStores
+
+    monkeypatch.chdir(tmp_path)
+    store = MemoryStores()
+    monkeypatch.setattr(config, "default_store", lambda *a, **k: store)
+
+    class _FakeSource:
+        source_id = "fake"
+
+        def pull(self, *, query: str, window: object, limit: object = None):
+            yield CorpusRecord(
+                id="fake_1",
+                source="fake",
+                source_id="1",
+                url="https://x/1",
+                title="t",
+                text="body",
+                engagement=3,
+            )
+
+        def comments_for(self, record_ids):
+            yield [
+                CorpusComment(
+                    id="c1",
+                    parent_id="fake_1",
+                    source="fake",
+                    url="https://x/1/c1",
+                    text="a comment",
+                    author_hash="h",
+                    engagement=1,
+                )
+            ]
+
+        def latest_window(self) -> SourceWindow:
+            return SourceWindow()
+
+    # `corpus add` builds the source via config.resolve_sources(override=[id]).
+    monkeypatch.setattr(config, "resolve_sources", lambda **k: [_FakeSource()])
+    result = runner.invoke(app, ["corpus", "add", "--source", "fake", "-q", "anything"])
+    assert result.exit_code == 0, result.output
+    assert "1 records" in result.output
+    assert "1 comments" in result.output
+    # The records actually landed in the store.
+    assert store.get_records(["fake_1"])[0].title == "t"
+
+    # And `corpus stats` now counts them by source.
+    stats = runner.invoke(app, ["corpus", "stats"])
+    assert stats.exit_code == 0, stats.output
+    assert "fake" in stats.output
+
+
+def test_research_run_source_override_resolves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`research run --source` threads the resolved sources into deps.sources;
+    the pipeline is mocked so no network/LLM is touched."""
+    from metalworks import config
+    from metalworks.cli import app as cli_app
+    from metalworks.stores import MemoryStores
+
+    monkeypatch.chdir(tmp_path)
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+    sentinel = object()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(config, "default_store", lambda *a, **k: MemoryStores())
+
+    def _fake_resolve_sources(override=None, **k):
+        captured["override"] = override
+        return [sentinel]
+
+    monkeypatch.setattr(config, "resolve_sources", _fake_resolve_sources)
+
+    import metalworks.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "_resolve_chat_or_exit", lambda: object())
+    monkeypatch.setattr(cli_mod, "_resolve_embeddings_or_exit", lambda: object())
+
+    def _fake_brief_from_question(deps, question, **kwargs):
+        captured["deps_sources"] = deps.sources
+        raise SystemExit(0)  # stop before the pipeline; we only assert the wiring
+
+    import metalworks.research.planner as planner
+
+    monkeypatch.setattr(planner, "brief_from_question", _fake_brief_from_question)
+
+    result = runner.invoke(
+        cli_app, ["research", "run", "-q", "x", "--source", "fake", "--source", "reddit"]
+    )
+    # SystemExit(0) from inside the command → exit_code 0; the wiring is captured.
+    assert captured["override"] == ["fake", "reddit"]
+    assert captured["deps_sources"] == [sentinel]
+    assert result.exit_code == 0
