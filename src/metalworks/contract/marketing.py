@@ -16,7 +16,7 @@ Honesty contract:
 - ``faq`` is built VERBATIM from ``report.brief.must_address`` when a brief is
   present; each item becomes a question with an empty ``answer_hint`` (the
   human/LLM fills the answer later — the plan never fabricates one).
-- ``CitationStrategy.reddit_targets`` are the actual ``QuoteCitation.permalink``
+- ``CitationStrategy.reddit_targets`` are the actual ``ResolvedCitation.source_url``
   values from the report's top clusters — disclosed, real sources to cite, not
   placeholders.
 - NO RANKING PROMISES anywhere. This is a structural plan for citable content,
@@ -85,7 +85,7 @@ class CitationStrategy(BaseModel):
     ``prompt_set`` are example prompts (derived mechanically from the pages'
     target phrases) a consumer might ask an assistant — the content should be
     the citable answer. ``reddit_targets`` are the REAL, disclosed
-    ``QuoteCitation.permalink`` values from the report's top clusters, deduped.
+    ``ResolvedCitation.source_url`` values from the report's top clusters, deduped.
     """
 
     prompt_set: list[str] = Field(

@@ -37,7 +37,7 @@ print(report.verdict)              # is there real demand? a one-line go / no-go
 for cluster in report.ranked_clusters:
     print(cluster.distinct_author_count, "people:", cluster.claim)
     for quote in cluster.quotes:   # the real comments behind it — nothing invented
-        print("  ", quote.permalink)
+        print("  ", quote.source_url)
 ```
 
 That's a real report grounded in real Reddit threads — see the full

@@ -45,7 +45,7 @@ report already verified, and a section with no backing quote does not ship.
 ## Rules
 
 - Every claim-bearing line cites a real permalink. A section's load-bearing copy
-  is a verbatim substring of a real `QuoteCitation.text`; if it isn't, the
+  is a verbatim substring of a real `ResolvedCitation.text`; if it isn't, the
   section is DROPPED. No-quote-no-section — the same gate the report uses.
 - Connective copy must be claim-free: no numbers, no superlatives
   (best/most/fastest/only/…). It carries no `EvidenceRef`. If glue smuggles in a

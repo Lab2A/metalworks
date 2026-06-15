@@ -6,7 +6,7 @@ export type Fork = "product_pinned" | "demographic_pinned" | "both";
 export type SignalStrength = "low" | "medium" | "high";
 
 export interface EvidenceRef {
-  /** Target QuoteCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
+  /** Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
   evidence_id?: string;
   /** Which evidence family this points at. */
   kind: "quote" | "web" | "price" | "cluster";

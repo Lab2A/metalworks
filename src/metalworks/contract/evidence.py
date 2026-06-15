@@ -41,7 +41,7 @@ class EvidenceRef(BaseModel):
 
     evidence_id: str = Field(
         default="",
-        description="Target QuoteCitation/WebFinding/PriceEvidence id. Empty for a cluster ref.",
+        description="Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref.",
     )
     kind: EvidenceKind = Field(description="Which evidence family this points at.")
     cluster_rank: int | None = Field(

@@ -32,7 +32,7 @@ print(report.verdict)                           # the go / no-go summary
 for cluster in report.ranked_clusters:
     print(cluster.claim, "—", cluster.distinct_author_count, "people")
     for quote in cluster.quotes:                # the real comments behind it
-        print("  ", quote.permalink, "→", quote.text[:80])
+        print("  ", quote.source_url, "→", quote.text[:80])
 ```
 
 Every cluster is a real demand theme, and every quote is a verbatim Reddit comment you can
