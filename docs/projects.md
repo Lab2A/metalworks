@@ -44,7 +44,7 @@ your-startup/
 | `project.json` | The manifest — project id, slug, idea, and a list of every run. | Yes |
 | `config.toml` | Non-secret settings (provider, model). **Secrets only ever come from env vars.** | Yes |
 | `corpus.db` | Your [saved research data](/docs/corpus) — the posts and comments you've read. Kept out of git so your raw data stays private. | No |
-| `runs/<report_id>/research.json` | The full `Research` bundle for one run — the durable, committable artifact. | Yes |
+| `runs/<report_id>/research.json` | The full `Research` bundle for one run — saved and safe to commit. | Yes |
 | `runs/<report_id>/research.md` | A human-readable summary of the same run. | Yes |
 | `artifacts/<kind>.json` | The latest output of each later stage (positioning, marketing site, content plan, …). | Yes |
 
