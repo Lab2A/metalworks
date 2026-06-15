@@ -3,11 +3,18 @@ title: "Protocols"
 description: "The versioned ChatModel, SearchProvider, EmbeddingProvider, and storage-repo protocols metalworks owns."
 ---
 
-These are the protocols you implement to bring your own model, search, embeddings,
-or storage. They are versioned as a unit (`metalworks.PROTOCOLS_VERSION`); minor
-versions add keyword-only parameters with defaults, major versions break. Your
-adapter declares which version it implements, and the conformance suites in
-`metalworks.testing` are the contract.
+These are the swappable interfaces. Implement one only if you want to bring your own
+model, search, embeddings, corpus, or storage that metalworks doesn't already ship.
+If you're using a known provider (Anthropic / OpenAI / Google) with the built-in
+storage, you don't need this — see [Configuration](/docs/configuration).
+
+Each protocol below is the exact shape your adapter has to match. The conformance
+suites in `metalworks.testing` are the contract: if your adapter passes them, it
+works everywhere the protocol is used.
+
+**Versioning.** The protocols are versioned as a unit
+(`metalworks.PROTOCOLS_VERSION`); minor versions add keyword-only parameters with
+defaults, major versions break. Your adapter declares which version it implements.
 
 ## ChatModel
 

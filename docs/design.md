@@ -6,10 +6,10 @@ description: "Decide what to build — web, mobile, CLI? — and the screens you
 **Decide what to build and write the site — both straight from real demand.**
 
 With a [demand report](/docs/demand-research) and your [positioning](/docs/positioning)
-in hand, two more calls cover design: **surface + screens** (what kind of product to
-build and the screens it needs) and a **marketing site** (a page whose every claim is
-a verbatim quote from a real user). Both read from the same report, so nothing is
-made up.
+in hand, two more calls cover design: **surface + screens** (your *surface* is what you
+build — a web app, mobile app, CLI, API… — and the screens it needs) and a **marketing
+site** (a page whose every claim is a verbatim quote from a real user). Both read from
+the same report, so nothing is made up.
 
 ## Surface & screens — what to build
 
@@ -55,7 +55,7 @@ purpose and a single primary action.
 | `surface.rubric[].is_assumption` | `True` when no real quote backs that finding — a stated guess, labeled. |
 | `surface.confidence` | How sure metalworks is, set from how many questions it could actually back with quotes. |
 | `ux.screens[].validated` | `True` when at least one real voice asked for that screen; `False` means it's a hypothesis to test. |
-| `ux.screens[].serves_wedge` | `True` when the screen directly delivers your positioning. |
+| `ux.screens[].serves_wedge` | `True` when the screen directly delivers your *wedge* — your unique angle (the positioning you landed on). |
 
 Each finding is checked against the real quotes in your report. Anything a quote
 backs is labeled as such; anything it can't back is flagged as an assumption rather
