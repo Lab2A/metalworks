@@ -16,6 +16,10 @@ from metalworks.contract.build import (
     PricingTier,
 )
 from metalworks.contract.bundle import Research
+from metalworks.contract.corpus import (
+    CorpusComment,
+    CorpusRecord,
+)
 from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
@@ -95,6 +99,9 @@ from metalworks.contract.surface import (
 )
 
 __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit), not globally sorted
+    # Corpus spine — source-neutral records the synthesis layer ranks/quotes.
+    "CorpusComment",
+    "CorpusRecord",
     # Evidence chain — the cross-stage spine every pillar resolves against.
     "EvidenceRecord",
     "EvidenceRef",

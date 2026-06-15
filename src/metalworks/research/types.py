@@ -107,6 +107,14 @@ class LoadedPost:
     score: int = 0
     num_comments: int = 0
     permalink: str = ""
+    # Source-neutral display fields (additive). The Reddit loader fills these
+    # alongside the legacy Reddit-specific fields above; downstream consumers
+    # may read either, and nothing Reddit-specific leaks for other sources.
+    source: str = "reddit"
+    source_label: str = ""
+    engagement: int = 0
+    engagement_unit: str = "upvotes"
+    source_url: str = ""
 
 
 @dataclass
@@ -118,10 +126,21 @@ class LoadedComment:
     upvotes: int = 0
     author_hash: str = ""
     permalink: str = ""
+    # Source-neutral display fields (additive) — see LoadedPost.
+    source: str = "reddit"
+    source_label: str = ""
+    engagement: int = 0
+    engagement_unit: str = "upvotes"
+    source_url: str = ""
 
     @property
     def post_url(self) -> str:
         return self.permalink
+
+    @property
+    def text(self) -> str:
+        """Source-neutral alias for the comment body."""
+        return self.body
 
 
 # ── Stage outputs ──────────────────────────────────────────────────────────

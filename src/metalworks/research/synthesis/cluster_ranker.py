@@ -74,9 +74,22 @@ def signal_from_author_count(distinct_authors: int) -> SignalStrength:
     return SignalStrength.LOW
 
 
-def compute_demand_score(distinct_authors: int, total_upvotes: int) -> float:
+def compute_demand_score(distinct_authors: int, total_engagement: int) -> float:
     """Rank by breadth of voices, not virality (50x2 outranks 1x200)."""
-    return distinct_authors * AUTHOR_WEIGHT + math.log1p(max(total_upvotes, 0))
+    return distinct_authors * AUTHOR_WEIGHT + math.log1p(max(total_engagement, 0))
+
+
+def _format_numbered_comment(i: int, c: LoadedComment) -> str:
+    """Render one numbered comment for the synthesis prompt, source-neutrally.
+
+    Reads the generic display fields (`source_label`, `engagement`,
+    `engagement_unit`, `text`) so nothing Reddit-specific (`r/...`, `upvotes`)
+    leaks when the source isn't Reddit. For the Reddit path these are populated
+    by the loader to `r/<sub>` / score / "upvotes", so the rendered line is
+    unchanged.
+    """
+    label = c.source_label or (f"r/{c.subreddit}" if c.subreddit else "")
+    return f"[{i}] ({label}, {c.engagement} {c.engagement_unit}) {c.text or c.body}"
 
 
 def _normalize(text: str) -> str:
@@ -103,12 +116,9 @@ def _default_synthesize(
     the retries we RAISE — synthesis never silently returns empty
     ranked_clusters and pretends that's success.
     """
-    numbered = "\n".join(
-        f"[{i}] (r/{c.subreddit}, {c.upvotes} upvotes) {c.body}"
-        for i, c in enumerate(representatives)
-    )
+    numbered = "\n".join(_format_numbered_comment(i, c) for i, c in enumerate(representatives))
     system = (
-        "You are a consumer-research analyst. Given real Reddit comments, group them into "
+        "You are a consumer-research analyst. Given real user conversations, group them into "
         "distinct consumer-insight themes. For each theme: a one-line claim, the indices of ALL "
         "comments expressing it (member_comment_indices), and 2-3 of those indices whose verbatim "
         "text best illustrates it (quote_comment_indices). Merge near-identical themes. Omit "
@@ -167,14 +177,21 @@ def _build_cluster(
     for m in quote_members:
         if not _verify_quote(m.body, member_bodies):
             continue
-        sub = m.subreddit if m.subreddit.startswith("r/") else f"r/{m.subreddit}"
+        # Read the source-neutral display fields; still populate the existing
+        # Reddit-named QuoteCitation columns (schema unchanged, additive). For
+        # the Reddit path source_label is "r/<sub>" and source_url is the
+        # permalink, so the serialized citation is byte-identical to before.
+        label = m.source_label or (
+            m.subreddit if m.subreddit.startswith("r/") else f"r/{m.subreddit}"
+        )
+        link = m.source_url or m.permalink or m.post_url
         quotes.append(
             QuoteCitation(
                 text=m.body,
-                permalink=m.permalink or m.post_url,
-                subreddit=sub,
+                permalink=link,
+                subreddit=label,
                 author_hash=m.author_hash,
-                upvotes=m.upvotes,
+                upvotes=m.engagement or m.upvotes,
             )
         )
         if len(quotes) >= MAX_QUOTES_PER_CLUSTER:
