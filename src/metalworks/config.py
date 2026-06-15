@@ -43,8 +43,17 @@ _CHAT_KEY_ORDER: tuple[tuple[str, str], ...] = (
     ("google", "GEMINI_API_KEY"),
 )
 
+# Single-key fallback paths. These are *recognized* provider keys, but they sit
+# below the native order: a native key (above) always wins. When none of the
+# native keys is set and no model/config names a provider, the first present key
+# here routes to its OpenAI-compatible provider — so one OpenRouter key reaches
+# many models, like the bundled-SDK universal-client design intends.
+_COMPAT_KEY_ORDER: tuple[tuple[str, str], ...] = (("openrouter", "OPENROUTER_API_KEY"),)
+
 # The full list named in MissingKeyError so the message is actionable.
-_ALL_CHAT_KEYS = "ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY (or GEMINI_API_KEY)"
+_ALL_CHAT_KEYS = (
+    "ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY (or GEMINI_API_KEY) / OPENROUTER_API_KEY"
+)
 
 # `provider/model` slash-ref routing (the Hermes/OpenClaw convention). Native
 # heads dispatch to the official SDK adapter; compat heads dispatch to the
@@ -166,6 +175,11 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     # loop above misses it. When Vertex mode is on, route to the Google adapter.
     if vertex_enabled():
         return "google", model
+    # No native key (and no Vertex): fall back to a recognized compat key. This
+    # never preempts the native order above — it only fires when none is set.
+    for provider, env_var in _COMPAT_KEY_ORDER:
+        if os.environ.get(env_var):
+            return provider, model
     raise MissingKeyError(_ALL_CHAT_KEYS, provider="chat model")
 
 

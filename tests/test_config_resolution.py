@@ -10,7 +10,13 @@ from metalworks import config
 from metalworks.config import _resolve_chat_provider as resolve_provider
 from metalworks.errors import MissingKeyError
 
-_CHAT_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY")
+_CHAT_KEYS = (
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+)
 
 
 def _clear_chat_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -174,6 +180,49 @@ def test_resolve_chat_openrouter_branch(monkeypatch: pytest.MonkeyPatch, tmp_pat
     model = config.resolve_chat("openrouter/meta-llama/llama-3-70b")
     assert type(model).__name__ == "OpenAIChatModel"
     assert model.capabilities.native_structured is False
+
+
+def test_resolve_chat_openrouter_anthropic_ref_routes_compat(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # An explicit openrouter/ ref carrying a native vendor namespace
+    # (anthropic/claude-…) must still route to the OpenAI-compatible client when
+    # OPENROUTER_API_KEY is set — construction only, no network call.
+    pytest.importorskip("openai")
+    monkeypatch.chdir(tmp_path)
+    _clear_chat_keys(monkeypatch)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    model = config.resolve_chat("openrouter/anthropic/claude-opus-4-6")
+    assert type(model).__name__ == "OpenAIChatModel"
+    assert model.model_id == "anthropic/claude-opus-4-6"
+    assert model.capabilities.native_structured is False
+
+
+def test_resolve_chat_openrouter_single_key_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # With no native key set, a lone OPENROUTER_API_KEY is a recognized
+    # single-key path: env inference routes to the OpenAI-compatible client.
+    pytest.importorskip("openai")
+    monkeypatch.chdir(tmp_path)
+    _clear_chat_keys(monkeypatch)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    assert resolve_provider(None) == ("openrouter", None)
+    model = config.resolve_chat()
+    assert type(model).__name__ == "OpenAIChatModel"
+
+
+def test_resolve_chat_native_key_wins_over_openrouter(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # OpenRouter recognition must never preempt the native order: a native key
+    # present alongside OPENROUTER_API_KEY still resolves native.
+    pytest.importorskip("openai")
+    monkeypatch.chdir(tmp_path)
+    _clear_chat_keys(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    assert resolve_provider(None) == ("openai", None)
 
 
 def test_resolve_models_fast_falls_back_to_main(

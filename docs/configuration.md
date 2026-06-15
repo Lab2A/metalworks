@@ -35,7 +35,10 @@ native SDK — it never silently lands on OpenRouter.
 
 With no `model`, the provider is taken from the first key present, in order:
 Anthropic, OpenAI, Google. So `Metalworks()` with only `OPENAI_API_KEY` set uses
-OpenAI. You can also pin a default in `~/.config/metalworks/metalworks.toml`:
+OpenAI. If none of those is set, a lone `OPENROUTER_API_KEY` is the recognized
+single-key fallback — `Metalworks()` then talks to OpenRouter's OpenAI-compatible
+endpoint (so one key reaches many models). A native key always wins over it. You
+can also pin a default in `~/.config/metalworks/metalworks.toml`:
 
 ```toml
 provider = "anthropic"
