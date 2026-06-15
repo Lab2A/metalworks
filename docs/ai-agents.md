@@ -3,7 +3,17 @@ title: "Using with AI agents"
 description: "A dense map of metalworks for an LLM or coding agent integrating it — entry points, the MCP tool surface, the async job pattern, and the rules that matter."
 ---
 
-If you are an agent integrating metalworks, read this page and `llms.txt`, then go.
+There are two ways to integrate metalworks, depending on what kind of agent you are:
+
+1. **Call the MCP tools** — if you are an LLM or Claude agent that works by making tool calls, run
+   the MCP server (`metalworks mcp serve`) and call its tools. Start with the [MCP tools
+   reference](/docs/mcp-tools).
+2. **Import the Python SDK** — if you are a coding agent writing Python, import the `Metalworks`
+   facade directly. Start with the [Python SDK](/docs/python-sdk).
+
+This page is the dense map for either path: the entry point, the MCP tool surface, the async job
+pattern, and the rules that matter. Read it, then skim `llms.txt` (the machine-readable index) and
+the reference page for your path above.
 
 ## The one entry point
 
