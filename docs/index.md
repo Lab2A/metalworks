@@ -1,15 +1,15 @@
 ---
 title: "metalworks"
-description: "Go from a startup idea to launch, grounded in what people actually want. Validate demand, get positioning, a marketing site, a build plan, and launch copy — every claim backed by a real Reddit quote."
+description: "Go from a startup idea to launch, grounded in what people actually want. Validate demand, get positioning, a marketing site, a build plan, and launch copy — every claim backed by a real quote you can open."
 ---
 
 **metalworks turns a startup idea into a launch plan, grounded in real demand.**
 
-Give it one sentence about what you want to build. It reads real Reddit conversations to
-tell you whether people actually want it, then turns that into the things you need to
-launch: your positioning, the competitors to beat, a marketing site, a build plan for your
-coding agent, and launch copy. **Every claim links back to a real comment you can click —
-nothing is invented.**
+Give it one sentence about what you want to build. It reads real conversations — Reddit,
+Hacker News, the web, or your own data — to tell you whether people actually want it, then
+turns that into the things you need to launch: your positioning, the competitors to beat, a
+marketing site, a build plan for your coding agent, and launch copy. **Every claim links back
+to a real quote you can click — nothing is invented.**
 
 It's a Python library you install (also a CLI, an MCP server, and a Claude Code plugin).
 
@@ -40,8 +40,10 @@ for cluster in report.ranked_clusters:
         print("  ", quote.source_url)
 ```
 
-That's a real report grounded in real Reddit threads — see the full
-[Quickstart](/docs/quickstart).
+That's a real report grounded in real conversations — see the full
+[Quickstart](/docs/quickstart). Reddit is one source among several; point it at
+[Hacker News, the web, or your own data](/docs/sources) too, and the signal
+compounds in a [durable corpus](/docs/corpus) you can refresh reports against.
 
 ## What you can do with it
 
@@ -56,14 +58,17 @@ falls into five stages — each step is a single call:
 | **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
 | **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
 
-New here? Walk one idea from start to finish in the [end-to-end walkthrough](/docs/walkthrough).
+It all sits on a durable, multi-source [corpus](/docs/corpus) the runs build up: choose what
+to read from in [Sources](/docs/sources), and **refresh** a report against the growing corpus
+to see what changed. New here? Walk one idea from start to finish in the
+[end-to-end walkthrough](/docs/walkthrough).
 
 ## Why it's not just another AI tool
 
 Most "AI market research" makes up plausible-sounding answers. metalworks doesn't. It reads
-real Reddit threads, and **anything it can't back with an actual quote, it drops.** When the
-demand isn't there, it tells you — instead of inventing an opportunity. That's what makes the
-output safe to act on. See [why you can trust the output](/docs/how-it-works).
+real conversations across real sources, and **anything it can't back with an actual quote, it
+drops.** When the demand isn't there, it tells you — instead of inventing an opportunity.
+That's what makes the output safe to act on. See [why you can trust the output](/docs/how-it-works).
 
 ## Four ways to use it
 
