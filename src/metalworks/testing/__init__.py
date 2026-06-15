@@ -11,6 +11,20 @@ conformance checks against it:
 `check_all_repos` runs the same semantic assertions metalworks holds its
 built-in backends to — including the >1000-rows-behind-one-filter case that
 catches silently-truncating paginated backends.
+
+Source connectors have their own conformance check — implement an
+:class:`~metalworks.research.sources.ItemSource` and verify it against the
+published contract before you ship it:
+
+    from metalworks.testing import check_item_source
+
+    def test_my_source_conforms():
+        check_item_source(MySource())
+
+`check_item_source` asserts the protocol contract: `pull` yields `CorpusRecord`s
+with stable, non-empty ids, a re-pull is idempotent (same id set), `comments_for`
+returns `CorpusComment`s parented to pulled record ids (or `None`), and
+`latest_window` returns a `SourceWindow`.
 """
 
 from __future__ import annotations
@@ -19,6 +33,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
 from metalworks.contract import (
+    CorpusComment,
+    CorpusRecord,
     InboxItem,
     Opportunity,
     RedditComment,
@@ -30,6 +46,7 @@ from metalworks.contract import (
 from metalworks.embeddings import FakeEmbedding, IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch
 from metalworks.llm.fake import FakeChatModel
+from metalworks.research.sources import ItemSource, SourceWindow
 from metalworks.stores.repos import (
     AccountRepo,
     BriefRepo,
@@ -183,6 +200,80 @@ def check_inbox_repo(repo: InboxRepo) -> None:
     assert all(i.message_id != "mwtest-m1" for i in repo.list_inbox_items(unread_only=True))
 
 
+def check_item_source(
+    source: ItemSource,
+    *,
+    query: str = "test",
+    window: SourceWindow | None = None,
+    limit: int | None = 25,
+) -> None:
+    """Assert that ``source`` honors the :class:`ItemSource` contract.
+
+    A third-party connector self-verifies with this BEFORE shipping. It runs a
+    small live pull against the source and checks the contract every downstream
+    stage relies on:
+
+    * ``source.source_id`` is a non-empty string.
+    * ``latest_window()`` returns a :class:`SourceWindow`.
+    * ``pull()`` yields :class:`CorpusRecord`s, each with a non-empty ``id``,
+      ``source`` matching ``source_id``, and ``source_id`` set.
+    * ids are UNIQUE within a pull and STABLE across a re-pull (idempotency — the
+      same query/window yields the same id set, so upsert-by-id never duplicates).
+    * ``comments_for()`` returns ``None`` (comment-less source) OR yields
+      :class:`CorpusComment`s, each parented (``parent_id``) to a pulled record id.
+
+    Pass a ``window`` for sources that require one; otherwise ``latest_window()``
+    is used. ``limit`` keeps the probe small — give the source a fixture with at
+    least one record so the assertions have something to bite on.
+    """
+    assert isinstance(source.source_id, str) and source.source_id, (
+        "source_id must be a non-empty string"
+    )
+
+    win = window if window is not None else source.latest_window()
+    assert isinstance(win, SourceWindow), "latest_window() must return a SourceWindow"
+
+    records = list(source.pull(query=query, window=win, limit=limit))
+    assert records, "pull() yielded no records — give check_item_source a fixture/window with data"
+
+    ids: list[str] = []
+    for r in records:
+        assert isinstance(r, CorpusRecord), f"pull() must yield CorpusRecord, got {type(r)!r}"
+        assert r.id, "every pulled record must have a non-empty, stable id"
+        assert r.source == source.source_id, (
+            f"record.source ({r.source!r}) must equal source_id ({source.source_id!r})"
+        )
+        assert r.source_id, "record.source_id (native id) must be set"
+        ids.append(r.id)
+
+    assert len(set(ids)) == len(ids), "pulled record ids must be unique within a pull"
+
+    # Idempotency: a re-pull over the same query/window yields the same id set.
+    again = [r.id for r in source.pull(query=query, window=win, limit=limit)]
+    assert set(again) == set(ids), (
+        "pull() is not idempotent: re-pulling the same query/window changed the id "
+        "set — record ids must be stable (the corpus upserts by id)"
+    )
+
+    # Comments: None (comment-less) is legal; otherwise every comment must be a
+    # CorpusComment parented to one of the pulled records.
+    batches = source.comments_for(ids)
+    if batches is not None:
+        pulled = set(ids)
+        for batch in batches:
+            for c in batch:
+                assert isinstance(c, CorpusComment), (
+                    f"comments_for() must yield CorpusComment, got {type(c)!r}"
+                )
+                assert c.id, "every comment must have a non-empty id"
+                assert c.parent_id in pulled, (
+                    f"comment.parent_id ({c.parent_id!r}) is not one of the pulled record ids"
+                )
+                assert c.source == source.source_id, (
+                    f"comment.source ({c.source!r}) must equal source_id ({source.source_id!r})"
+                )
+
+
 def check_all_repos(backend: AllRepos, *, corpus_rows: int = 1500) -> None:
     """Run every repo conformance check against one backend instance.
 
@@ -205,6 +296,7 @@ __all__ = [
     "check_brief_repo",
     "check_corpus_repo",
     "check_inbox_repo",
+    "check_item_source",
     "check_opportunity_repo",
     "check_run_repo",
 ]
