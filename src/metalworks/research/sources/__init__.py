@@ -124,12 +124,14 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
     Triggers a lazy import of a built-in connector for known ids so a bare
     ``import`` of this package stays free of ``duckdb`` / ``httpx``: the Arctic
     connector for ``"reddit"`` / ``"arctic"``, the Hacker News connector for
-    ``"hackernews"``. Unknown ids raise ``KeyError``.
+    ``"hackernews"``, the web-search connector for ``"web"``. Unknown ids raise
+    ``KeyError``.
     """
     _BUILTIN_MODULES = {
         "reddit": "metalworks.research.sources.arctic",
         "arctic": "metalworks.research.sources.arctic",
         "hackernews": "metalworks.research.sources.hackernews",
+        "web": "metalworks.research.sources.web",
     }
     if source_id not in SOURCES and source_id in _BUILTIN_MODULES:
         # Lazy self-registration: importing the module runs its register_source.
