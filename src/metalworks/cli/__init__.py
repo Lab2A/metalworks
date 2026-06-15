@@ -26,6 +26,7 @@ import metalworks
 from metalworks import config
 
 if TYPE_CHECKING:
+    from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
 
 app = typer.Typer(
@@ -168,10 +169,14 @@ def quickstart() -> None:
 
     import tempfile
 
-    from metalworks.cli._demo import DEMO_SUBREDDIT, write_demo_corpus
+    from metalworks.cli._demo import (
+        DEMO_SUBREDDIT,
+        DemoComments,
+        build_demo_chat,
+        write_demo_corpus,
+    )
     from metalworks.contract import ResearchBrief, TargetSubreddit, TriageThresholds
     from metalworks.embeddings import FakeEmbedding
-    from metalworks.llm import FakeChatModel
     from metalworks.research import ResearchDeps, run_research
     from metalworks.research.arctic import ArcticReader
     from metalworks.stores import MemoryStores
@@ -183,19 +188,26 @@ def quickstart() -> None:
         reader = ArcticReader(data_root=str(root), probe_sleep_s=0.0)
         store = MemoryStores()
 
-        # An unscripted FakeChatModel is enough: the subreddit picker and
-        # planner both catch and fall back on a missing scripted response, and
-        # with no comment source the synthesis stage takes its deterministic
-        # empty-corpus path (slot plan + verdict are computed, not LLM'd).
-        chat = FakeChatModel()
+        # A demo chat model scripted for the whole pipeline + a fake comment
+        # source, so the offline demo produces a real (if synthetic) report
+        # instead of an empty-corpus stub. Same wiring as `Metalworks.demo()`.
+        chat = build_demo_chat()
 
-        deps = ResearchDeps(chat=chat, embeddings=FakeEmbedding(), corpus=store, reader=reader)
+        deps = ResearchDeps(
+            chat=chat,
+            embeddings=FakeEmbedding(),
+            corpus=store,
+            reader=reader,
+            comments=DemoComments(),
+        )
         brief = ResearchBrief(
             brief_id="demo-brief",
             question="Is there demand for an affordable jitter-free focus supplement?",
             decision_context="Validating a v0 before committing to manufacturing.",
             success_criteria=["Surfaces what consumers actually say in their own words"],
-            must_address=["What price point does the audience accept?"],
+            # Empty (like the auto-generated brief from `brief_from_question`), so
+            # the scripted demo triangulator has no must_address item to resolve.
+            must_address=[],
             target_subreddits=[
                 TargetSubreddit(name=DEMO_SUBREDDIT, rationale="Highest-intent demo community.")
             ],
@@ -287,7 +299,7 @@ def research_plan(
     )
 
     chat = _resolve_chat_or_exit()
-    embeddings = config.resolve_embeddings()
+    embeddings = _resolve_embeddings_or_exit()
     store = config.default_store()
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(chat=chat, embeddings=embeddings, corpus=store, reader=reader)
@@ -344,7 +356,7 @@ def research_run(
         raise typer.Exit(code=2)
 
     chat = _resolve_chat_or_exit()
-    embeddings = config.resolve_embeddings()
+    embeddings = _resolve_embeddings_or_exit()
     store = config.default_store()
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
@@ -450,7 +462,7 @@ def research_position(
         raise typer.Exit(code=1)
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
-        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
     console.print(f"[bold]Positioning[/bold] report {report_id}...")
     try:
@@ -502,7 +514,7 @@ def research_competitor_map(
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
         chat=chat,
-        embeddings=config.resolve_embeddings(),
+        embeddings=_resolve_embeddings_or_exit(),
         corpus=store,
         reader=reader,
         search=config.resolve_search(),
@@ -564,7 +576,7 @@ def research_surface(
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
         chat=chat,
-        embeddings=config.resolve_embeddings(),
+        embeddings=_resolve_embeddings_or_exit(),
         corpus=store,
         reader=reader,
         search=config.resolve_search(),
@@ -608,7 +620,7 @@ def research_site(
         raise typer.Exit(code=1)
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
-        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
     console.print(f"[bold]Building site[/bold] for report {report_id}...")
     try:
@@ -649,7 +661,7 @@ def research_launch(
         raise typer.Exit(code=1)
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
-        chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
     console.print(f"[bold]Drafting launch assets[/bold] for report {report_id}...")
     try:
@@ -766,7 +778,7 @@ def build_init(
     reader = ArcticReader(probe_sleep_s=0.0)
     deps = ResearchDeps(
         chat=chat,
-        embeddings=config.resolve_embeddings(),
+        embeddings=_resolve_embeddings_or_exit(),
         corpus=config.default_store(),
         reader=reader,
     )
@@ -1088,6 +1100,25 @@ def _resolve_chat_or_exit() -> ChatModel:
 
     try:
         return config.resolve_chat()
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+
+def _resolve_embeddings_or_exit() -> EmbeddingProvider:
+    """Resolve embeddings, or exit cleanly with guidance (never a raw traceback).
+
+    The research pipeline needs an embeddings provider in addition to the chat
+    model. Anthropic has no embeddings API, so an Anthropic-only key is not
+    enough — this surfaces that as a one-line message + fix rather than a stack
+    trace.
+    """
+    from metalworks.errors import MetalworksError
+
+    try:
+        return _resolve_embeddings_or_exit()
     except MetalworksError as exc:
         err_console.print(f"[red]{exc.message}[/red]")
         if exc.fix:

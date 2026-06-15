@@ -35,8 +35,9 @@ for cluster in report.ranked_clusters:
     print(cluster.distinct_author_count, "people:", cluster.claim)
 ```
 
-Then add a provider key (Anthropic, OpenAI, or Google) and point it at your own idea to
-get a real report. See [Quickstart](/docs/quickstart).
+Then install a provider SDK and set its key — `pip install "metalworks[research,openai]"`
+with `OPENAI_API_KEY` (or Google) is the simplest, since one key covers both chat and
+embeddings — and point it at your own idea. See [Quickstart](/docs/quickstart).
 
 ## What you can do with it
 

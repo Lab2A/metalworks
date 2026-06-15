@@ -247,7 +247,12 @@ def resolve_embeddings() -> EmbeddingProvider:
 
         return OpenAIEmbedding()
     raise MissingKeyError(
-        "GOOGLE_API_KEY (or GEMINI_API_KEY) / OPENAI_API_KEY", provider="embeddings"
+        "GOOGLE_API_KEY (or GEMINI_API_KEY) / OPENAI_API_KEY",
+        provider="embeddings",
+        detail=(
+            "The research pipeline needs an embeddings provider, and Anthropic has no "
+            "embeddings API — so an Anthropic-only setup must also set a Google or OpenAI key."
+        ),
     )
 
 

@@ -49,11 +49,12 @@ class MissingKeyError(MetalworksError):
 
     error_code = "missing_key"
 
-    def __init__(self, env_var: str, *, provider: str | None = None):
+    def __init__(self, env_var: str, *, provider: str | None = None, detail: str | None = None):
         self.env_var = env_var
         who = f" for {provider}" if provider else ""
+        extra = f" {detail}" if detail else ""
         super().__init__(
-            f"No API credential found{who}.",
+            f"No API credential found{who}.{extra}",
             fix=f"Set the {env_var} environment variable.",
         )
 

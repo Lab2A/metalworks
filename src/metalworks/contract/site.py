@@ -29,11 +29,17 @@ synthesis is unavailable.
 
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from metalworks.contract.evidence import EvidenceRef
+
+# `copy` is a deliberate wire-contract field name that shadows the deprecated
+# BaseModel.copy attribute; the override is intentional (see SiteSection), so
+# suppress pydantic's shadow warning narrowly rather than renaming the field.
+warnings.filterwarnings("ignore", message=r'Field name "copy".*', category=UserWarning)
 
 
 class SiteSection(BaseModel):
