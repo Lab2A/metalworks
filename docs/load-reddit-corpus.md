@@ -1,37 +1,32 @@
 ---
-title: "Build your own Reddit corpus"
-description: "metalworks doesn't hinge on Arctic Shift. Pull your own local Reddit corpus with the load_arctic_corpus.py sample script, then point ArcticReader at it."
+title: "Use Reddit's archive offline"
+description: "Download the slice of Reddit you care about to your machine, so research runs fast and offline instead of fetching over the network."
 ---
 
-metalworks reads submissions through a small `CorpusReader` protocol — Arctic
-Shift is the *default* implementation, not a requirement (see
-[Use your own corpus](/docs/custom-corpus)). This guide takes the next step:
-instead of letting the library reach out to the (slow, rate-limited) Hugging Face
-mirror at runtime, you run a **sample loader script once** to materialize a local
-Parquet corpus, then point metalworks at that directory.
+The `reddit` source normally fetches posts from a large public Reddit archive
+(called Arctic Shift) over the network, which can be slow and rate-limited. If you
+want research to run **fast or fully offline**, download the slice you care about
+once with a small script, then point metalworks at the local copy.
 
-The script lives at [`scripts/load_arctic_corpus.py`](https://github.com/) in the
-repo. It is standalone — standard library plus `duckdb` only — so it doubles as a
-copy-paste reference if you want to adapt it for a different mirror or source.
+**Is this for you?** Use it if you'll run research repeatedly over the same
+subreddits, need to work offline, or want to pin exactly what a run sees. The
+tradeoff: a local copy is a snapshot — it won't include new posts until you
+re-download. For a one-off run, you don't need this; just use the `reddit` source.
 
-## Why build your own corpus
+The script is
+[`scripts/load_arctic_corpus.py`](https://github.com/Lab2A/metalworks/blob/main/scripts/load_arctic_corpus.py)
+in the repo. It's standalone (standard library plus `duckdb`), so you can also
+adapt it for a different archive.
 
-- **No runtime dependency on the HF mirror.** The mirror is convenient for a
-  quick run but slow and rate-limited. A local corpus is fast and offline.
-- **Reproducibility.** A committed corpus directory pins exactly what a run saw.
-- **Control.** Pull only the subreddits and months you care about, once.
-
-## Prerequisites
+## Install
 
 ```bash
 pip install "metalworks[arctic]"
 ```
 
-That pulls in `duckdb`, which the script uses to read the mirror's Parquet shards
-over `httpfs`. (The script will run with a bare `pip install duckdb` too, but
-you'll want the full extra to point metalworks at the result.)
+This includes `duckdb`, which the script uses to read the archive.
 
-## Pull a corpus
+## Download a slice
 
 ```bash
 python scripts/load_arctic_corpus.py --subreddit Supplements --months 3 --out ./corpus
@@ -41,17 +36,17 @@ python scripts/load_arctic_corpus.py --subreddit Supplements --months 3 --out ./
 | --- | --- |
 | `--subreddit, -s NAME` | Subreddit to pull. Repeatable: `-s Supplements -s Nootropics`. |
 | `--months, -m INT` | How many months back to pull, ending at the latest available month (default `1`). |
-| `--out, -o PATH` | Output corpus root (default `./corpus`). |
-| `--comments` | Also fetch live comment trees for pulled submissions (Arctic Shift API). |
-| `--limit INT` | Max submissions per subreddit-month (default: no limit). |
-| `--hf-token TOKEN` | Hugging Face token for authenticated mirror reads (optional). |
+| `--out, -o PATH` | Where to write the corpus (default `./corpus`). |
+| `--comments` | Also fetch the comment threads for those posts. |
+| `--limit INT` | Max posts per subreddit-month (default: no limit). |
+| `--hf-token TOKEN` | Access token for the archive, if you have one (optional). |
 
 Run `python scripts/load_arctic_corpus.py --help` for the full list.
 
-## What it produces
+## What you get
 
-The script writes a directory laid out exactly how `ArcticReader` globs for
-shards:
+A folder with one Parquet file per subreddit and month (and comments alongside, if
+you asked for them):
 
 ```
 corpus/
@@ -65,13 +60,7 @@ corpus/
       06/Supplements.jsonl
 ```
 
-Submissions are real Parquet (one file per subreddit-month). Empty months are
-skipped — no stray files. Comments, when fetched, land as JSONL next to the
-submissions for the same month.
-
 ## Point metalworks at it
-
-`ArcticReader(data_root=...)` reads the local layout with no `hf://` access:
 
 ```python
 from metalworks import Metalworks
@@ -84,14 +73,13 @@ mw.research(
 )
 ```
 
-That's it — the rest of the pipeline (triage, synthesis, web, triangulation) is
-unchanged. If you didn't pull comments, pass `comments=None` and the report comes
-back `partial` with submission-level signal only (see
-[Comments are optional](/docs/custom-corpus#comments-are-optional)).
+Everything else works the same. If you didn't download comments, the report comes
+back marked `partial` and uses the posts alone (your quotes come from comments, so
+they'll be thinner) — see
+[Comments are optional](/docs/custom-corpus#comments-are-optional).
 
-## Going further
+## Other data
 
-The loader is deliberately small and source-specific. To run research over a
-*non-Arctic* source — your own database, an internal API, a cache — implement the
-`CorpusReader` and `CommentSource` protocols directly; that path is documented in
-[Use your own corpus](/docs/custom-corpus).
+This script is just for Reddit. To run research over something else — your own
+database, an internal API, a forum — [add a source](/docs/sources#add-your-own-source)
+or implement [`CorpusReader`](/docs/custom-corpus) for non-archive Reddit data.

@@ -1,95 +1,78 @@
 ---
-title: "The corpus"
-description: "The corpus is metalworks' durable core: a persistent, multi-source store of real conversations that grows across runs. Reports are live, versioned views over it — refresh a report against a bigger corpus and see exactly what changed."
+title: "Your research data"
+description: "Where metalworks saves the conversations it reads, how that collection grows as you run more research, and how to update an old report to see what changed."
 ---
 
-**The corpus is the durable core of metalworks.** It's a persistent, multi-source
-store of the real records and comments your [sources](/docs/sources) pull —
-accumulated across runs, not thrown away after each one. A report is a **live
-view** over the corpus, not a frozen artifact: grow the corpus, refresh the
-report, and the picture sharpens. Power is in numbers.
+When metalworks runs research, it saves the conversations it read. That saved collection is
+**your research data** (metalworks calls it your *corpus*). This page answers three questions:
+where is it, does it stick around, and can you update an old report later.
 
-## What's in it
+## Where it's saved
 
-Every source maps its items onto one source-neutral spine, so a Reddit post, a
-Hacker News story, and a web page all land in the same shape:
+Inside a [project](/docs/projects), your research data is a single file:
+`.metalworks/corpus.db`. Everything you read — the posts, the comments — lives there, and it
+stays between runs, so your collection grows as you do more research.
 
-- **`CorpusRecord`** — a top-level item: `id`, `source`, `source_id`, `url`,
-  `title`, `text`, `author_hash`, `engagement`, `created_at`, and an open `extra`
-  map for source-specific fields (subreddit, domain, rating, …).
-- **`CorpusComment`** — a quote-bearing sub-item of a record (a reply, a thread
-  comment), same spine plus a `parent_id`.
-- **Embeddings** — one vector per record/comment id, used for triage and dedup,
-  reused across runs.
+It's kept out of git on purpose: it's your raw research data, and you should decide whether and
+where it goes. Your reports (the summaries you'd actually share) *are* saved to git; the raw
+data isn't.
 
-The records and their comments are what citations resolve against: a quote in a
-report carries the `record_id` it came from, so the chain runs from a line on
-your landing page all the way back to the real comment.
+If you're not in a project, metalworks keeps the data in memory for the run and writes nothing
+to disk.
 
-## Where it lives
+## Growing it
 
-In a [project](/docs/projects) the corpus is `.metalworks/corpus.db` — a single
-SQLite file that is the project's whole memory. It is **durable but gitignored**:
-authoritative and meant to survive across runs, but never committed, because it
-holds verbatim user text, salted author hashes, and embedding vectors. Outside a
-project, metalworks keeps an in-memory corpus that leaves no footprint.
-
-## Growing the corpus
-
-A `mw.research(...)` run ingests its sources automatically — you never have to
-seed the corpus first. But you can also grow it directly, which is how the signal
-compounds across sources and over time:
+Every `mw.research(...)` saves what it read automatically — you never have to load anything
+first. You can also add to your collection directly, which is useful for building up evidence
+over time or across [sources](/docs/sources):
 
 ```bash
-metalworks corpus add --source hackernews -q "rust developer tooling" --limit 50
-metalworks corpus add --source reddit -q "rust developer tooling"
-metalworks corpus sync          # re-pull the latest window for enabled sources
-metalworks corpus stats         # records + comments, broken down by source
+metalworks corpus add --source hackernews -q "rust developer tooling"
+metalworks corpus add --source reddit    -q "rust developer tooling"
+metalworks corpus sync     # fetch the latest for the sources you have on
+metalworks corpus stats    # how much you've collected, by source
 ```
 
-Ingestion is idempotent — re-adding the same window upserts by id, so nothing
-duplicates. The next report you run reads everything that's in there.
+Adding the same thing twice is safe — nothing gets duplicated. The next report you run reads
+everything you've collected.
 
-## Live, versioned reports
+## Updating an old report
 
-Because a report is a view, you can **refresh** it against the now-larger corpus.
-Each refresh pins a new **version** in the same **lineage** and shows you a
-**diff** of what moved:
+A report reflects what you'd read at the time. After you've collected more, you can **update**
+a report instead of starting over — metalworks re-runs it against everything you have now and
+shows you what changed:
 
 ```bash
-metalworks research run --question "rust developer tooling"   # v1
+metalworks research run --question "rust developer tooling"   # your first report
 metalworks corpus add --source hackernews -q "rust developer tooling"
-metalworks research refresh <report-id>                       # v2 + a diff
-metalworks research versions <report-id>                      # the lineage
-metalworks research diff <id-a> <id-b>                        # any two versions
+metalworks research refresh <report-id>     # an updated report + what changed
+metalworks research versions <report-id>    # every version of this report
+metalworks research diff <id-a> <id-b>      # compare any two versions
 ```
 
 In Python:
 
 ```python
-research, diff = mw.refresh(prior_research)
-print(diff.summary)              # e.g. "+2 themes, 3 shifted, +180 threads"
+research, changes = mw.refresh(prior_research)
+print(changes.summary)        # e.g. "2 new needs, 3 grew, 180 more conversations"
 ```
 
-The **prior version stays frozen** — its citations are materialized inline, so a
-report you committed or shipped against still renders even if the corpus moves on.
-"What did I ship against?" is never lost; refresh only ever appends a version.
+Updating never overwrites the old version — each one is kept exactly as it was, so a report you
+already shared or shipped against still reads the same. You just get a new version next to it.
 
-### What the diff tells you
+### What "what changed" tells you
 
-`ReportDiff` has two layers:
+The comparison has two parts:
 
-- **Deterministic (ground truth)** — thread, distinct-author, and cluster counts,
-  and the source distribution, read straight off the two reports.
-- **Advisory (claim-matched)** — themes added, faded, or shifted, matched across
-  versions by claim-embedding nearest-neighbor. Synthesis is non-deterministic, so
-  a theme's wording can drift between runs; the counts are exact, the wording diff
-  is a hint. Diffing a report against an identical re-synthesis yields an empty
-  diff — the refresh determinism guarantee.
+- **The numbers** — how many more conversations and distinct people showed up, and which needs
+  appeared or faded. These are exact.
+- **The needs** — which demand themes are new, gone, or moved. Because the analysis is written
+  fresh each time, the wording of a need can shift slightly between runs even when it's the same
+  underlying thing; the numbers are the reliable part. Re-running on the exact same data shows
+  no change.
 
 ## Next
 
-- [Sources](/docs/sources) — the connectors that feed the corpus.
-- [Projects](/docs/projects) — the `.metalworks/` directory the corpus lives in.
-- [Bring your own corpus](/docs/custom-corpus) — load records directly.
-- [Data model](/docs/data-model) — the full shape of records, citations, and the report.
+- [Sources](/docs/sources) — where the data comes from.
+- [Projects](/docs/projects) — the `.metalworks/` folder this lives in.
+- [Use your own data](/docs/custom-corpus) — load conversations you already have.

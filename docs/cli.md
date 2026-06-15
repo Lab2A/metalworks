@@ -46,8 +46,8 @@ report-grounded commands (`position`, `competitor-map`, `surface`, `site`, `laun
 | `metalworks research plan PROMPT` | Walk the D1-D8 planner over a prompt and write a `brief.json` (recommended option auto-selected, non-interactive). | chat key |
 | `metalworks research run` | Run the research pipeline from a `--question` (no brief needed) or a `--brief` file. Stores the report. | chat key |
 | `metalworks research list` | List stored research runs — the report ids the report-grounded commands take. | zero-key |
-| `metalworks research refresh REPORT_ID` | Re-synthesize a stored report against the current [corpus](/docs/corpus) → a new pinned version in the same lineage, plus a diff of what moved. | chat key |
-| `metalworks research versions REPORT_ID` | List the versions in a report's lineage, oldest → newest. | zero-key |
+| `metalworks research refresh REPORT_ID` | Re-run a stored report against your latest [research data](/docs/corpus) → an updated report saved as a new version, plus what changed. | chat key |
+| `metalworks research versions REPORT_ID` | List a report's versions, oldest → newest. | zero-key |
 | `metalworks research diff REPORT_A REPORT_B` | Show the diff between two stored report versions. | chat key |
 | `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
 | `metalworks research competitor-map REPORT_ID` | Map the competitive landscape for a stored report — grounded names, cited gaps. | chat key |
@@ -61,16 +61,16 @@ Options:
 - `research plan` — `--out, -o PATH` (default `brief.json`).
 - `research run` — `--question, -q TEXT` *or* `--brief PATH` (pass exactly one); `--subreddit TEXT` (repeatable, else auto); `--source TEXT` (repeatable — which [sources](/docs/sources) to ingest from; else configured/Reddit); `--months INT` (corpus window, default 12); `--out, -o PATH` to write the report JSON.
 - `research list` — `--limit INT` (max runs to show, default 20).
-- `research refresh` — `REPORT_ID` argument (any version in the lineage; advances from the lineage head); `--out, -o PATH` to write the new report JSON.
+- `research refresh` — `REPORT_ID` argument (any version of the report; updates from the latest one); `--out, -o PATH` to write the new report JSON.
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later).
 - `research position` / `competitor-map` / `surface` / `launch` / `content-plan` — `REPORT_ID` argument; `--out, -o PATH` to write the artifact JSON.
 - `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON.
 
 ## corpus
 
-Grow and inspect the durable [corpus](/docs/corpus) — the multi-source store
-research reads from. A `research run` ingests automatically, but you can also seed
-or grow it directly; the signal compounds across sources and over time.
+Grow and inspect your [saved research data](/docs/corpus) — what research reads
+from. A `research run` saves what it reads automatically, but you can also add to
+it directly to build up evidence over time and across sources.
 
 | Command | Description | Keys |
 | --- | --- | --- |

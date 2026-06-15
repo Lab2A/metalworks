@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "metalworks",
-  "description": "Go from a startup idea to launch, grounded in real demand. Run multi-source demand research over Reddit, Hacker News, the web, or your own data, then get positioning, a marketing site, a build spec, and launch copy — every claim backed by a real quote. A Python library, CLI, MCP server, and Claude Code plugin.",
+  "description": "Go from a startup idea to launch, grounded in what people actually want. Research real demand across Reddit, Hacker News, and the web, then get positioning, a marketing site, a build spec, and launch copy — every claim backed by a real quote. A Python library, CLI, MCP server, and Claude Code plugin.",
   "colors": {
     "primary": "#111111",
     "light": "#f5f5f5",
@@ -46,10 +46,6 @@
             "pages": ["docs/walkthrough"]
           },
           {
-            "group": "Sources & corpus",
-            "pages": ["docs/sources", "docs/corpus"]
-          },
-          {
             "group": "Research",
             "pages": ["docs/demand-research", "docs/positioning"]
           },
@@ -68,6 +64,10 @@
           {
             "group": "Grow",
             "pages": ["docs/content-seo", "docs/reddit-engagement"]
+          },
+          {
+            "group": "Sources & your data",
+            "pages": ["docs/sources", "docs/corpus"]
           },
           {
             "group": "How it works",

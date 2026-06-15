@@ -36,10 +36,8 @@ for cluster in report.ranked_clusters:
 ```
 
 Every cluster is a real demand theme, and every quote is a verbatim comment you can open —
-nothing is invented. Reddit is the default; add [Hacker News, the web, or your own
-data](/docs/sources) and the signal compounds in a [corpus](/docs/corpus) you can refresh
-against. That report is the input to everything else: positioning, a marketing site, a build
-spec, launch copy. See the [end-to-end walkthrough](/docs/walkthrough).
+nothing is invented. That report is the input to everything else: positioning, a marketing
+site, a build spec, launch copy. See the [end-to-end walkthrough](/docs/walkthrough).
 
 ## 3. Or use the CLI / MCP / plugin
 

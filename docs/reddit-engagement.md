@@ -3,9 +3,18 @@ title: "Reddit engagement"
 description: "Find Reddit threads worth joining and draft honest, disclosed replies that pass a compliance check. You approve every post — it never auto-posts."
 ---
 
-Find live Reddit threads where your product genuinely helps, and draft a reply in a real
-persona's voice that passes a compliance check before you ever see it. **You approve every post —
-nothing is posted automatically.**
+Find real Reddit threads where your product genuinely helps, and draft honest replies in a chosen
+voice. metalworks drafts only — **you review and post; nothing is auto-posted.**
+
+A few terms used in the code below:
+
+- A **persona** (`Persona`) is a real person whose voice a reply is written in — a voice rubric plus
+  a true background. It matters because replies should sound like an actual human with relevant
+  experience, not a brand. A **`PersonaSet`** is just the named collection you pick from.
+- A **`DiscoveryContext`** is what you inject into a run — your voice guidelines plus that persona
+  set — so every draft follows your rules.
+- The **compliance check** is an automatic check that catches fake or off-topic drafts before you
+  ever see them (detailed below).
 
 ```python
 from metalworks import Metalworks
@@ -58,7 +67,8 @@ within Reddit's limits.
 
 ## The compliance check
 
-The check is a standalone, deterministic function — usable with no Reddit, no posting, no model:
+The compliance check is an automatic check that catches fake or off-topic drafts before you ever
+see them. It is a standalone, deterministic function — usable with no Reddit, no posting, no model:
 
 ```python
 from metalworks.reddit import heuristic_check
@@ -68,8 +78,8 @@ verdict.pass_, verdict.violations, verdict.confidence
 ```
 
 Below a confidence threshold, it escalates to an LLM judge
-(`metalworks.discovery.llm_judge`). The check is the security boundary, not a suggestion: the
-posting tools refuse on a block verdict regardless of what a model asked for.
+(`metalworks.discovery.llm_judge`). This check is what guarantees nothing inauthentic gets drafted:
+the posting tools refuse on a block verdict regardless of what a model asked for.
 
 ## Posting (you approve, every time)
 
