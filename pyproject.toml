@@ -94,7 +94,9 @@ pythonVersion = "3.11"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--disable-socket"
+# Offline by default: block sockets AND deselect tests that need real network
+# (run them explicitly with `-m network --enable-socket`).
+addopts = "--disable-socket -m 'not network'"
 markers = [
-  "network: test needs real network/sockets (not run under --disable-socket)",
+  "network: test needs real network/sockets (deselected by default; see addopts)",
 ]
