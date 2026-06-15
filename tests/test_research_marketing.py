@@ -13,8 +13,8 @@ from metalworks.contract import (
     DemandReport,
     Fork,
     InsightCluster,
-    QuoteCitation,
     ResearchBrief,
+    ResolvedCitation,
     SignalStrength,
 )
 from metalworks.research.marketing import (
@@ -26,9 +26,9 @@ from metalworks.research.marketing import (
 # ── fixtures ─────────────────────────────────────────────────────────────────
 
 
-def _quote(text: str, permalink: str, author_hash: str = "a1") -> QuoteCitation:
-    return QuoteCitation(
-        text=text, permalink=permalink, subreddit="SkincareAddiction", author_hash=author_hash
+def _quote(text: str, permalink: str, author_hash: str = "a1") -> ResolvedCitation:
+    return ResolvedCitation(
+        text=text, source_url=permalink, source_name="r/SkincareAddiction", author_hash=author_hash
     )
 
 
@@ -36,7 +36,7 @@ def _cluster(
     rank: int,
     *,
     claim: str,
-    quotes: list[QuoteCitation],
+    quotes: list[ResolvedCitation],
     distinct_authors: int = 5,
     mentions: int = 12,
 ) -> InsightCluster:

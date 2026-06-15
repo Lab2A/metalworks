@@ -82,14 +82,14 @@ def _page_from_cluster(cluster: InsightCluster, faq: list[FaqItem]) -> ContentPa
 
 
 def _reddit_targets(report: DemandReport) -> list[str]:
-    """Deduped quote permalinks from the top clusters, in encounter order."""
+    """Deduped quote source URLs from the top clusters, in encounter order."""
     targets: list[str] = []
     seen: set[str] = set()
     for cluster in report.ranked_clusters[:_TOP_CLUSTERS_FOR_CITATION]:
         for quote in cluster.quotes:
-            if quote.permalink and quote.permalink not in seen:
-                seen.add(quote.permalink)
-                targets.append(quote.permalink)
+            if quote.source_url and quote.source_url not in seen:
+                seen.add(quote.source_url)
+                targets.append(quote.source_url)
     return targets
 
 

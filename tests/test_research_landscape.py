@@ -19,7 +19,7 @@ from metalworks.contract import (
     DemandReport,
     Fork,
     InsightCluster,
-    QuoteCitation,
+    ResolvedCitation,
     SignalStrength,
     WebFinding,
 )
@@ -51,14 +51,18 @@ class _NullReader:
         return None
 
 
-def _quote(text: str, permalink: str, author_hash: str = "a1") -> QuoteCitation:
-    return QuoteCitation(
-        text=text, permalink=permalink, subreddit="SkincareAddiction", author_hash=author_hash
+def _quote(text: str, permalink: str, author_hash: str = "a1") -> ResolvedCitation:
+    return ResolvedCitation(
+        text=text, source_url=permalink, source_name="r/SkincareAddiction", author_hash=author_hash
     )
 
 
 def _cluster(
-    rank: int, *, quotes: list[QuoteCitation], distinct_authors: int = 3, demand_score: float = 10.0
+    rank: int,
+    *,
+    quotes: list[ResolvedCitation],
+    distinct_authors: int = 3,
+    demand_score: float = 10.0,
 ) -> InsightCluster:
     return InsightCluster(
         rank=rank,

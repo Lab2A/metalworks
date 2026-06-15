@@ -23,19 +23,19 @@ from metalworks.contract import (
     InsightCluster,
     PriceEvidence,
     PriceFinding,
-    QuoteCitation,
+    ResolvedCitation,
     SignalStrength,
     WebFinding,
 )
 
 
-def _quote(text: str, permalink: str, author_hash: str = "a1") -> QuoteCitation:
-    return QuoteCitation(
-        text=text, permalink=permalink, subreddit="Supplements", author_hash=author_hash
+def _quote(text: str, permalink: str, author_hash: str = "a1") -> ResolvedCitation:
+    return ResolvedCitation(
+        text=text, source_url=permalink, source_name="r/Supplements", author_hash=author_hash
     )
 
 
-def _cluster(rank: int, quotes: list[QuoteCitation]) -> InsightCluster:
+def _cluster(rank: int, quotes: list[ResolvedCitation]) -> InsightCluster:
     return InsightCluster(
         rank=rank,
         claim=f"claim {rank}",
@@ -77,13 +77,13 @@ def _report(
 def test_quote_id_is_content_addressed_and_author_independent() -> None:
     a = _quote("too sweet", "https://r/x/1", author_hash="aaa")
     b = _quote("too sweet", "https://r/x/1", author_hash="zzz")
-    assert a.id == b.id  # id is (permalink, text) only — upvotes/author don't move it
+    assert a.id == b.id  # id is (source_url, text) only — engagement/author don't move it
     assert a.id.startswith("q:")
 
 
 def test_quote_id_changes_with_content() -> None:
     a = _quote("too sweet", "https://r/x/1")
-    assert a.id != _quote("too sweet", "https://r/x/2").id  # different permalink
+    assert a.id != _quote("too sweet", "https://r/x/2").id  # different source_url
     assert a.id != _quote("too bitter", "https://r/x/1").id  # different text
 
 
@@ -111,7 +111,7 @@ def test_id_survives_round_trip_and_ignores_injected_id() -> None:
     dumped = q.model_dump()
     assert dumped["id"] == q.id  # computed id serializes
     # a reload that carries a bogus id in the payload recomputes from content
-    reloaded = QuoteCitation(**{**dumped, "id": "q:deadbeef"})
+    reloaded = ResolvedCitation(**{**dumped, "id": "q:deadbeef"})
     assert reloaded.id == q.id
 
 

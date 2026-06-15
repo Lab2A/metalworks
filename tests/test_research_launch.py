@@ -15,7 +15,7 @@ from metalworks.contract import (
     DemandReport,
     Fork,
     InsightCluster,
-    QuoteCitation,
+    ResolvedCitation,
     SignalStrength,
 )
 from metalworks.embeddings import FakeEmbedding
@@ -47,16 +47,16 @@ class _NullReader:
         return None
 
 
-def _quote(text: str, permalink: str, author_hash: str = "a1") -> QuoteCitation:
-    return QuoteCitation(
-        text=text, permalink=permalink, subreddit="SkincareAddiction", author_hash=author_hash
+def _quote(text: str, permalink: str, author_hash: str = "a1") -> ResolvedCitation:
+    return ResolvedCitation(
+        text=text, source_url=permalink, source_name="r/SkincareAddiction", author_hash=author_hash
     )
 
 
 def _cluster(
     rank: int,
     *,
-    quotes: list[QuoteCitation],
+    quotes: list[ResolvedCitation],
     signal: SignalStrength = SignalStrength.HIGH,
 ) -> InsightCluster:
     return InsightCluster(

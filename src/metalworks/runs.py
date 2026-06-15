@@ -51,7 +51,8 @@ def render_run_markdown(research: Research) -> str:
             )
             if cluster.quotes:
                 quote = cluster.quotes[0]
-                lines += ["", f"> {quote.text}", ">", f"> — [{quote.subreddit}]({quote.permalink})"]
+                label = quote.source_name or quote.source
+                lines += ["", f"> {quote.text}", ">", f"> — [{label}]({quote.source_url})"]
             lines.append("")
 
     if report.web_findings:

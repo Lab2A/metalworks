@@ -20,7 +20,7 @@ from metalworks.contract import (
     Fork,
     InsightCluster,
     PositioningBrief,
-    QuoteCitation,
+    ResolvedCitation,
     SignalStrength,
     WebFinding,
     WedgeClaim,
@@ -55,11 +55,11 @@ class _NullReader:
         return None
 
 
-def _quote(text: str, permalink: str) -> QuoteCitation:
-    return QuoteCitation(text=text, permalink=permalink, subreddit="X", author_hash="a1")
+def _quote(text: str, permalink: str) -> ResolvedCitation:
+    return ResolvedCitation(text=text, source_url=permalink, source_name="r/X", author_hash="a1")
 
 
-def _cluster(rank: int, *, quotes: list[QuoteCitation]) -> InsightCluster:
+def _cluster(rank: int, *, quotes: list[ResolvedCitation]) -> InsightCluster:
     return InsightCluster(
         rank=rank,
         claim=f"pain {rank}",

@@ -11,7 +11,7 @@ returns a body plus a list of claims, each paired with the verbatim quote that
 supports it. The builder then, for each claim:
 
 1. finds the claim's supporting quote in the report (exact substring match
-   against some ``QuoteCitation.text``) → an :class:`EvidenceRef` (quote id);
+   against some ``ResolvedCitation.text``) → an :class:`EvidenceRef` (quote id);
 2. locates the claim text inside the asset body (``body.find``) → char span;
 3. emits a :class:`~metalworks.contract.launch.ClaimCitation` only when BOTH
    resolve. A claim whose support doesn't resolve against ``report.evidence``,
@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from metalworks.contract import DemandReport, EvidenceRef, QuoteCitation
+from metalworks.contract import DemandReport, EvidenceRef, ResolvedCitation
 from metalworks.contract.launch import (
     ChannelPlan,
     ChannelStep,
@@ -137,12 +137,12 @@ def _is_no_go(report: DemandReport) -> bool:
 # ── Grounding helpers ────────────────────────────────────────────────────────
 
 
-def _all_quotes(report: DemandReport) -> list[QuoteCitation]:
-    """Every QuoteCitation across all clusters (the verbatim corpus to ground on)."""
+def _all_quotes(report: DemandReport) -> list[ResolvedCitation]:
+    """Every ResolvedCitation across all clusters (the verbatim corpus to ground on)."""
     return [q for c in report.ranked_clusters for q in c.quotes]
 
 
-def _supporting_quote(report: DemandReport, supporting_quote: str) -> QuoteCitation | None:
+def _supporting_quote(report: DemandReport, supporting_quote: str) -> ResolvedCitation | None:
     """The report quote whose text contains the LLM's supporting_quote, or None.
 
     Exact-substring match (the verbatim gate): the LLM's claimed support must be
@@ -165,7 +165,7 @@ def _ground_claims(
     """Build a ClaimCitation per claim that resolves BOTH ways; drop the rest.
 
     A claim survives only when (a) its supporting quote resolves to a real
-    QuoteCitation in the report AND (b) its claim text is found verbatim in the
+    ResolvedCitation in the report AND (b) its claim text is found verbatim in the
     asset body. The resulting span satisfies ``body[start:end] == claim_text``,
     and the ``EvidenceRef`` resolves against ``report.evidence`` by quote id.
     """

@@ -11,8 +11,8 @@ from metalworks.contract import (
     DemandReport,
     Fork,
     InsightCluster,
-    QuoteCitation,
     Research,
+    ResolvedCitation,
     SignalStrength,
     WebFinding,
 )
@@ -22,10 +22,10 @@ from metalworks.runs import render_run_markdown, write_run
 
 def _research() -> Research:
     now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-    quote = QuoteCitation(
+    quote = ResolvedCitation(
         text="I'd pay for a clean focus supplement",
-        permalink="https://reddit.com/r/Supplements/comments/x/c/",
-        subreddit="Supplements",
+        source_url="https://reddit.com/r/Supplements/comments/x/c/",
+        source_name="r/Supplements",
         author_hash="a1",
     )
     cluster = InsightCluster(
