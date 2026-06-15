@@ -10,7 +10,7 @@ connective copy with no refs at all.
 Honesty contract (the no-quote-no-section gate, the same spine the demand
 report and positioning brief use):
 - A claim-bearing section's ``copy`` MUST contain a fragment that exact-matches
-  a real ``QuoteCitation.text`` in its source cluster. That fragment is the
+  a real ``ResolvedCitation.text`` in its source cluster. That fragment is the
   load-bearing claim; the section ships ``provenance="verbatim"`` with one
   ``EvidenceRef(kind="quote")`` resolving against the source report's
   ``evidence``. A section whose fragment matches nothing — or that carries no
@@ -47,7 +47,7 @@ class SiteSection(BaseModel):
 
     ``role`` is the section's job on the page (hero/feature/objection/pricing/
     social_proof/cta). ``copy`` is the rendered text. A ``verbatim`` section's
-    ``copy`` contains a fragment that exact-matches a real ``QuoteCitation.text``
+    ``copy`` contains a fragment that exact-matches a real ``ResolvedCitation.text``
     and carries exactly the ``EvidenceRef``s that back it; a ``connective``
     section carries no refs and no claims.
     """

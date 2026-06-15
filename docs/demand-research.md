@@ -26,7 +26,7 @@ print(report.verdict)                   # is there real demand? a one-line go / 
 for c in report.ranked_clusters:
     print(c.distinct_author_count, "people:", c.claim)
     for q in c.quotes:                  # the real comments behind the claim
-        print("   ", q.permalink, "→", q.text[:80])
+        print("   ", q.source_url, "→", q.text[:80])
 ```
 
 From the command line:

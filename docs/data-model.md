@@ -19,8 +19,8 @@ else you generate later reads from this one report.
   `distinct_author_count` (how many different people raised it), `mention_count`, a `signal`
   chip, a `demand_score` that weights how many distinct people care over how viral a single
   post was, and the `quotes` behind it.
-- **`QuoteCitation`** — a verbatim Reddit quote. Its `text` is the exact text of a real
-  stored comment, and it carries the `permalink` so you can open the thread and read it
+- **`ResolvedCitation`** — a verbatim quote. Its `text` is the exact text of a real
+  stored comment, and it carries the `source_url` so you can open the thread and read it
   yourself. A cluster with zero verified quotes never ships — metalworks drops anything it
   can't back with a real quote.
 - **`WebFinding`** — a fact pulled from the web. Its `source_url` comes from the search
@@ -28,7 +28,7 @@ else you generate later reads from this one report.
 
 ```
 ResearchBrief ──▶ run_research ──▶ DemandReport
-                                    ├─ ranked_clusters: [InsightCluster ─▶ quotes: [QuoteCitation]]
+                                    ├─ ranked_clusters: [InsightCluster ─▶ quotes: [ResolvedCitation]]
                                     ├─ web_findings:    [WebFinding]
                                     └─ verdict / audience / sizing
 ```

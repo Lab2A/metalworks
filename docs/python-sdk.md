@@ -89,7 +89,7 @@ print(report.verdict)                         # one-line go / no-go (str | None)
 for c in report.ranked_clusters:
     print(c.distinct_author_count, "people:", c.claim)
     for q in c.quotes:
-        print("  ", q.permalink, q.text[:80])
+        print("  ", q.source_url, q.text[:80])
 ```
 
 ### `.plan(prompt)`
@@ -125,8 +125,8 @@ Key fields you'll read on `.demand`:
 | `partial` / `caveat` | `bool` / `str \| None` | Set when the signal was too thin to be confident. |
 
 Each `InsightCluster` carries `rank`, `claim`, `demand_score`, `distinct_author_count`,
-`mention_count`, `signal`, and `quotes` (verbatim `QuoteCitation`s with `text`, `permalink`,
-`subreddit`, `author_hash`, `upvotes`).
+`mention_count`, `signal`, and `quotes` (verbatim `ResolvedCitation`s with `text`, `source_url`,
+`source`/`source_name`, `author_hash`, `engagement`).
 
 ## The stage methods
 

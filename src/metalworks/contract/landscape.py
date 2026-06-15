@@ -6,7 +6,7 @@ and attaches to each competitor what it does well plus an exploitable gap backed
 by a cited complaint. The discipline is **no-quote-no-gap**: every
 :class:`GapClaim` carries exactly one :class:`~metalworks.contract.evidence.EvidenceRef`
 that resolves against the source report's evidence (a verbatim
-``QuoteCitation`` when a real complaint matches the gap, else a grounded
+``ResolvedCitation`` when a real complaint matches the gap, else a grounded
 ``WebFinding``); a gap with no resolvable evidence is dropped at assembly.
 
 Honesty contract:
@@ -49,7 +49,7 @@ class GapClaim(BaseModel):
 
     ``severity`` is service-assigned (complaint breadth or web confidence), never
     LLM-authored. ``evidence`` resolves against the source report's evidence —
-    a ``QuoteCitation`` (verbatim complaint) or a ``WebFinding`` (grounded-web).
+    a ``ResolvedCitation`` (verbatim complaint) or a ``WebFinding`` (grounded-web).
     """
 
     gap_index: int = Field(description="1-based index within the competitor's gaps.")
