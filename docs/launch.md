@@ -10,7 +10,14 @@ real quote. `channel_plan` gives you a step-by-step checklist to run by hand.
 **Drafting only. metalworks never posts.** `launch(...)` returns drafts; `channel_plan(...)`
 returns a checklist you execute yourself. Nothing here touches a network.
 
-```python
+<CodeGroup>
+
+```text Claude Code
+# uses the report you already made
+/launch-kit
+```
+
+```python Python
 from metalworks import Metalworks
 mw = Metalworks()
 research = mw.research("an affordable, jitter-free focus supplement for developers")
@@ -28,11 +35,11 @@ for step in plan.steps:
     print(step.scheduled_offset, step.surface, "—", step.action)
 ```
 
-From the CLI (`report-id` comes from `metalworks research list`):
-
-```bash
+```bash CLI
 metalworks research launch <report-id>
 ```
+
+</CodeGroup>
 
 ## What you give it / what you get back
 

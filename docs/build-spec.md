@@ -13,7 +13,14 @@ No React components, no API routes, no migrations. It carries the demand forward
 a frozen quote table — so the agent that *does* write the code can't drift from what real users
 asked for.
 
-```python
+<CodeGroup>
+
+```text Claude Code
+# uses the report you already made
+/build-spec
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()
@@ -29,13 +36,12 @@ for feature in spec.features:
 paths = mw.scaffold(spec, research, "./build", base="next-shipfast")
 ```
 
-Or do both in one command from the CLI — it derives the positioning, specs the build, and
-scaffolds the project:
-
-```bash
+```bash CLI
 # report-id comes from `metalworks research list`
 metalworks build init <report-id> --dest ./build --surface web --base next-shipfast
 ```
+
+</CodeGroup>
 
 | Flag | Default | What it does |
 | --- | --- | --- |

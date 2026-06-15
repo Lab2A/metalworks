@@ -23,7 +23,13 @@ pip install "metalworks[research,openai]"     # or [research,google], [research,
 export OPENAI_API_KEY=...                      # or ANTHROPIC_API_KEY / GOOGLE_API_KEY
 ```
 
-```python
+<CodeGroup>
+
+```text Claude Code
+/demand-report an affordable, jitter-free focus supplement for developers
+```
+
+```python Python
 from metalworks import Metalworks
 
 mw = Metalworks()                  # provider inferred from your env key
@@ -39,6 +45,8 @@ for cluster in report.ranked_clusters:
     for quote in cluster.quotes:   # the real comments behind it — nothing invented
         print("  ", quote.source_url)
 ```
+
+</CodeGroup>
 
 That's a real report grounded in real conversations you can open — see the full
 [Quickstart](/docs/quickstart).
