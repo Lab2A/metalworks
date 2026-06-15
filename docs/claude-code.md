@@ -23,8 +23,7 @@ You need [uv](https://docs.astral.sh/uv/) on your PATH. The plugin runs the meta
 server via `uvx`, which installs it into an isolated environment on first launch:
 
 ```
-uvx --from "metalworks[mcp,arctic,reddit] @ git+https://github.com/Lab2A/metalworks@main" \
-    metalworks mcp serve --transport stdio
+uvx --from "metalworks[mcp,arctic,reddit]" metalworks mcp serve --transport stdio
 ```
 
 A `SessionStart` hook **pre-warms** that environment (it runs `metalworks version` quietly when

@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "metalworks[mcp,arctic,reddit] @ git+https://github.com/Lab2A/metalworks@main",
+        "metalworks[mcp,arctic,reddit]",
         "metalworks",
         "mcp",
         "serve",
