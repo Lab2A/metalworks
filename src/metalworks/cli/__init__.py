@@ -50,12 +50,15 @@ mcp_app = typer.Typer(help="Run the metalworks MCP server.", no_args_is_help=Tru
 
 _ENV_EXAMPLE = """\
 # metalworks — secrets come from the environment ONLY (never the config file).
-# Set the key(s) for the provider you want; the CLI auto-resolves by which is present.
+# One chat key is enough; the CLI auto-resolves by which is present. Embeddings
+# need no separate key — a Google/OpenAI key is used if present, else a local
+# model (no key, bundled with [research]).
 
-# Chat model (first present wins: anthropic > openai > google):
+# Chat model (first present wins: anthropic > openai > google > openrouter):
 # ANTHROPIC_API_KEY=
 # OPENAI_API_KEY=
 # GOOGLE_API_KEY=          # or GEMINI_API_KEY
+# OPENROUTER_API_KEY=      # one key reaches 200+ models
 
 # External web search (optional; exa preferred, then tavily):
 # EXA_API_KEY=

@@ -5,16 +5,16 @@ description: "Install metalworks with one provider key and get a real demand rep
 
 ## 1. Install + set a key
 
-Install metalworks with a provider SDK, then set the key. The simplest path is OpenAI or
-Google — **one key covers both the chat model and the embeddings** the pipeline needs:
+Install metalworks with a provider SDK, then set **one** key — any provider works:
 
 ```bash
-pip install "metalworks[research,openai]"     # or [research,google]
-export OPENAI_API_KEY=...                      # chat + embeddings
+pip install "metalworks[research,openai]"     # or [research,google], [research,anthropic]
+export OPENAI_API_KEY=...                      # or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
 ```
 
-Using Anthropic? It has no embeddings API, so set a Google or OpenAI key as well
-(`export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...`). See [Installation](/docs/installation).
+Embeddings need no separate key: a Google or OpenAI key is used when present, otherwise a
+small local model (bundled with `[research]`) is downloaded once — so a single chat key,
+Anthropic or OpenRouter included, is enough. See [Installation](/docs/installation).
 
 ## 2. Your first report
 

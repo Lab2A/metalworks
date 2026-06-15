@@ -18,10 +18,21 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 | Command | Description | Keys |
 | --- | --- | --- |
 | `metalworks version` | Print the installed metalworks version. | zero-key |
-| `metalworks doctor` | Report installed extras, configured keys (from env), the store path, and connected Reddit accounts. | zero-key |
+| `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the store path, connected Reddit accounts, and actionable hints. | zero-key |
 | `metalworks init` | Create a `.metalworks/` project in the cwd (like `git init`) — a `project.json` manifest, a `config.toml`, a gitignored `corpus.db`, and a `.env.example`. Idempotent. | zero-key |
 
 **`metalworks init`** option: `--idea TEXT` — one line on what you're building (seeds the project slug).
+
+## models
+
+Inspect and set the chat/fast/embedding models.
+
+| Command | Description | Keys |
+| --- | --- | --- |
+| `metalworks models list` | Resolved chat / fast / embedding models + a provider × key × extra reachability matrix. | zero-key |
+| `metalworks models set <ref>` | Set the default chat model (writes `model` to the cwd `metalworks.toml`). | zero-key |
+| `metalworks models set-fast <ref>` | Set the fast/triage model (`fast_model`). | zero-key |
+| `metalworks models warm` | Pre-download the local embedding model so the first run isn't blocked on it. | zero-key |
 
 ## research
 
