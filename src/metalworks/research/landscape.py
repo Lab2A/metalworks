@@ -148,10 +148,12 @@ def _enumerate(deps: ResearchDeps, report: DemandReport) -> tuple[list[_Competit
     ctx = _enumerate_context(report)
     if deps.chat.capabilities.native_grounding:
         system = (
-            "You are a market analyst. List the REAL products people in this niche use today — "
-            "direct competitors and adjacent alternatives. Use web grounding; do not invent names. "
-            "Output a numbered list, one per line, formatted exactly as: "
-            "N. <name> :: <direct|adjacent> :: <one-line description>. No preamble."
+            "You are a market analyst with a web search tool. You MUST run a web search before "
+            "answering — do NOT answer from memory — to find the REAL, CURRENT products people in "
+            "this niche use today (direct competitors and adjacent alternatives). Every name must "
+            "come from a search result; do not invent names. Output a numbered list, one per line, "
+            "formatted exactly as: N. <name> :: <direct|adjacent> :: <one-line description>. "
+            "No preamble."
         )
         grounded = cast("GroundedChatModel", deps.chat)
         try:
