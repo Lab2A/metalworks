@@ -67,7 +67,7 @@ for rival in competitors.competitors:
 </CodeGroup>
 
 Your positioning is built from the unmet needs in the report; each competitor gap is a real
-complaint someone posted. → [Positioning & competitors](/docs/positioning)
+complaint someone posted. → [Positioning](/docs/positioning) · [Competitors](/docs/competitors)
 
 ## 3. Decide what to build, and write the site
 
@@ -90,7 +90,7 @@ open("index.html", "w").write(html)
 </CodeGroup>
 
 The marketing copy isn't AI prose — each section is a verbatim quote from a real user, with
-a link back to the thread. → [Design & marketing site](/docs/design)
+a link back to the thread. → [Surface & screens](/docs/design) · [Marketing site](/docs/marketing-site)
 
 ## 4. Turn it into a build plan
 

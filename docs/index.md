@@ -58,8 +58,8 @@ falls into five stages — each step is a single call:
 
 | Stage | What you get |
 | --- | --- |
-| **Research** | [Demand research](/docs/demand-research) — a go/no-go verdict + the real needs people voiced, each backed by quotes. Then [positioning & competitors](/docs/positioning) — your angle (who it's for, why it's different) and the rivals to beat. |
-| **Design** | [What to build and a marketing site](/docs/design) — the surface + screens to ship, plus a landing page whose every line is a real quote. |
+| **Research** | [Demand research](/docs/demand-research) — a go/no-go verdict + the real needs people voiced, each backed by quotes. Then your [positioning](/docs/positioning) (who it's for, why it's different) and the [competitors](/docs/competitors) to beat. |
+| **Design** | [Surface & screens](/docs/design) — what to build (web, mobile, CLI?) and the screens to ship — plus a [marketing site](/docs/marketing-site) whose every line is a real quote. |
 | **Build** | [A build spec](/docs/build-spec) — a feature plan mapped to real demand + a project scaffold your coding agent executes. |
 | **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
 | **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
