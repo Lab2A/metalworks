@@ -1433,6 +1433,71 @@ def research_landscape(
     _print_landscape(landscape)
 
 
+def _print_idea_sketch(s: object) -> None:
+    console.print(f"\n[bold]Idea[/bold] ({getattr(s, 'provenance', '')}): {getattr(s, 'idea', '')}")
+    console.print(f"  [bold]hypothesis:[/bold] {getattr(s, 'hypothesis', '')}")
+    if getattr(s, "pain", ""):
+        console.print(f"  pain: {s.pain}")  # type: ignore[attr-defined]
+    if getattr(s, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(s, 'caveat', '')}")
+
+
+def _print_ideation(r: object) -> None:
+    console.print(f"\n[bold]Ideas surfaced[/bold] from report {getattr(r, 'report_id', '')}:")
+    for s in getattr(r, "sketches", []):
+        console.print(f"  • [bold]{s.idea}[/bold] — {s.hypothesis}")
+    if getattr(r, "partial", False):
+        console.print(f"  [yellow]{getattr(r, 'caveat', '')}[/yellow]")
+
+
+@research_app.command("ideate")
+def research_ideate(
+    idea: Annotated[str | None, typer.Argument(help="A raw idea to sharpen (idea-first).")] = None,
+    from_report: Annotated[
+        str | None,
+        typer.Option("--from-report", help="Surface ideas from a stored report's forks."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
+    ] = None,
+) -> None:
+    """Frame an idea to test — idea-first (sharpen a pitch) or evidence-first (--from-report)."""
+    if not idea and not from_report:
+        err_console.print("[red]Provide an idea, or --from-report <report_id>.[/red]")
+        raise typer.Exit(code=1)
+    from metalworks.research import ideate_from_idea, ideate_from_report
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    try:
+        if from_report:
+            report = store.get_report(from_report)
+            if report is None:
+                err_console.print(f"[red]No report {from_report!r} in the local store.[/red]")
+                raise typer.Exit(code=1)
+            result: object = ideate_from_report(deps, report)
+            _print_ideation(result)
+        else:
+            assert idea is not None
+            result = ideate_from_idea(deps, idea)
+            _print_idea_sketch(result)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(result.model_dump_json(indent=2), encoding="utf-8")  # type: ignore[attr-defined]
+        console.print(f"[green]Wrote[/green] {out}")
+
+
 def _print_surface(rec: object, skeleton: object) -> None:
     console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
     console.print(

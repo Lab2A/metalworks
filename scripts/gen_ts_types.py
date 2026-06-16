@@ -63,6 +63,8 @@ from metalworks.contract import (  # noqa: E402
     FeatureSpec,
     Fork,
     GapClaim,
+    IdeaSketch,
+    IdeationResult,
     InboxItem,
     InsightCluster,
     Landscape,
@@ -138,6 +140,8 @@ MODELS: list[type[BaseModel]] = [
     Research,
     ReportSummary,
     RunSummary,
+    IdeaSketch,
+    IdeationResult,
     # landscape (Pillar A)
     StrengthClaim,
     GapClaim,

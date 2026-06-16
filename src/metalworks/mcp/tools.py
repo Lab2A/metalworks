@@ -379,6 +379,40 @@ def landscape_from_report(report_id: str, store_path: str | None = None) -> Tool
     return {"landscape": landscape.model_dump(mode="json")}
 
 
+@guard
+def ideate_from_idea(idea: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Idea-first ideation — sharpen a raw idea into a testable
+    hypothesis plus a research brief to run demand on. The front of the validate loop."""
+    from metalworks.research import ideate_from_idea as _ideate
+
+    deps = _build_deps(store_path)
+    sketch = _ideate(deps, idea)
+    return {"idea_sketch": sketch.model_dump(mode="json")}
+
+
+@guard
+def ideate_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Evidence-first ideation — surface a stored report's forks
+    (candidate wedges, else top clusters) as grounded idea sketches to pick from."""
+    from metalworks import config
+    from metalworks.research import ideate_from_report as _ideate
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    result = _ideate(deps, report)
+    return {"ideation": result.model_dump(mode="json")}
+
+
 def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
     from metalworks import config
 

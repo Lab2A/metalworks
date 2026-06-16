@@ -367,6 +367,35 @@ export interface RunSummary {
   ready_at?: string | null;
 }
 
+export interface IdeaSketch {
+  /** The idea in the user's / cluster's own words. */
+  idea: string;
+  /** The sharpened wedge/segment hypothesis, one sentence. */
+  hypothesis: string;
+  /** The specific pain this addresses. */
+  pain?: string;
+  /** Who it's for, if discernible. */
+  target_segment_hint?: string;
+  /** Which entry point produced this sketch. */
+  provenance: "idea-first" | "evidence-first";
+  /** Backing forks (evidence-first); empty for an idea-first hypothesis. */
+  evidence?: EvidenceRef[];
+  /** The brief to run demand on (idea-first); None evidence-first. */
+  brief?: ResearchBrief | null;
+  partial?: boolean;
+  caveat?: string | null;
+  /** Stable content-addressed id (``idea:<hash of idea|provenance>``). */
+  sketch_id: string;
+}
+
+export interface IdeationResult {
+  /** The report these were surfaced from. */
+  report_id?: string | null;
+  sketches?: IdeaSketch[];
+  partial?: boolean;
+  caveat?: string | null;
+}
+
 export interface StrengthClaim {
   /** A concrete strength, one clause. */
   claim: string;

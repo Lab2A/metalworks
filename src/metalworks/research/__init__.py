@@ -10,6 +10,7 @@ no provider dependencies (the heavy bits live behind the `[research]` extra).
 """
 
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
+from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
 from metalworks.research.launch import build_launch_assets, plan_channels
 from metalworks.research.marketing import content_plan_from_report
@@ -34,6 +35,8 @@ __all__ = [
     "build_ux_skeleton",
     "content_plan_from_report",
     "decide_surface",
+    "ideate_from_idea",
+    "ideate_from_report",
     "plan_channels",
     "render_site_html",
     "run_competitor_map",

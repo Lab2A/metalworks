@@ -24,6 +24,10 @@ from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
 )
+from metalworks.contract.ideate import (
+    IdeaSketch,
+    IdeationResult,
+)
 from metalworks.contract.landscape import (
     Competitor,
     CompetitorMap,
@@ -126,6 +130,8 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "EvidenceBackedChoice",
     "ExplorationReport",
     "Fork",
+    "IdeaSketch",
+    "IdeationResult",
     "SegmentChoice",
     "InsightCluster",
     "MarketSizing",

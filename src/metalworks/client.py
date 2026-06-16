@@ -27,6 +27,8 @@ if TYPE_CHECKING:
         ContentPlan,
         DemandReport,
         DiscoveryContext,
+        IdeaSketch,
+        IdeationResult,
         InboxItem,
         Landscape,
         LaunchAsset,
@@ -368,6 +370,20 @@ class Metalworks:
         from metalworks.research import run_landscape
 
         return run_landscape(self.deps, _demand(research))
+
+    def ideate(self, idea: str) -> IdeaSketch:
+        """Idea-first ideation — sharpen a raw idea into a testable hypothesis plus
+        a brief to run demand on. The front of the validate loop."""
+        from metalworks.research import ideate_from_idea
+
+        return ideate_from_idea(self.deps, idea)
+
+    def ideate_from_evidence(self, research: Research | DemandReport) -> IdeationResult:
+        """Evidence-first ideation — surface an existing report's forks (candidate
+        wedges, else top clusters) as grounded idea sketches to pick from."""
+        from metalworks.research import ideate_from_report
+
+        return ideate_from_report(self.deps, _demand(research))
 
     def surface(
         self, research: Research | DemandReport, positioning: PositioningBrief
