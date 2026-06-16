@@ -9,6 +9,7 @@ Public surface lands incrementally across M2; this package is import-safe with
 no provider dependencies (the heavy bits live behind the `[research]` extra).
 """
 
+from metalworks.research.assess import run_assessment
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
@@ -39,6 +40,7 @@ __all__ = [
     "ideate_from_report",
     "plan_channels",
     "render_site_html",
+    "run_assessment",
     "run_competitor_map",
     "run_landscape",
     "run_research",

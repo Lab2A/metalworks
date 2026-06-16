@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from metalworks.contract import (
+        Assessment,
         BuildSpec,
         ChannelPlan,
         CompetitorMap,
@@ -384,6 +385,14 @@ class Metalworks:
         from metalworks.research import ideate_from_report
 
         return ideate_from_report(self.deps, _demand(research))
+
+    def assess(self, research: Research | DemandReport, landscape: Landscape) -> Assessment:
+        """The GO / PIVOT / NO-GO verdict — a deterministic gap over demand (does the
+        pain exist) and landscape (can people already solve it). PIVOT carries a target:
+        an under-served fork the report surfaced. A partial landscape never yields GO."""
+        from metalworks.research import run_assessment
+
+        return run_assessment(self.deps, _demand(research), landscape)
 
     def surface(
         self, research: Research | DemandReport, positioning: PositioningBrief

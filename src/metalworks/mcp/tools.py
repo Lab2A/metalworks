@@ -413,6 +413,31 @@ def ideate_from_report(report_id: str, store_path: str | None = None) -> ToolRes
     return {"ideation": result.model_dump(mode="json")}
 
 
+@guard
+def assess_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). The GO/PIVOT/NO-GO verdict for a stored report —
+    runs the landscape, then the deterministic gap over demand + landscape. A partial
+    landscape never yields a hard GO (anti-confirmation)."""
+    from metalworks import config
+    from metalworks.research import run_assessment, run_landscape
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    landscape = run_landscape(deps, report)
+    assessment = run_assessment(deps, report, landscape)
+    return {"assessment": assessment.model_dump(mode="json")}
+
+
 def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
     from metalworks import config
 

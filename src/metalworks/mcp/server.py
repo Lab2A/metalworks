@@ -113,6 +113,11 @@ async def ideate_from_report(report_id: str, store_path: str | None = None) -> d
     return tools.ideate_from_report(report_id, store_path)
 
 
+async def assess_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. The GO/PIVOT/NO-GO verdict — landscape then the demand-vs-landscape gap."""
+    return tools.assess_from_report(report_id, store_path)
+
+
 async def surface_recommend(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Recommend a product surface for a stored report (chat + embedding keys, sync)."""
     return tools.surface_recommend(report_id, store_path)
@@ -215,6 +220,7 @@ _TOOL_WRAPPERS = (
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,
+    assess_from_report,
     surface_recommend,
     ux_skeleton_build,
     site_render,

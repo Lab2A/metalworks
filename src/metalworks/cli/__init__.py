@@ -1498,6 +1498,62 @@ def research_ideate(
         console.print(f"[green]Wrote[/green] {out}")
 
 
+def _print_assessment(a: object) -> None:
+    decision = str(getattr(a, "decision", ""))
+    color = {"go": "green", "pivot": "yellow", "no_go": "red"}.get(decision, "white")
+    label = decision.upper().replace("_", "-")
+    console.print(f"\n[bold {color}]{label}[/bold {color}] — report {getattr(a, 'report_id', '')}")
+    gap = getattr(a, "gap", None)
+    if gap is not None:
+        console.print(f"  demand: {gap.demand_strength} · saturation: {gap.landscape_saturation}")
+    console.print(f"  {getattr(a, 'rationale', '')}")
+    pt = getattr(a, "pivot_target", None)
+    if pt is not None:
+        console.print(f"  [bold]pivot →[/bold] {pt.kind} {pt.target_id}: {pt.why}")
+    if getattr(a, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(a, 'caveat', '')}")
+
+
+@research_app.command("assess")
+def research_assess(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the assessment JSON here.")
+    ] = None,
+) -> None:
+    """Verdict: GO / PIVOT / NO-GO — the deterministic gap over demand + landscape."""
+    from metalworks.research import run_assessment, run_landscape
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Assessing[/bold] report {report_id} (landscape → verdict)...")
+    try:
+        landscape = run_landscape(deps, report)
+        assessment = run_assessment(deps, report, landscape)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(assessment.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote assessment[/green] {out}")
+    _print_assessment(assessment)
+
+
 def _print_surface(rec: object, skeleton: object) -> None:
     console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
     console.print(

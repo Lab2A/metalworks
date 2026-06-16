@@ -4,6 +4,7 @@
 
 export type Fork = "product_pinned" | "demographic_pinned" | "both";
 export type SignalStrength = "low" | "medium" | "high";
+export type Decision = "go" | "pivot" | "no_go";
 
 export interface EvidenceRef {
   /** Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
@@ -473,6 +474,48 @@ export interface Landscape {
   partial?: boolean;
   /** What to treat as lower-confidence. */
   caveat?: string | null;
+}
+
+export interface GapAnalysis {
+  /** From distinct-author breadth. */
+  demand_strength: SignalStrength;
+  /** The demand-strength sentence (from derive_verdict). */
+  demand_summary: string;
+  /** How crowded the supply is — competitors + existing solutions. */
+  landscape_saturation: SignalStrength;
+  /** The under-served fork's label, when one exists to pivot to. */
+  open_wedge?: string | null;
+  /** One line: why these signals imply the decision. */
+  reasoning?: string;
+}
+
+export interface PivotTarget {
+  /** Which kind of fork to pivot to. */
+  kind: "segment" | "wedge";
+  /** A real SegmentChoice / CandidateWedge id in the report. */
+  target_id: string;
+  /** Why this fork is the better bet. */
+  why?: string;
+}
+
+export interface Assessment {
+  /** Stable id (derived from report_id). */
+  assessment_id: string;
+  /** The DemandReport this verdict was computed from. */
+  report_id: string;
+  /** GO | PIVOT | NO_GO — deterministic from the gap. */
+  decision: Decision;
+  /** Human-facing argument for the decision (LLM prose). */
+  rationale: string;
+  /** The computed demand-vs-landscape gap. */
+  gap: GapAnalysis;
+  /** Where to aim instead — set iff decision == PIVOT. */
+  pivot_target?: PivotTarget | null;
+  /** Backing forks for the verdict. */
+  evidence?: EvidenceRef[];
+  partial?: boolean;
+  caveat?: string | null;
+  generated_at: string;
 }
 
 export interface WedgeClaim {

@@ -34,6 +34,7 @@ _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "src"))
 
 from metalworks.contract import (  # noqa: E402
+    Assessment,
     AudienceAttribute,
     AudienceProfile,
     BuildPersona,
@@ -51,6 +52,7 @@ from metalworks.contract import (  # noqa: E402
     ContentPlan,
     CorpusStats,
     CrossReference,
+    Decision,
     DemandReport,
     DesignBrief,
     DiscoveryContext,
@@ -62,6 +64,7 @@ from metalworks.contract import (  # noqa: E402
     FaqItem,
     FeatureSpec,
     Fork,
+    GapAnalysis,
     GapClaim,
     IdeaSketch,
     IdeationResult,
@@ -75,6 +78,7 @@ from metalworks.contract import (  # noqa: E402
     Opportunity,
     Persona,
     PersonaSet,
+    PivotTarget,
     PositioningBrief,
     PostLintVerdict,
     PriceEvidence,
@@ -109,6 +113,7 @@ from metalworks.contract import (  # noqa: E402
 ENUMS: list[type[enum.Enum]] = [
     Fork,
     SignalStrength,
+    Decision,
 ]
 
 # Models to emit, in dependency order (leaves first).
@@ -149,6 +154,10 @@ MODELS: list[type[BaseModel]] = [
     CompetitorMap,
     ExistingSolution,
     Landscape,
+    # assess (GO / PIVOT / NO-GO)
+    GapAnalysis,
+    PivotTarget,
+    Assessment,
     # positioning (Pillar B)
     WedgeClaim,
     PriceHypothesis,
