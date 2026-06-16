@@ -140,6 +140,8 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
         "reddit": "metalworks.research.sources.arctic",
         "arctic": "metalworks.research.sources.arctic",
         "hackernews": "metalworks.research.sources.hackernews",
+        "hackernews_archive": "metalworks.research.sources.hn_archive",
+        "hn_archive": "metalworks.research.sources.hn_archive",
         "web": "metalworks.research.sources.web",
     }
     if source_id not in SOURCES and source_id in _BUILTIN_MODULES:
