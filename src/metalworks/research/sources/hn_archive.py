@@ -37,6 +37,7 @@ import contextlib
 import hashlib
 import html
 import logging
+import os
 import re
 import time as _time
 from collections import deque
@@ -174,12 +175,18 @@ class HackerNewsArchiveReader:
     def _is_remote(self) -> bool:
         return "://" in self._data_root and not self._data_root.startswith("file://")
 
+    def _remote_reads(self) -> bool:
+        """Whether reads go over the network (so httpfs must be loaded). The
+        Supabase-mirror subclass returns True even though ``data_root`` is unset —
+        its month files resolve to signed ``https://`` URLs."""
+        return self._is_remote()
+
     def _connection(self) -> Any:
         if self._con is not None:
             return self._con
         duckdb = self._duckdb()
         con: Any = duckdb.connect(":memory:")
-        if self._is_remote():
+        if self._remote_reads():
             con.execute("INSTALL httpfs;")
             con.execute("LOAD httpfs;")
             if self._hf_token:
@@ -187,6 +194,10 @@ class HackerNewsArchiveReader:
                     con.execute(
                         "CREATE SECRET hf_token (TYPE huggingface, TOKEN ?);", [self._hf_token]
                     )
+            # Signed-URL reads at scale touch many objects; loosen the httpfs
+            # defaults so one slow object can't strand a query.
+            con.execute("SET http_timeout = 120000;")
+            con.execute("SET http_retries = 5;")
         con.execute(f"SET memory_limit = '{self._memory_limit_gb}GB';")
         con.execute("SET errors_as_json = true;")
         self._con = con
@@ -259,7 +270,10 @@ class HackerNewsArchiveReader:
                 ors.append("lower(coalesce(text, '')) LIKE ?")
                 params.extend([f"%{t}%", f"%{t}%"])
             where.append("(" + " OR ".join(ors) + ")")
-        cols = 'id, "by", time, text, url, score, title, descendants'
+        # Read `time` as an epoch (not a TIMESTAMP) so DuckDB never does a
+        # Python timestamp conversion (which would require pytz); _ts_to_dt
+        # turns the epoch back into a datetime.
+        cols = 'id, "by", epoch("time") AS "time", text, url, score, title, descendants'
         limit_clause = f"LIMIT {int(limit)}" if limit else ""
         sql = (
             f"SELECT {cols} FROM read_parquet({arr}, union_by_name=true) "
@@ -328,7 +342,8 @@ class HackerNewsArchiveReader:
             for chunk in _chunked(level, _ID_CHUNK):
                 ph = ", ".join("?" for _ in chunk)
                 sql = (
-                    'SELECT id, "by", time, text, parent, kids, type, dead, deleted '
+                    'SELECT id, "by", epoch("time") AS "time", text, parent, kids, '
+                    "type, dead, deleted "
                     f"FROM read_parquet({arr}, union_by_name=true) WHERE id IN ({ph})"
                 )
                 cur: Any = con.execute(sql, list(chunk))
@@ -457,7 +472,121 @@ class HackerNewsArchiveSource:
         return SourceWindow(months=(anchor,))
 
 
+# ── Supabase mirror reader ───────────────────────────────────────────────────
+
+DEFAULT_MIRROR_BUCKET = "hackernews-mirror"
+DEFAULT_SIGNED_URL_TTL = 3600
+_SIGN_BATCH = 500
+_LIST_LIMIT = 100000
+
+
+class HackerNewsArchiveMirrorReader(HackerNewsArchiveReader):
+    """Reads the HN archive from a Supabase Storage mirror — the HN analogue of
+    :class:`~metalworks.research.arctic.mirror_reader.ArcticMirrorReader`.
+
+    Months come from the ``hackernews_pulls`` table (``status='complete'``); each
+    month's Parquet shards live under ``<YYYY>/<MM>/`` in a private bucket, are
+    listed + batch-signed to URLs, and read over httpfs. Everything else — the
+    keyword story pull and the offline comment-tree walk — runs unchanged against
+    the signed URLs (this only overrides how a month resolves to files).
+
+    Config (constructor args win over env): ``SUPABASE_URL`` /
+    ``SUPABASE_SERVICE_ROLE_KEY``, ``HN_ARCHIVE_MIRROR_BUCKET`` (default
+    ``hackernews-mirror``), ``HN_ARCHIVE_SIGNED_URL_TTL`` seconds. Needs the
+    ``supabase`` extra.
+    """
+
+    def __init__(
+        self,
+        *,
+        bucket: str | None = None,
+        signed_url_ttl: int | None = None,
+        memory_limit_gb: int = 4,
+        client: Any = None,
+    ) -> None:
+        super().__init__(memory_limit_gb=memory_limit_gb, probe_sleep_s=0.0)
+        self._bucket = bucket or os.environ.get("HN_ARCHIVE_MIRROR_BUCKET") or DEFAULT_MIRROR_BUCKET
+        self._ttl = (
+            signed_url_ttl
+            if signed_url_ttl is not None
+            else int(os.environ.get("HN_ARCHIVE_SIGNED_URL_TTL") or DEFAULT_SIGNED_URL_TTL)
+        )
+        self._sb = client
+
+    def _remote_reads(self) -> bool:
+        return True
+
+    def _supabase(self) -> Any:
+        if self._sb is not None:
+            return self._sb
+        try:
+            from supabase import create_client
+        except ImportError as exc:  # pragma: no cover - exercised via MissingExtra test
+            raise MissingExtraError("supabase", package="supabase") from exc
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        if not url or not key:
+            raise RuntimeError(
+                "HackerNewsArchiveMirrorReader needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY"
+            )
+        self._sb = create_client(url, key)
+        return self._sb
+
+    def latest_available_month(self) -> MonthRef:
+        sb: Any = self._supabase()
+        resp: Any = (
+            sb.table("hackernews_pulls")
+            .select("year,month")
+            .eq("status", "complete")
+            .order("year", desc=True)
+            .order("month", desc=True)
+            .limit(1)
+            .execute()
+        )
+        rows: list[Any] = list(getattr(resp, "data", None) or [])
+        if not rows:
+            raise RuntimeError(
+                "HackerNewsArchiveMirrorReader: no complete months in hackernews_pulls"
+            )
+        top = rows[0]
+        return MonthRef(int(top["year"]), int(top["month"]))
+
+    def _existing_month_files(self, months: Sequence[MonthRef]) -> list[str]:
+        """List each month's shards in the bucket and batch-sign them to URLs."""
+        sb: Any = self._supabase()
+        paths: list[str] = []
+        for m in months:
+            prefix = f"{m.year:04d}/{m.month:02d}"
+            entries: list[Any] = list(
+                sb.storage.from_(self._bucket).list(prefix, {"limit": _LIST_LIMIT}) or []
+            )
+            paths.extend(
+                sorted(
+                    f"{prefix}/{e['name']}"
+                    for e in entries
+                    if str(e.get("name", "")).endswith(".parquet")
+                )
+            )
+        if not paths:
+            return []
+        urls: list[str] = []
+        for i in range(0, len(paths), _SIGN_BATCH):
+            chunk: list[str] = paths[i : i + _SIGN_BATCH]
+            batch: list[Any] = list(
+                sb.storage.from_(self._bucket).create_signed_urls(chunk, self._ttl) or []
+            )
+            for item in batch:
+                signed = item.get("signedURL") if hasattr(item, "get") else item["signedURL"]
+                if signed:
+                    urls.append(str(signed))
+        return urls
+
+
 def _factory(**kwargs: Any) -> HackerNewsArchiveSource:
+    # Opt into the Supabase mirror with HN_ARCHIVE_SOURCE=mirror (when no explicit
+    # reader is passed) — the HN analogue of ARCTIC_SHIFT_SOURCE=mirror.
+    if "reader" not in kwargs and os.environ.get("HN_ARCHIVE_SOURCE", "").lower() == "mirror":
+        kwargs["reader"] = HackerNewsArchiveMirrorReader()
     return HackerNewsArchiveSource(**kwargs)
 
 
@@ -466,4 +595,8 @@ register_source("hackernews_archive", _factory)
 register_source("hn_archive", _factory)
 
 
-__all__ = ["HackerNewsArchiveReader", "HackerNewsArchiveSource"]
+__all__ = [
+    "HackerNewsArchiveMirrorReader",
+    "HackerNewsArchiveReader",
+    "HackerNewsArchiveSource",
+]
