@@ -4,6 +4,7 @@
 
 export type Fork = "product_pinned" | "demographic_pinned" | "both";
 export type SignalStrength = "low" | "medium" | "high";
+export type Decision = "go" | "pivot" | "no_go";
 
 export interface EvidenceRef {
   /** Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
@@ -101,12 +102,55 @@ export interface AudienceProfile {
   caveat?: string | null;
 }
 
-export interface AudienceSegment {
+export interface EvidenceBackedChoice {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
+}
+
+export interface SegmentChoice {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
   name: string;
   profile: AudienceProfile;
   preferences?: string[];
-  demand_score: number;
-  distinct_author_count: number;
+  demand_score?: number;
+  distinct_author_count?: number;
+  /** id -> author-set Jaccard vs other segments; near 1.0 ⇒ NOT distinct. */
+  overlap?: Record<string, number>;
+  /** Stable content-addressed fork id (``s:<hash of name|evidence ids>``). */
+  id: string;
+}
+
+export interface CandidateWedge {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
+  label: string;
+  /** The specific complaint it kills (echoes a cluster claim). */
+  pain?: string;
+  scope?: "minimal" | "broad" | "lateral";
+  /** The SegmentChoice.id it serves, if segment-specific. */
+  segment_id?: string | null;
+  effort?: "S" | "M" | "L" | "XL" | null;
+  /** Ranks of the InsightClusters this draws on. */
+  cluster_ranks?: number[];
+  /** authors + domains, as on InsightCluster. */
+  breadth_count?: number;
+  breadth_unit?: string;
+  distinct_author_count?: number;
+  /** Stable content-addressed fork id (``w:<hash of pain|scope>``). */
+  id: string;
 }
 
 export interface PriceEvidence {
@@ -273,7 +317,12 @@ export interface DemandReport {
   verdict?: string | null;
   slot_plan?: SlotPlan | null;
   audience_profile?: AudienceProfile | null;
-  segments?: AudienceSegment[];
+  segments?: SegmentChoice[];
+  candidate_wedges?: CandidateWedge[];
+  /** Set by a surface when the user picks a segment. None ⇒ engine surfaced the fork but nothing chosen yet; deterministic callers read `default_segment`. */
+  chosen_segment_id?: string | null;
+  /** Picked wedge id, else None. */
+  chosen_wedge_id?: string | null;
   market_sizing?: MarketSizing | null;
   price_finding?: PriceFinding | null;
   source_map?: SourceMapEntry[];
@@ -291,6 +340,9 @@ export interface Research {
   demand: DemandReport;
   competitors?: CompetitorMap | null;
   positioning?: PositioningBrief | null;
+  landscape?: Landscape | null;
+  assessment?: Assessment | null;
+  ideation?: IdeaSketch | null;
 }
 
 export interface ReportSummary {
@@ -317,6 +369,35 @@ export interface RunSummary {
   created_at: string;
   generated_at?: string | null;
   ready_at?: string | null;
+}
+
+export interface IdeaSketch {
+  /** The idea in the user's / cluster's own words. */
+  idea: string;
+  /** The sharpened wedge/segment hypothesis, one sentence. */
+  hypothesis: string;
+  /** The specific pain this addresses. */
+  pain?: string;
+  /** Who it's for, if discernible. */
+  target_segment_hint?: string;
+  /** Which entry point produced this sketch. */
+  provenance: "idea-first" | "evidence-first";
+  /** Backing forks (evidence-first); empty for an idea-first hypothesis. */
+  evidence?: EvidenceRef[];
+  /** The brief to run demand on (idea-first); None evidence-first. */
+  brief?: ResearchBrief | null;
+  partial?: boolean;
+  caveat?: string | null;
+  /** Stable content-addressed id (``idea:<hash of idea|provenance>``). */
+  sketch_id: string;
+}
+
+export interface IdeationResult {
+  /** The report these were surfaced from. */
+  report_id?: string | null;
+  sketches?: IdeaSketch[];
+  partial?: boolean;
+  caveat?: string | null;
 }
 
 export interface StrengthClaim {
@@ -363,6 +444,107 @@ export interface CompetitorMap {
   partial?: boolean;
   /** What to treat as lower-confidence. */
   caveat?: string | null;
+}
+
+export interface ExistingSolution {
+  /** The product name. */
+  name: string;
+  /** Resolvable link to the product. */
+  url?: string;
+  /** The product's one-line pitch, when available. */
+  tagline?: string;
+  /** Source-native traction signal (e.g. PH votes). */
+  traction?: number;
+  /** Where it was found: producthunt | web. */
+  source?: string;
+  /** Demand-cluster ranks this product speaks to. */
+  addresses_clusters?: number[];
+  /** The cluster ref this product was matched against. */
+  evidence: EvidenceRef;
+}
+
+export interface Landscape {
+  /** Stable id for this landscape (derived from report_id). */
+  landscape_id: string;
+  /** The DemandReport this landscape was derived from. */
+  report_id: string;
+  /** The grounded competitor map (Pillar A core). */
+  competitor_map: CompetitorMap;
+  /** Real shipped products, grounded to demand clusters. */
+  existing_solutions?: ExistingSolution[];
+  generated_at: string;
+  /** True when either half degraded. */
+  partial?: boolean;
+  /** What to treat as lower-confidence. */
+  caveat?: string | null;
+}
+
+export interface GapAnalysis {
+  /** From distinct-author breadth. */
+  demand_strength: SignalStrength;
+  /** The demand-strength sentence (from derive_verdict). */
+  demand_summary: string;
+  /** How crowded the supply is — competitors + existing solutions. */
+  landscape_saturation: SignalStrength;
+  /** The under-served fork's label, when one exists to pivot to. */
+  open_wedge?: string | null;
+  /** One line: why these signals imply the decision. */
+  reasoning?: string;
+}
+
+export interface PivotTarget {
+  /** Which kind of fork to pivot to. */
+  kind: "segment" | "wedge";
+  /** A real SegmentChoice / CandidateWedge id in the report. */
+  target_id: string;
+  /** Why this fork is the better bet. */
+  why?: string;
+}
+
+export interface Assessment {
+  /** Stable id (derived from report_id). */
+  assessment_id: string;
+  /** The DemandReport this verdict was computed from. */
+  report_id: string;
+  /** GO | PIVOT | NO_GO — deterministic from the gap. */
+  decision: Decision;
+  /** Human-facing argument for the decision (LLM prose). */
+  rationale: string;
+  /** The computed demand-vs-landscape gap. */
+  gap: GapAnalysis;
+  /** Where to aim instead — set iff decision == PIVOT. */
+  pivot_target?: PivotTarget | null;
+  /** Backing forks for the verdict. */
+  evidence?: EvidenceRef[];
+  partial?: boolean;
+  caveat?: string | null;
+  generated_at: string;
+}
+
+export interface DecisionLogEntry {
+  /** 1-based round number. */
+  iteration: number;
+  /** The idea this round tested. */
+  idea: string;
+  /** The verdict for this round. */
+  decision: Decision;
+  /** Forks/ideas this round eliminated — the anti-repeat memory. */
+  ruled_out?: string[];
+  /** One-line reasoning for the verdict. */
+  why?: string;
+  /** True if this round ran a fresh corpus pull; False if it reused the corpus (a PIVOT to a fork already in the report needs no re-pull). */
+  fresh_pull?: boolean;
+}
+
+export interface ValidationResult {
+  /** Why the loop stopped. */
+  outcome: "go" | "no_go" | "exhausted";
+  /** The last round's GO/PIVOT/NO-GO verdict. */
+  final_assessment?: Assessment | null;
+  /** One entry per round. */
+  decision_log?: DecisionLogEntry[];
+  /** Rounds run. */
+  iterations?: number;
 }
 
 export interface WedgeClaim {

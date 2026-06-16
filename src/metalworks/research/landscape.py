@@ -39,12 +39,14 @@ from metalworks.contract import (
     SignalStrength,
     StrengthClaim,
 )
+from metalworks.contract.landscape import ExistingSolution, Landscape
 from metalworks.errors import GroundingUnavailable
 from metalworks.research.web import parse_numbered_findings
 
 if TYPE_CHECKING:
     from metalworks.llm.protocol import GroundedChatModel, GroundedResult, GroundingSupport
     from metalworks.research.deps import ResearchDeps
+    from metalworks.research.sources import ItemSource
 
 # Bounds (the re-plan's "cap N, bound the pull"): keep the call count + latency
 # predictable so the synchronous surface stays responsive.
@@ -146,10 +148,12 @@ def _enumerate(deps: ResearchDeps, report: DemandReport) -> tuple[list[_Competit
     ctx = _enumerate_context(report)
     if deps.chat.capabilities.native_grounding:
         system = (
-            "You are a market analyst. List the REAL products people in this niche use today — "
-            "direct competitors and adjacent alternatives. Use web grounding; do not invent names. "
-            "Output a numbered list, one per line, formatted exactly as: "
-            "N. <name> :: <direct|adjacent> :: <one-line description>. No preamble."
+            "You are a market analyst with a web search tool. You MUST run a web search before "
+            "answering — do NOT answer from memory — to find the REAL, CURRENT products people in "
+            "this niche use today (direct competitors and adjacent alternatives). Every name must "
+            "come from a search result; do not invent names. Output a numbered list, one per line, "
+            "formatted exactly as: N. <name> :: <direct|adjacent> :: <one-line description>. "
+            "No preamble."
         )
         grounded = cast("GroundedChatModel", deps.chat)
         try:
@@ -332,4 +336,107 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
         generated_at=deps.clock(),
         partial=partial,
         caveat=caveat,
+    )
+
+
+# ── existing-solutions scan (empirical product pull, matched to clusters) ─────
+
+_MAX_EXISTING = 8
+_EXISTING_MATCH_THRESHOLD = 0.45  # cosine floor for a product↔cluster match
+
+
+def _existing_solutions(
+    deps: ResearchDeps, report: DemandReport, source: ItemSource | None
+) -> tuple[list[ExistingSolution], bool]:
+    """Pull real shipped products and keep those that map to a demand cluster.
+
+    Returns ``(solutions, ok)``; ``ok=False`` marks a degrade (no product source
+    / token, or embeddings unavailable). A product matched to no cluster is
+    dropped — grounded, not guessed.
+    """
+    if not report.ranked_clusters:
+        return [], True  # nothing to ground against; not a failure
+    if source is None:
+        try:
+            from metalworks.research.sources import get_source
+
+            source = get_source("producthunt")
+        except Exception:
+            return [], False  # no token / source unavailable
+
+    from metalworks.research.sources import SourceWindow
+
+    window = SourceWindow(start=report.date_range_start, end=report.date_range_end)
+    try:
+        records = list(source.pull(query=report.query, window=window))
+    except Exception:
+        return [], False
+    if not records:
+        return [], True
+
+    from metalworks.stores.vectors import cosine_topk
+
+    cluster_texts = {f"c{c.rank}": c.claim for c in report.ranked_clusters}
+    cl_ids = list(cluster_texts)
+    try:
+        cl_vecs = deps.embeddings.embed([cluster_texts[i] for i in cl_ids], task="document")
+        prod_texts = [f"{r.title} {r.text}".strip() for r in records]
+        prod_vecs = deps.embeddings.embed(prod_texts, task="document")
+    except Exception:  # embeddings down or numpy ([research] extra) absent
+        return [], False
+    vectors = {cl_ids[i]: cl_vecs[i] for i in range(len(cl_ids))}
+
+    solutions: list[ExistingSolution] = []
+    for rec, pvec in zip(records, prod_vecs, strict=True):
+        top = cosine_topk(pvec, vectors, 1)
+        if not top or top[0][1] < _EXISTING_MATCH_THRESHOLD:
+            continue  # no cluster match → dropped
+        rank = int(top[0][0][1:])  # "c<rank>" → rank
+        tagline = str(rec.extra.get("tagline", ""))
+        solutions.append(
+            ExistingSolution(
+                name=rec.title or "Unknown product",
+                url=rec.url,
+                tagline=str(tagline),
+                traction=rec.engagement,
+                source=rec.source,
+                addresses_clusters=[rank],
+                evidence=EvidenceRef(kind="cluster", cluster_rank=rank),
+            )
+        )
+        if len(solutions) >= _MAX_EXISTING:
+            break
+    return solutions, True
+
+
+def run_landscape(
+    deps: ResearchDeps, report: DemandReport, *, existing_source: ItemSource | None = None
+) -> Landscape:
+    """Pillar A (thick) — the competitor map PLUS an empirical existing-solutions scan.
+
+    Wraps :func:`run_competitor_map` (competitors + status-quo) and adds real
+    shipped products (Product Hunt by default) matched to the report's demand
+    clusters. ``existing_source`` is injectable for tests; in production it
+    resolves the Product Hunt source. Degrades honestly: a missing token or
+    source leaves the competitor map intact and marks ``partial``.
+    """
+    cmap = run_competitor_map(deps, report)
+    solutions, ok = _existing_solutions(deps, report, existing_source)
+
+    caveats: list[str] = []
+    if cmap.caveat:
+        caveats.append(cmap.caveat)
+    if not ok:
+        caveats.append(
+            "Existing-solutions scan unavailable (no product source / token, or embeddings off) — "
+            "competitors and the status-quo cost still hold."
+        )
+    return Landscape(
+        landscape_id=f"ls:{report.report_id}",
+        report_id=report.report_id,
+        competitor_map=cmap,
+        existing_solutions=solutions,
+        generated_at=deps.clock(),
+        partial=cmap.partial or not ok,
+        caveat=" ".join(caveats) or None,
     )

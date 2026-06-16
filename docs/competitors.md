@@ -62,8 +62,17 @@ the "do nothing" alternative (always grounded in your report's strongest pains) 
 flags the rest with `partial=True` and a caveat telling you the named set is unverified.
 You're never handed a confident-looking map built on invented rivals.
 
+## The fuller picture: landscape
+
+The competitor map is the lean "who are the rivals." For the full **"what exists today"** —
+the competitor map **plus** an empirical scan of real shipped products (Product Hunt launches and
+web), each matched to a demand cluster with its traction — use `landscape()` instead. That's the
+supply side the [validation loop](/docs/validation-loop) weighs against demand to reach a
+GO / PIVOT / NO-GO call.
+
 ## Next
 
-You know the landscape. Now decide what to build and write the site:
-→ [Surface & screens](/docs/design) · [Marketing site](/docs/marketing-site) ·
-[the full walkthrough](/docs/walkthrough) · [why you can trust the output](/docs/how-it-works)
+You know the landscape. Decide whether it's worth building with the
+[validation loop](/docs/validation-loop), or move to what to build:
+→ [Validation loop](/docs/validation-loop) · [Surface & screens](/docs/design) ·
+[Marketing site](/docs/marketing-site) · [why you can trust the output](/docs/how-it-works)

@@ -2,7 +2,7 @@
   "name": "metalworks",
   "displayName": "metalworks",
   "description": "Reddit demand reports, thread discovery, and gated reply drafting. The data tools run with no API keys; the pipeline tools use whatever provider key you have.",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "author": {
     "name": "Lab2A",
     "email": "hello@lab2a.dev"

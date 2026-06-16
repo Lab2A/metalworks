@@ -23,8 +23,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from metalworks.contract.assess import Assessment
 from metalworks.contract.evidence import EvidenceRecord
-from metalworks.contract.landscape import CompetitorMap
+from metalworks.contract.ideate import IdeaSketch
+from metalworks.contract.landscape import CompetitorMap, Landscape
 from metalworks.contract.positioning import PositioningBrief
 from metalworks.contract.research import DemandReport
 
@@ -43,6 +45,9 @@ class Research(BaseModel):
     demand: DemandReport
     competitors: CompetitorMap | None = None
     positioning: PositioningBrief | None = None
+    landscape: Landscape | None = None
+    assessment: Assessment | None = None
+    ideation: IdeaSketch | None = None
 
     @property
     def evidence(self) -> list[EvidenceRecord]:

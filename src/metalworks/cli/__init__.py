@@ -1379,6 +1379,228 @@ def research_competitor_map(
     _print_competitor_map(cmap)
 
 
+def _print_landscape(landscape: object) -> None:
+    _print_competitor_map(getattr(landscape, "competitor_map", None))
+    sols = getattr(landscape, "existing_solutions", [])
+    if sols:
+        console.print("\n[bold]Existing solutions[/bold] (real shipped products):")
+        for s in sols:
+            tag = f" — {s.tagline}" if getattr(s, "tagline", "") else ""
+            console.print(f"  [bold]{s.name}[/bold] ({s.source}, {s.traction} traction){tag}")
+    if getattr(landscape, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(landscape, 'caveat', '')}")
+
+
+@research_app.command("landscape")
+def research_landscape(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the landscape JSON here.")
+    ] = None,
+) -> None:
+    """Map the full landscape: competitors + existing solutions + cost of doing nothing."""
+    from metalworks.research import run_landscape
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Mapping landscape[/bold] for report {report_id}...")
+    try:
+        landscape = run_landscape(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(landscape.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote landscape[/green] {out}")
+    _print_landscape(landscape)
+
+
+def _print_idea_sketch(s: object) -> None:
+    console.print(f"\n[bold]Idea[/bold] ({getattr(s, 'provenance', '')}): {getattr(s, 'idea', '')}")
+    console.print(f"  [bold]hypothesis:[/bold] {getattr(s, 'hypothesis', '')}")
+    if getattr(s, "pain", ""):
+        console.print(f"  pain: {s.pain}")  # type: ignore[attr-defined]
+    if getattr(s, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(s, 'caveat', '')}")
+
+
+def _print_ideation(r: object) -> None:
+    console.print(f"\n[bold]Ideas surfaced[/bold] from report {getattr(r, 'report_id', '')}:")
+    for s in getattr(r, "sketches", []):
+        console.print(f"  • [bold]{s.idea}[/bold] — {s.hypothesis}")
+    if getattr(r, "partial", False):
+        console.print(f"  [yellow]{getattr(r, 'caveat', '')}[/yellow]")
+
+
+@research_app.command("ideate")
+def research_ideate(
+    idea: Annotated[str | None, typer.Argument(help="A raw idea to sharpen (idea-first).")] = None,
+    from_report: Annotated[
+        str | None,
+        typer.Option("--from-report", help="Surface ideas from a stored report's forks."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
+    ] = None,
+) -> None:
+    """Frame an idea to test — idea-first (sharpen a pitch) or evidence-first (--from-report)."""
+    if not idea and not from_report:
+        err_console.print("[red]Provide an idea, or --from-report <report_id>.[/red]")
+        raise typer.Exit(code=1)
+    from metalworks.research import ideate_from_idea, ideate_from_report
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    try:
+        if from_report:
+            report = store.get_report(from_report)
+            if report is None:
+                err_console.print(f"[red]No report {from_report!r} in the local store.[/red]")
+                raise typer.Exit(code=1)
+            result: object = ideate_from_report(deps, report)
+            _print_ideation(result)
+        else:
+            assert idea is not None
+            result = ideate_from_idea(deps, idea)
+            _print_idea_sketch(result)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(result.model_dump_json(indent=2), encoding="utf-8")  # type: ignore[attr-defined]
+        console.print(f"[green]Wrote[/green] {out}")
+
+
+def _print_assessment(a: object) -> None:
+    decision = str(getattr(a, "decision", ""))
+    color = {"go": "green", "pivot": "yellow", "no_go": "red"}.get(decision, "white")
+    label = decision.upper().replace("_", "-")
+    console.print(f"\n[bold {color}]{label}[/bold {color}] — report {getattr(a, 'report_id', '')}")
+    gap = getattr(a, "gap", None)
+    if gap is not None:
+        console.print(f"  demand: {gap.demand_strength} · saturation: {gap.landscape_saturation}")
+    console.print(f"  {getattr(a, 'rationale', '')}")
+    pt = getattr(a, "pivot_target", None)
+    if pt is not None:
+        console.print(f"  [bold]pivot →[/bold] {pt.kind} {pt.target_id}: {pt.why}")
+    if getattr(a, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(a, 'caveat', '')}")
+
+
+@research_app.command("assess")
+def research_assess(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the assessment JSON here.")
+    ] = None,
+) -> None:
+    """Verdict: GO / PIVOT / NO-GO — the deterministic gap over demand + landscape."""
+    from metalworks.research import run_assessment, run_landscape
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Assessing[/bold] report {report_id} (landscape → verdict)...")
+    try:
+        landscape = run_landscape(deps, report)
+        assessment = run_assessment(deps, report, landscape)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(assessment.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote assessment[/green] {out}")
+    _print_assessment(assessment)
+
+
+def _print_validation(v: object) -> None:
+    outcome = str(getattr(v, "outcome", ""))
+    color = {"go": "green", "no_go": "red", "exhausted": "yellow"}.get(outcome, "white")
+    console.print(
+        f"\n[bold {color}]{outcome.upper()}[/bold {color}] after "
+        f"{getattr(v, 'iterations', 0)} round(s)"
+    )
+    for e in getattr(v, "decision_log", []):
+        console.print(f"  {e.iteration}. [{e.decision}] {e.idea} — {e.why}")
+
+
+@research_app.command("validate")
+def research_validate(
+    idea: Annotated[str, typer.Argument(help="The idea to run through the validate loop.")],
+    max_iterations: Annotated[
+        int, typer.Option("--max-iterations", help="Loop cap before 'exhausted'.")
+    ] = 4,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
+    ] = None,
+) -> None:
+    """Run the validate loop (--auto): ideate → demand → landscape → assess, looping on PIVOT."""
+    from metalworks.research import validate as run_validate
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Validating[/bold] '{idea}' (auto loop, ≤{max_iterations} rounds)...")
+    try:
+        result = run_validate(deps, idea, max_iterations=max_iterations)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote result[/green] {out}")
+    _print_validation(result)
+
+
 def _print_surface(rec: object, skeleton: object) -> None:
     console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
     console.print(

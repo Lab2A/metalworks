@@ -1,6 +1,6 @@
 ---
 title: "Claude Code plugin"
-description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 26 tools and a hard posting gate."
+description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 31 tools and a hard posting gate."
 ---
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
@@ -9,7 +9,7 @@ report the library produces — every claim linked to a real quote you can open 
 then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls
-one or more of its 26 tools. The commands chain through a stored demand report, exactly like the
+one or more of its 31 tools. The commands chain through a stored demand report, exactly like the
 [CLI](/docs/cli) — see [Projects & memory](/docs/projects) for how that state persists.
 
 ## Install
@@ -52,6 +52,15 @@ Each command runs one step of the [end-to-end workflow](/docs/walkthrough). Star
 - **`/demand-report <idea>`** — is there real demand? Runs the pipeline (`research_plan_brief` → `research_start` → poll `research_status` → `research_result`), or a zero-key Arctic-corpus path if no key is set. Returns a go/no-go plus ranked demand clusters with distinct-author counts and verbatim, permalinked quotes. Research only — never posts.
 - **`/position-wedge`** — turns the report into a Dunford wedge (competitive alternative, unique attribute, value, beachhead, category) + a price band. Calls `positioning_from_report`. Every slot resolves to a real quote; if nothing defensible survives, it says so rather than inventing one.
 - **`/competitor-map`** — direct / adjacent / status-quo rivals, each gap backed by a cited complaint, severity derived from distinct-author counts. Calls `competitor_map_from_report`. Leads with the "do nothing" alternative.
+
+### Validation loop
+
+Frame an idea, weigh demand against what already exists, get an honest build/don't-build call. See the [validation loop](/docs/validation-loop).
+
+- **`/ideate <idea>`** — sharpen a raw idea into a testable hypothesis + a brief to run demand on (idea-first), or surface a report's under-served forks as grounded sketches to pick from (evidence-first). Calls `ideate_from_idea` / `ideate_from_report`.
+- **`/market-landscape`** — the full "what exists today": the competitor map **plus** an empirical scan of real shipped products, each matched to a demand cluster. Calls `landscape_from_report`.
+- **`/go-no-go`** — the **GO / PIVOT / NO-GO** verdict, a deterministic gap over demand × landscape, delivered office-hours-style; PIVOT names an under-served fork to aim at, and you make the final call. Calls `assess_from_report`.
+- **`/validate <idea>`** — runs the whole loop interactively, with you deciding at each gate; loops back on PIVOT toward the under-served fork until GO, NO-GO, or exhausted.
 
 ### Design
 

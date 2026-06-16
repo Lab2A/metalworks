@@ -21,13 +21,17 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from metalworks.contract import (
+        Assessment,
         BuildSpec,
         ChannelPlan,
         CompetitorMap,
         ContentPlan,
         DemandReport,
         DiscoveryContext,
+        IdeaSketch,
+        IdeationResult,
         InboxItem,
+        Landscape,
         LaunchAsset,
         MarketingSite,
         Opportunity,
@@ -42,6 +46,7 @@ if TYPE_CHECKING:
         SurfaceKind,
         SurfaceRecommendation,
         UxSkeleton,
+        ValidationResult,
     )
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
@@ -359,6 +364,44 @@ class Metalworks:
         from metalworks.research import run_competitor_map
 
         return run_competitor_map(self.deps, _demand(research))
+
+    def landscape(self, research: Research | DemandReport) -> Landscape:
+        """Pillar A (thick) — the competitor map PLUS an empirical existing-solutions
+        scan (real shipped products, with traction, matched to demand clusters).
+        This is the 'what exists today' surface ``assess()`` consumes."""
+        from metalworks.research import run_landscape
+
+        return run_landscape(self.deps, _demand(research))
+
+    def ideate(self, idea: str) -> IdeaSketch:
+        """Idea-first ideation — sharpen a raw idea into a testable hypothesis plus
+        a brief to run demand on. The front of the validate loop."""
+        from metalworks.research import ideate_from_idea
+
+        return ideate_from_idea(self.deps, idea)
+
+    def ideate_from_evidence(self, research: Research | DemandReport) -> IdeationResult:
+        """Evidence-first ideation — surface an existing report's forks (candidate
+        wedges, else top clusters) as grounded idea sketches to pick from."""
+        from metalworks.research import ideate_from_report
+
+        return ideate_from_report(self.deps, _demand(research))
+
+    def assess(self, research: Research | DemandReport, landscape: Landscape) -> Assessment:
+        """The GO / PIVOT / NO-GO verdict — a deterministic gap over demand (does the
+        pain exist) and landscape (can people already solve it). PIVOT carries a target:
+        an under-served fork the report surfaced. A partial landscape never yields GO."""
+        from metalworks.research import run_assessment
+
+        return run_assessment(self.deps, _demand(research), landscape)
+
+    def validate(self, idea: str, *, max_iterations: int = 4) -> ValidationResult:
+        """Run the validate loop headlessly (--auto): ideate → demand → landscape → assess,
+        looping on PIVOT toward the under-served fork until GO, NO-GO, or exhausted. The
+        interactive, human-gated loop lives in the `validate` Claude Code skill."""
+        from metalworks.research import validate as _validate
+
+        return _validate(self.deps, idea, max_iterations=max_iterations)
 
     def surface(
         self, research: Research | DemandReport, positioning: PositioningBrief

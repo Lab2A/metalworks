@@ -62,6 +62,25 @@ def _window_months(deps: ResearchDeps, brief: ResearchBrief) -> list[MonthRef]:
     return months_back(max(1, brief.time_window_months), anchor=anchor)
 
 
+# Map a source's registry id to the DemandReport.source provenance label.
+_SOURCE_LABELS = {"reddit": "reddit_arctic_shift", "arctic": "reddit_arctic_shift"}
+
+
+def _source_label(deps: ResearchDeps) -> str:
+    """The honest provenance label for this run, from the sources actually configured.
+
+    One source → its label (reddit/arctic → ``reddit_arctic_shift``, else the source id
+    verbatim, e.g. ``hackernews``); more than one → ``mixed``. Falls back to
+    ``reddit_arctic_shift`` only when no source is configured.
+    """
+    ids = sorted({s.source_id for s in deps.effective_sources()})
+    if not ids:
+        return "reddit_arctic_shift"
+    if len(ids) > 1:
+        return "mixed"
+    return _SOURCE_LABELS.get(ids[0], ids[0])
+
+
 def _pull_corpus(
     deps: ResearchDeps,
     brief: ResearchBrief,
@@ -152,7 +171,7 @@ def _empty_report(
         fork=Fork.PRODUCT_PINNED,
         pinned_axis="(no corpus)",
         optimized_axis="(no corpus)",
-        source="reddit_arctic_shift",
+        source=_source_label(deps),
         date_range_start=_month_to_dt(months[0]),
         date_range_end=_month_to_dt(months[-1], end_of_month=True),
         total_threads=0,
@@ -319,7 +338,7 @@ def run_research(
         fork=Fork.PRODUCT_PINNED,
         pinned_axis="(slot_plan-driven)",
         optimized_axis="(slot_plan-driven)",
-        source="reddit_arctic_shift",
+        source=_source_label(deps),
         date_range_start=_month_to_dt(months[0]),
         date_range_end=_month_to_dt(months[-1], end_of_month=True),
         total_threads=len(relevant_items),
@@ -333,6 +352,7 @@ def run_research(
         slot_plan=synthesis_out.slot_plan,
         audience_profile=synthesis_out.audience_profile,
         segments=synthesis_out.segments,
+        candidate_wedges=synthesis_out.candidate_wedges,
         market_sizing=synthesis_out.market_sizing,
         price_finding=synthesis_out.price_finding,
         source_map=synthesis_out.source_map,

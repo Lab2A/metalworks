@@ -20,13 +20,30 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from metalworks.contract import AudienceProfile, AudienceSegment, InsightCluster
+from metalworks.contract import (
+    AudienceProfile,
+    AudienceSegment,
+    EvidenceRef,
+    InsightCluster,
+    SignalStrength,
+)
 
 if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
 
 MAX_SEGMENTS = 4
 LLM_RETRIES = 3
+_HIGH_AUTHORS = 20
+_MEDIUM_AUTHORS = 5
+
+
+def _seg_signal(n: int) -> SignalStrength:
+    """Confidence chip from a segment's distinct-author breadth (service-assigned)."""
+    if n >= _HIGH_AUTHORS:
+        return SignalStrength.HIGH
+    if n >= _MEDIUM_AUTHORS:
+        return SignalStrength.MEDIUM
+    return SignalStrength.LOW
 
 
 class _SegmentProposal(BaseModel):
@@ -64,6 +81,7 @@ def build_segments(
     by_rank = {c.rank: i for i, c in enumerate(clusters)}
 
     segments: list[AudienceSegment] = []
+    seg_authors: list[set[str]] = []  # parallel to `segments`, for the overlap pass
     for prop in plan.segments[:MAX_SEGMENTS]:
         idxs = [by_rank[r] for r in dict.fromkeys(prop.cluster_ranks) if r in by_rank]
         if not idxs or not (prop.name or "").strip():
@@ -85,11 +103,27 @@ def build_segments(
                 preferences=[p.strip() for p in prop.preferences if (p or "").strip()][:6],
                 demand_score=round(demand, 4),
                 distinct_author_count=len(authors),
+                signal=_seg_signal(len(authors)),
+                evidence=[EvidenceRef(kind="cluster", cluster_rank=clusters[i].rank) for i in idxs],
             )
         )
+        seg_authors.append(authors)
 
-    segments.sort(key=lambda s: s.demand_score, reverse=True)
-    return segments
+    # Overlap pass (the anti-fake-fork guard): author-set Jaccard vs every other
+    # segment, keyed by id. Near 1.0 ⇒ not a distinct audience; the surface suppresses it.
+    enriched: list[AudienceSegment] = []
+    for i, seg in enumerate(segments):
+        overlap: dict[str, float] = {}
+        for j, other in enumerate(segments):
+            if i == j:
+                continue
+            a, b = seg_authors[i], seg_authors[j]
+            union = a | b
+            overlap[other.id] = round(len(a & b) / len(union), 4) if union else 0.0
+        enriched.append(seg.model_copy(update={"overlap": overlap}))
+
+    enriched.sort(key=lambda s: s.demand_score, reverse=True)
+    return enriched
 
 
 def _default_propose(deps: ResearchDeps, clusters: list[InsightCluster]) -> _SegmentPlan:

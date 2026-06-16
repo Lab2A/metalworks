@@ -354,6 +354,105 @@ def competitor_map_from_report(report_id: str, store_path: str | None = None) ->
     return {"competitor_map": cmap.model_dump(mode="json")}
 
 
+@guard
+def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
+    the competitor map PLUS an empirical existing-solutions scan (real shipped
+    products matched to demand clusters), synchronous. Degrades honestly when no
+    product source / token is configured (competitors + status-quo still hold)."""
+    from metalworks import config
+    from metalworks.research import run_landscape
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    landscape = run_landscape(deps, report)
+    return {"landscape": landscape.model_dump(mode="json")}
+
+
+@guard
+def ideate_from_idea(idea: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Idea-first ideation — sharpen a raw idea into a testable
+    hypothesis plus a research brief to run demand on. The front of the validate loop."""
+    from metalworks.research import ideate_from_idea as _ideate
+
+    deps = _build_deps(store_path)
+    sketch = _ideate(deps, idea)
+    return {"idea_sketch": sketch.model_dump(mode="json")}
+
+
+@guard
+def ideate_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Evidence-first ideation — surface a stored report's forks
+    (candidate wedges, else top clusters) as grounded idea sketches to pick from."""
+    from metalworks import config
+    from metalworks.research import ideate_from_report as _ideate
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    result = _ideate(deps, report)
+    return {"ideation": result.model_dump(mode="json")}
+
+
+@guard
+def assess_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). The GO/PIVOT/NO-GO verdict for a stored report —
+    runs the landscape, then the deterministic gap over demand + landscape. A partial
+    landscape never yields a hard GO (anti-confirmation)."""
+    from metalworks import config
+    from metalworks.research import run_assessment, run_landscape
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    landscape = run_landscape(deps, report)
+    assessment = run_assessment(deps, report, landscape)
+    return {"assessment": assessment.model_dump(mode="json")}
+
+
+@guard
+def validate_from_idea(
+    idea: str, max_iterations: int = 3, store_path: str | None = None
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Run the validate loop headlessly (--auto) from a raw
+    idea — ideate → demand → landscape → assess, looping on PIVOT toward the under-served fork.
+    Synchronous and can be slow (runs demand each round); the human-gated loop lives in the
+    `validate` skill, which drives the discrete ideate / landscape / assess tools."""
+    from metalworks.research import validate as _validate
+
+    deps = _build_deps(store_path)
+    result = _validate(deps, idea, max_iterations=max_iterations)
+    return {"validation": result.model_dump(mode="json")}
+
+
 def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
     from metalworks import config
 
