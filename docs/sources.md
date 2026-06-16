@@ -15,7 +15,15 @@ more evidence behind every report.
 | `hackernews` | Hacker News stories and comments (live) | No |
 | `hackernews_archive` | A large archive of past Hacker News, read offline — see [Use Hacker News offline](/docs/load-hn-corpus) | No |
 | `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | A search key |
+| `producthunt` | Product Hunt launches + their comments | A free developer token |
 | `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | No |
+
+**Product Hunt** is launches and the discussion around them — strongest for sizing up the
+*competitive landscape* (what already exists and how it landed), a complement to the
+unmet-need signal on Reddit and Hacker News. It needs a free, non-expiring **developer token**
+from the [Product Hunt API dashboard](https://api.producthunt.com/v2/docs); set it as
+`PRODUCT_HUNT_TOKEN`. Product Hunt has no keyword search, so the source pulls the top launches
+(by votes) in your time window and lets the relevance step filter them.
 
 ## Pick what to read from
 
