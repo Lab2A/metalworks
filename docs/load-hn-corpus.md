@@ -72,6 +72,27 @@ Stories are matched to your question by keyword; each story's full comment threa
 straight from the same files, so your quotes come from real HN comments with nothing fetched
 live.
 
+## Read from a Supabase mirror
+
+For a shared, always-available copy (instead of a local download on each machine),
+you can mirror the months you want into a private Supabase Storage bucket and read
+them over signed URLs — no HF and no local files at query time. Point the source at
+a `HackerNewsArchiveMirrorReader` (needs the `supabase` extra):
+
+```python
+from metalworks.research.sources.hn_archive import (
+    HackerNewsArchiveMirrorReader,
+    HackerNewsArchiveSource,
+)
+
+# reads months tracked in a `hackernews_pulls` table + shards under <YYYY>/<MM>/
+reader = HackerNewsArchiveMirrorReader()   # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from env
+mw = Metalworks(sources=[HackerNewsArchiveSource(reader=reader)])
+```
+
+Or set `HN_ARCHIVE_SOURCE=mirror` in the environment and `--source hackernews_archive`
+resolves to the mirror automatically. This mirrors how Reddit's Supabase tier works.
+
 ## Other sources
 
 This is one of several [sources](/docs/sources) you can read from. For Reddit's archive, see

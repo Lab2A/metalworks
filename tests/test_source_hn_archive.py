@@ -15,6 +15,7 @@ import pytest
 
 from metalworks.research.sources import ItemSource, SourceWindow
 from metalworks.research.sources.hn_archive import (
+    HackerNewsArchiveMirrorReader,
     HackerNewsArchiveReader,
     HackerNewsArchiveSource,
 )
@@ -112,3 +113,82 @@ def test_two_stories_each_get_their_own_thread(archive_root: str) -> None:
     batches = list(src.comments_for(["100", "200"]))
     assert {c.id for c in batches[0]} == {"101", "102", "103"}
     assert {c.id for c in batches[1]} == {"201"}
+
+
+# ── Supabase mirror reader (offline, via a fake client + local "signed URLs") ──
+
+
+@pytest.fixture
+def mirror_root(tmp_path: Path) -> str:
+    """Write the same fixture into the mirror layout <root>/<YYYY>/<MM>/data_NNN.parquet."""
+    duckdb = pytest.importorskip("duckdb")
+
+    shard_dir = tmp_path / "2024" / "01"
+    shard_dir.mkdir(parents=True)
+    con = duckdb.connect()
+    con.execute(_FIXTURE_SQL)
+    con.execute(f"COPY items TO '{(shard_dir / 'data_000.parquet').as_posix()}' (FORMAT PARQUET)")
+    con.close()
+    return tmp_path.as_posix()
+
+
+class _FakeStorage:
+    def __init__(self, root: str) -> None:
+        self._root = root
+
+    def from_(self, _bucket: str) -> _FakeStorage:
+        return self
+
+    def list(self, prefix: str, _opts: object = None) -> list[dict[str, str]]:
+        import os as _os
+
+        d = _os.path.join(self._root, prefix)
+        if not _os.path.isdir(d):
+            return []
+        return [{"name": n} for n in sorted(_os.listdir(d)) if n.endswith(".parquet")]
+
+    def create_signed_urls(self, paths: list[str], _ttl: int) -> list[dict[str, str]]:
+        # Resolve to local file paths — DuckDB reads them like any other path.
+        return [{"signedURL": f"{self._root}/{p}"} for p in paths]
+
+
+class _FakeClient:
+    """A stand-in Supabase client backed by a local fixture dir + canned table."""
+
+    def __init__(self, root: str) -> None:
+        self.storage = _FakeStorage(root)
+
+    def table(self, _name: str) -> _FakeClient:
+        return self
+
+    def select(self, *_a: object, **_k: object) -> _FakeClient:
+        return self
+
+    def eq(self, *_a: object, **_k: object) -> _FakeClient:
+        return self
+
+    def order(self, *_a: object, **_k: object) -> _FakeClient:
+        return self
+
+    def limit(self, *_a: object, **_k: object) -> _FakeClient:
+        return self
+
+    def execute(self) -> object:
+        return type("Resp", (), {"data": [{"year": 2024, "month": 1}]})()
+
+
+def test_mirror_reader_resolves_and_reads(mirror_root: str) -> None:
+    reader = HackerNewsArchiveMirrorReader(client=_FakeClient(mirror_root))
+    # latest month comes from the (faked) hackernews_pulls table
+    assert (reader.latest_available_month().year, reader.latest_available_month().month) == (
+        2024,
+        1,
+    )
+
+    src = HackerNewsArchiveSource(reader=reader)
+    records = list(src.pull(query="mechanical keyboard", window=_WINDOW))
+    assert {r.id for r in records} == {"100"}  # read through listed+signed shards
+    assert records[0].source == "hackernews"
+
+    comments = next(iter(src.comments_for(["100"])))
+    assert {c.id for c in comments} == {"101", "102", "103"}  # BFS over the mirror shards
