@@ -63,7 +63,7 @@ _COMMENTS_RESP = {
                     {
                         "node": {
                             "id": "c1",
-                            "body": "I'd pay for this — caffeine wrecks my afternoons",
+                            "body": "<p>I&#39;d pay for this<br>caffeine wrecks my afternoons</p>",
                             "votesCount": 12,
                             "createdAt": "2026-01-15T11:00:00Z",
                             "url": "https://www.producthunt.com/posts/focusflow#c1",
@@ -135,7 +135,8 @@ def test_comments_map_and_drop_empty() -> None:
     assert c.parent_id == "1"
     assert c.source == "producthunt"
     assert c.engagement == 12
-    assert c.text.startswith("I'd pay for this")
+    # HTML stripped, entity unescaped, <br> → newline
+    assert c.text == "I'd pay for this\ncaffeine wrecks my afternoons"
 
 
 def test_window_pull_is_cached() -> None:
