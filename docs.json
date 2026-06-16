@@ -105,6 +105,7 @@
               "docs/custom-chatmodel",
               "docs/custom-corpus",
               "docs/load-reddit-corpus",
+              "docs/load-hn-corpus",
               "docs/custom-store",
               "docs/build-your-own"
             ]

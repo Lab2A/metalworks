@@ -12,7 +12,8 @@ more evidence behind every report.
 | Name | Reads | Needs a key? |
 | --- | --- | --- |
 | `reddit` | Public Reddit posts and comments | No |
-| `hackernews` | Hacker News stories and comments | No |
+| `hackernews` | Hacker News stories and comments (live) | No |
+| `hackernews_archive` | A large archive of past Hacker News, read offline — see [Use Hacker News offline](/docs/load-hn-corpus) | No |
 | `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | A search key |
 | `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | No |
 
