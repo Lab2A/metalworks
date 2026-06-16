@@ -84,38 +84,108 @@
       "title": "AudienceProfile",
       "type": "object"
     },
-    "AudienceSegment": {
+    "CandidateWedge": {
+      "description": "A narrowest-thing-someone-would-pay-for-this-week, surfaced as an option.\n\nDerived from the ranked clusters: each wedge kills a tight set of high-breadth\ncomplaints for a specific segment. The engine proposes a few and does NOT\nchoose. ``scope`` carries the minimal/broad/lateral alternative-trio; breadth\nfields live here (a segment has no coherent ``breadth_unit``).",
       "properties": {
-        "demand_score": {
-          "title": "Demand Score",
-          "type": "number"
+        "breadth_count": {
+          "default": 0,
+          "description": "authors + domains, as on InsightCluster.",
+          "title": "Breadth Count",
+          "type": "integer"
+        },
+        "breadth_unit": {
+          "default": "authors",
+          "title": "Breadth Unit",
+          "type": "string"
+        },
+        "cluster_ranks": {
+          "description": "Ranks of the InsightClusters this draws on.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Cluster Ranks",
+          "type": "array"
         },
         "distinct_author_count": {
+          "default": 0,
           "title": "Distinct Author Count",
           "type": "integer"
         },
-        "name": {
-          "title": "Name",
-          "type": "string"
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "S",
+                "M",
+                "L",
+                "XL"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort"
         },
-        "preferences": {
+        "evidence": {
+          "description": "Backing evidence (refs into report.evidence) \u2014 the proof this fork is real.",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EvidenceRef"
           },
-          "title": "Preferences",
+          "title": "Evidence",
           "type": "array"
         },
-        "profile": {
-          "$ref": "#/$defs/AudienceProfile"
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "pain": {
+          "default": "",
+          "description": "The specific complaint it kills (echoes a cluster claim).",
+          "title": "Pain",
+          "type": "string"
+        },
+        "rationale": {
+          "default": "",
+          "description": "Why this is a GENUINELY distinct path, not a synonym of another fork.",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "scope": {
+          "default": "minimal",
+          "enum": [
+            "minimal",
+            "broad",
+            "lateral"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The SegmentChoice.id it serves, if segment-specific.",
+          "title": "Segment Id"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalStrength",
+          "default": "low",
+          "description": "Confidence chip \u2014 a thin fork never reads as strong as a deep one."
         }
       },
       "required": [
-        "name",
-        "profile",
-        "demand_score",
-        "distinct_author_count"
+        "label"
       ],
-      "title": "AudienceSegment",
+      "title": "CandidateWedge",
       "type": "object"
     },
     "CorpusStats": {
@@ -188,6 +258,46 @@
         "note"
       ],
       "title": "CrossReference",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "description": "A downstream pillar's pointer to one piece of upstream evidence.\n\nResolves against the source `DemandReport.evidence` list by `evidence_id`,\nor against an `InsightCluster` by `cluster_rank` when `kind == \"cluster\"`\n(clusters have no leaf id of their own).",
+      "properties": {
+        "cluster_rank": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set only when kind=='cluster' \u2014 1-based InsightCluster.rank.",
+          "title": "Cluster Rank"
+        },
+        "evidence_id": {
+          "default": "",
+          "description": "Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref.",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Which evidence family this points at.",
+          "enum": [
+            "quote",
+            "web",
+            "price",
+            "cluster"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "EvidenceRef",
       "type": "object"
     },
     "ExplorationReport": {
@@ -689,6 +799,68 @@
       "title": "ResolvedCitation",
       "type": "object"
     },
+    "SegmentChoice": {
+      "description": "A distinct audience you could build FOR \u2014 the demographic fork.\n\nSupersedes the descriptive ``AudienceSegment`` (kept as an alias below):\nsame ``name`` / ``profile`` / scores, now decision-bearing. ``name`` stays\ncanonical (downstream readers depend on ``.name``; old payloads validate\ndirectly). ``overlap`` lets a surface SUPPRESS a fake fork \u2014 two \"segments\"\nthat are ~the same authors are not a real choice.",
+      "properties": {
+        "demand_score": {
+          "default": 0.0,
+          "title": "Demand Score",
+          "type": "number"
+        },
+        "distinct_author_count": {
+          "default": 0,
+          "title": "Distinct Author Count",
+          "type": "integer"
+        },
+        "evidence": {
+          "description": "Backing evidence (refs into report.evidence) \u2014 the proof this fork is real.",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "overlap": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "id -> author-set Jaccard vs other segments; near 1.0 \u21d2 NOT distinct.",
+          "title": "Overlap",
+          "type": "object"
+        },
+        "preferences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Preferences",
+          "type": "array"
+        },
+        "profile": {
+          "$ref": "#/$defs/AudienceProfile"
+        },
+        "rationale": {
+          "default": "",
+          "description": "Why this is a GENUINELY distinct path, not a synonym of another fork.",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalStrength",
+          "default": "low",
+          "description": "Confidence chip \u2014 a thin fork never reads as strong as a deep one."
+        }
+      },
+      "required": [
+        "name",
+        "profile"
+      ],
+      "title": "SegmentChoice",
+      "type": "object"
+    },
     "SignalStrength": {
       "description": "Per-cluster confidence, driven by distinct-author count.\n\nRendered as a text-labelled chip (never color alone) so a thin-evidence\ncluster never reads as authoritative as a well-supported one.",
       "enum": [
@@ -954,6 +1126,13 @@
       "default": null,
       "description": "The brief this run was produced against (frozen-version FK)."
     },
+    "candidate_wedges": {
+      "items": {
+        "$ref": "#/$defs/CandidateWedge"
+      },
+      "title": "Candidate Wedges",
+      "type": "array"
+    },
     "caveat": {
       "anyOf": [
         {
@@ -965,6 +1144,32 @@
       ],
       "default": null,
       "title": "Caveat"
+    },
+    "chosen_segment_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Set by a surface when the user picks a segment. None \u21d2 engine surfaced the fork but nothing chosen yet; deterministic callers read `default_segment`.",
+      "title": "Chosen Segment Id"
+    },
+    "chosen_wedge_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Picked wedge id, else None.",
+      "title": "Chosen Wedge Id"
     },
     "client_id": {
       "default": "local",
@@ -1104,7 +1309,7 @@
     },
     "segments": {
       "items": {
-        "$ref": "#/$defs/AudienceSegment"
+        "$ref": "#/$defs/SegmentChoice"
       },
       "title": "Segments",
       "type": "array"

@@ -46,7 +46,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
-from metalworks.contract.evidence import EvidenceRecord
+from metalworks.contract.evidence import EvidenceRecord, EvidenceRef
 
 # ──────────────────────────────────────────────────────────────────────────
 # Evidence ids
@@ -276,12 +276,94 @@ class AudienceProfile(BaseModel):
     caveat: str | None = None
 
 
-class AudienceSegment(BaseModel):
+class EvidenceBackedChoice(BaseModel):
+    """Shared spine for a fork the engine SURFACES instead of collapsing.
+
+    A choice the pipeline computed but returns as an *option* rather than picking
+    for you (a segment you could target, a wedge you could pursue). Minimal by
+    design — only the fields every fork shares. Subclasses add their own
+    human-facing name (``name`` for a segment, ``label`` for a wedge) and any
+    breadth fields that actually apply to them. Same no-cite-no-claim rule as
+    ``InsightCluster``: a choice with zero backing ``evidence`` is never surfaced.
+    """
+
+    rationale: str = Field(
+        default="",
+        description="Why this is a GENUINELY distinct path, not a synonym of another fork.",
+    )
+    evidence: list[EvidenceRef] = Field(
+        default_factory=list[EvidenceRef],
+        description="Backing evidence (refs into report.evidence) — the proof this fork is real.",
+    )
+    signal: SignalStrength = Field(
+        default=SignalStrength.LOW,
+        description="Confidence chip — a thin fork never reads as strong as a deep one.",
+    )
+
+
+class SegmentChoice(EvidenceBackedChoice):
+    """A distinct audience you could build FOR — the demographic fork.
+
+    Supersedes the descriptive ``AudienceSegment`` (kept as an alias below):
+    same ``name`` / ``profile`` / scores, now decision-bearing. ``name`` stays
+    canonical (downstream readers depend on ``.name``; old payloads validate
+    directly). ``overlap`` lets a surface SUPPRESS a fake fork — two "segments"
+    that are ~the same authors are not a real choice.
+    """
+
     name: str
     profile: AudienceProfile
     preferences: list[str] = Field(default_factory=list)
-    demand_score: float
-    distinct_author_count: int
+    demand_score: float = 0.0
+    distinct_author_count: int = 0
+    overlap: dict[str, float] = Field(
+        default_factory=dict,
+        description="id -> author-set Jaccard vs other segments; near 1.0 ⇒ NOT distinct.",
+    )
+
+    @computed_field
+    @property
+    def id(self) -> str:
+        """Stable content-addressed fork id (``s:<hash of name|evidence ids>``)."""
+        return _evidence_id("s", self.name, *sorted(e.evidence_id for e in self.evidence))
+
+
+# Back-compat alias: ``AudienceSegment`` is now the decision-bearing ``SegmentChoice``.
+# Existing imports, type annotations, and ``build_segments`` construction keep working;
+# old persisted payloads (which carry ``name``) validate directly.
+AudienceSegment = SegmentChoice
+
+
+class CandidateWedge(EvidenceBackedChoice):
+    """A narrowest-thing-someone-would-pay-for-this-week, surfaced as an option.
+
+    Derived from the ranked clusters: each wedge kills a tight set of high-breadth
+    complaints for a specific segment. The engine proposes a few and does NOT
+    choose. ``scope`` carries the minimal/broad/lateral alternative-trio; breadth
+    fields live here (a segment has no coherent ``breadth_unit``).
+    """
+
+    label: str
+    pain: str = Field(
+        default="", description="The specific complaint it kills (echoes a cluster claim)."
+    )
+    scope: Literal["minimal", "broad", "lateral"] = "minimal"
+    segment_id: str | None = Field(
+        default=None, description="The SegmentChoice.id it serves, if segment-specific."
+    )
+    effort: Literal["S", "M", "L", "XL"] | None = None
+    cluster_ranks: list[int] = Field(
+        default_factory=list[int], description="Ranks of the InsightClusters this draws on."
+    )
+    breadth_count: int = Field(default=0, description="authors + domains, as on InsightCluster.")
+    breadth_unit: str = "authors"
+    distinct_author_count: int = 0
+
+    @computed_field
+    @property
+    def id(self) -> str:
+        """Stable content-addressed fork id (``w:<hash of pain|scope>``)."""
+        return _evidence_id("w", self.pain or self.label, self.scope)
 
 
 class PriceEvidence(BaseModel):
@@ -614,7 +696,14 @@ class DemandReport(BaseModel):
     verdict: str | None = None
     slot_plan: SlotPlan | None = None
     audience_profile: AudienceProfile | None = None
-    segments: list[AudienceSegment] = Field(default_factory=list[AudienceSegment])
+    segments: list[SegmentChoice] = Field(default_factory=list[SegmentChoice])
+    candidate_wedges: list[CandidateWedge] = Field(default_factory=list[CandidateWedge])
+    chosen_segment_id: str | None = Field(
+        default=None,
+        description="Set by a surface when the user picks a segment. None ⇒ engine surfaced the "
+        "fork but nothing chosen yet; deterministic callers read `default_segment`.",
+    )
+    chosen_wedge_id: str | None = Field(default=None, description="Picked wedge id, else None.")
     market_sizing: MarketSizing | None = None
     price_finding: PriceFinding | None = None
     source_map: list[SourceMapEntry] = Field(default_factory=list[SourceMapEntry])
@@ -639,6 +728,35 @@ class DemandReport(BaseModel):
         reports (where ``lineage_id`` is empty). Use this — never raw
         ``lineage_id`` — when grouping versions of the same report."""
         return self.lineage_id or self.report_id
+
+    # ── Fork selectors: the engine surfaces options; these resolve the one in play.
+    # Deterministic one-shot callers read ``default_*``; interactive callers set
+    # ``chosen_*`` and read ``active_*``. All are ``None``-safe on the empty
+    # (zero-cluster cold-start) report — never raise.
+
+    @property
+    def default_segment(self) -> SegmentChoice | None:
+        """Top segment by demand_score — the deterministic pick. None if no segments."""
+        return max(self.segments, key=lambda s: s.demand_score, default=None)
+
+    @property
+    def active_segment(self) -> SegmentChoice | None:
+        """The segment this run narrows to: the user's pick, else the default."""
+        if self.chosen_segment_id:
+            return next((s for s in self.segments if s.id == self.chosen_segment_id), None)
+        return self.default_segment
+
+    @property
+    def default_wedge(self) -> CandidateWedge | None:
+        """Top wedge by breadth — the deterministic pick. None if no wedges."""
+        return max(self.candidate_wedges, key=lambda w: w.breadth_count, default=None)
+
+    @property
+    def active_wedge(self) -> CandidateWedge | None:
+        """The wedge this run narrows to: the user's pick, else the default."""
+        if self.chosen_wedge_id:
+            return next((w for w in self.candidate_wedges if w.id == self.chosen_wedge_id), None)
+        return self.default_wedge
 
     @property
     def evidence(self) -> list[EvidenceRecord]:

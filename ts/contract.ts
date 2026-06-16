@@ -101,12 +101,55 @@ export interface AudienceProfile {
   caveat?: string | null;
 }
 
-export interface AudienceSegment {
+export interface EvidenceBackedChoice {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
+}
+
+export interface SegmentChoice {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
   name: string;
   profile: AudienceProfile;
   preferences?: string[];
-  demand_score: number;
-  distinct_author_count: number;
+  demand_score?: number;
+  distinct_author_count?: number;
+  /** id -> author-set Jaccard vs other segments; near 1.0 ⇒ NOT distinct. */
+  overlap?: Record<string, number>;
+  /** Stable content-addressed fork id (``s:<hash of name|evidence ids>``). */
+  id: string;
+}
+
+export interface CandidateWedge {
+  /** Why this is a GENUINELY distinct path, not a synonym of another fork. */
+  rationale?: string;
+  /** Backing evidence (refs into report.evidence) — the proof this fork is real. */
+  evidence?: EvidenceRef[];
+  /** Confidence chip — a thin fork never reads as strong as a deep one. */
+  signal?: SignalStrength;
+  label: string;
+  /** The specific complaint it kills (echoes a cluster claim). */
+  pain?: string;
+  scope?: "minimal" | "broad" | "lateral";
+  /** The SegmentChoice.id it serves, if segment-specific. */
+  segment_id?: string | null;
+  effort?: "S" | "M" | "L" | "XL" | null;
+  /** Ranks of the InsightClusters this draws on. */
+  cluster_ranks?: number[];
+  /** authors + domains, as on InsightCluster. */
+  breadth_count?: number;
+  breadth_unit?: string;
+  distinct_author_count?: number;
+  /** Stable content-addressed fork id (``w:<hash of pain|scope>``). */
+  id: string;
 }
 
 export interface PriceEvidence {
@@ -273,7 +316,12 @@ export interface DemandReport {
   verdict?: string | null;
   slot_plan?: SlotPlan | null;
   audience_profile?: AudienceProfile | null;
-  segments?: AudienceSegment[];
+  segments?: SegmentChoice[];
+  candidate_wedges?: CandidateWedge[];
+  /** Set by a surface when the user picks a segment. None ⇒ engine surfaced the fork but nothing chosen yet; deterministic callers read `default_segment`. */
+  chosen_segment_id?: string | null;
+  /** Picked wedge id, else None. */
+  chosen_wedge_id?: string | null;
   market_sizing?: MarketSizing | null;
   price_finding?: PriceFinding | null;
   source_map?: SourceMapEntry[];
