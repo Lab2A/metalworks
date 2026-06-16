@@ -27,7 +27,9 @@ post. Product Hunt has comments, so this is not a unit source.
 from __future__ import annotations
 
 import hashlib
+import html
 import os
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -79,6 +81,22 @@ query Comments($id: ID!, $first: Int!, $after: String) {
   }
 }
 """
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_BR_P_RE = re.compile(r"\s*<\s*(?:br|/p|p)\s*/?\s*>\s*", re.IGNORECASE)
+_MULTI_NL_RE = re.compile(r"\n{2,}")
+
+
+def _clean_html(text: str | None) -> str:
+    """Product Hunt comment/description bodies are HTML — convert ``<p>``/``<br>``
+    to newlines, strip other tags, unescape entities."""
+    if not text:
+        return ""
+    text = _BR_P_RE.sub("\n", text)
+    text = _TAG_RE.sub("", text)
+    text = _MULTI_NL_RE.sub("\n", text)
+    return html.unescape(text).strip()
 
 
 def _hash_author(handle: str | None, *, salt: str) -> str | None:
@@ -271,7 +289,7 @@ class ProductHuntSource:
                 node.get("url") or f"https://www.producthunt.com/posts/{node.get('slug') or pid}"
             ),
             title=title,
-            text=str(node.get("description") or tagline or ""),
+            text=_clean_html(str(node.get("description") or "")) or tagline,
             author_hash=_hash_author(user.get("username") or user.get("id"), salt=self._salt),
             engagement=votes,
             created_at=_ts_to_dt(node.get("createdAt")),
@@ -326,7 +344,7 @@ class ProductHuntSource:
         self, node: dict[str, Any], *, parent_record: str
     ) -> CorpusComment | None:
         cid = node.get("id")
-        body = str(node.get("body") or "").strip()
+        body = _clean_html(str(node.get("body") or ""))
         if not cid or not body:
             return None
         cid = str(cid)
