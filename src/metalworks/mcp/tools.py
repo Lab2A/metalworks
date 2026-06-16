@@ -354,6 +354,31 @@ def competitor_map_from_report(report_id: str, store_path: str | None = None) ->
     return {"competitor_map": cmap.model_dump(mode="json")}
 
 
+@guard
+def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
+    the competitor map PLUS an empirical existing-solutions scan (real shipped
+    products matched to demand clusters), synchronous. Degrades honestly when no
+    product source / token is configured (competitors + status-quo still hold)."""
+    from metalworks import config
+    from metalworks.research import run_landscape
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    landscape = run_landscape(deps, report)
+    return {"landscape": landscape.model_dump(mode="json")}
+
+
 def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
     from metalworks import config
 

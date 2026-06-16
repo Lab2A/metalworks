@@ -1379,6 +1379,60 @@ def research_competitor_map(
     _print_competitor_map(cmap)
 
 
+def _print_landscape(landscape: object) -> None:
+    _print_competitor_map(getattr(landscape, "competitor_map", None))
+    sols = getattr(landscape, "existing_solutions", [])
+    if sols:
+        console.print("\n[bold]Existing solutions[/bold] (real shipped products):")
+        for s in sols:
+            tag = f" — {s.tagline}" if getattr(s, "tagline", "") else ""
+            console.print(f"  [bold]{s.name}[/bold] ({s.source}, {s.traction} traction){tag}")
+    if getattr(landscape, "partial", False):
+        console.print(f"  [yellow]partial:[/yellow] {getattr(landscape, 'caveat', '')}")
+
+
+@research_app.command("landscape")
+def research_landscape(
+    report_id: Annotated[
+        str, typer.Argument(help="Report id (from `research run` / `research list`).")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the landscape JSON here.")
+    ] = None,
+) -> None:
+    """Map the full landscape: competitors + existing solutions + cost of doing nothing."""
+    from metalworks.research import run_landscape
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Mapping landscape[/bold] for report {report_id}...")
+    try:
+        landscape = run_landscape(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(landscape.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote landscape[/green] {out}")
+    _print_landscape(landscape)
+
+
 def _print_surface(rec: object, skeleton: object) -> None:
     console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
     console.print(

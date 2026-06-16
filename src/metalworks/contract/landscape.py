@@ -87,3 +87,50 @@ class CompetitorMap(BaseModel):
     generated_at: datetime
     partial: bool = Field(default=False, description="True when a stage degraded.")
     caveat: str | None = Field(default=None, description="What to treat as lower-confidence.")
+
+
+class ExistingSolution(BaseModel):
+    """One real shipped product in the space, matched to a demand cluster.
+
+    The EMPIRICAL counterpart to the LLM-enumerated competitors: pulled from a
+    product source (Product Hunt launches; web) and kept only when its pitch maps
+    to a real demand cluster — grounded, not guessed. ``traction`` is the
+    source-native signal (e.g. PH votes); ``evidence`` resolves against the
+    cluster it speaks to (a ``cluster`` ref), so a solution with no cluster match
+    is dropped at assembly.
+    """
+
+    name: str = Field(description="The product name.")
+    url: str = Field(default="", description="Resolvable link to the product.")
+    tagline: str = Field(default="", description="The product's one-line pitch, when available.")
+    traction: int = Field(default=0, description="Source-native traction signal (e.g. PH votes).")
+    source: str = Field(default="producthunt", description="Where it was found: producthunt | web.")
+    addresses_clusters: list[int] = Field(
+        default_factory=list[int], description="Demand-cluster ranks this product speaks to."
+    )
+    evidence: EvidenceRef = Field(description="The cluster ref this product was matched against.")
+
+
+class Landscape(BaseModel):
+    """Pillar A (thick) — the full 'what exists today' for one report.
+
+    Wraps the grounded :class:`CompetitorMap` (direct / adjacent rivals + the
+    mandatory status-quo 'do nothing' cost) and ADDS an empirical
+    ``existing_solutions`` scan: real shipped products, with traction, each mapped
+    to a demand cluster. ``competitors()`` stays the lean map; this is the
+    surface ``assess()`` consumes. ``partial`` is true when either half degraded
+    (ungrounded enumeration, or no product source / token).
+    """
+
+    landscape_id: str = Field(description="Stable id for this landscape (derived from report_id).")
+    report_id: str = Field(description="The DemandReport this landscape was derived from.")
+    competitor_map: CompetitorMap = Field(
+        description="The grounded competitor map (Pillar A core)."
+    )
+    existing_solutions: list[ExistingSolution] = Field(
+        default_factory=list[ExistingSolution],
+        description="Real shipped products, grounded to demand clusters.",
+    )
+    generated_at: datetime
+    partial: bool = Field(default=False, description="True when either half degraded.")
+    caveat: str | None = Field(default=None, description="What to treat as lower-confidence.")

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         DemandReport,
         DiscoveryContext,
         InboxItem,
+        Landscape,
         LaunchAsset,
         MarketingSite,
         Opportunity,
@@ -359,6 +360,14 @@ class Metalworks:
         from metalworks.research import run_competitor_map
 
         return run_competitor_map(self.deps, _demand(research))
+
+    def landscape(self, research: Research | DemandReport) -> Landscape:
+        """Pillar A (thick) — the competitor map PLUS an empirical existing-solutions
+        scan (real shipped products, with traction, matched to demand clusters).
+        This is the 'what exists today' surface ``assess()`` consumes."""
+        from metalworks.research import run_landscape
+
+        return run_landscape(self.deps, _demand(research))
 
     def surface(
         self, research: Research | DemandReport, positioning: PositioningBrief

@@ -16,6 +16,7 @@ import pytest
 pytest.importorskip("numpy")  # complaint-matching uses cosine_topk (the [research] extra)
 
 from metalworks.contract import (
+    CorpusRecord,
     DemandReport,
     Fork,
     InsightCluster,
@@ -31,6 +32,7 @@ from metalworks.research.landscape import (
     _CompetitorList,
     _Harvest,
     run_competitor_map,
+    run_landscape,
 )
 from metalworks.stores import MemoryStores
 
@@ -261,3 +263,78 @@ def test_mcp_competitor_map_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cm["report_id"] == "rpt-1"
     assert cm["status_quo_alternative"]["kind"] == "status_quo"
     assert cm["competitors"][0]["gaps"][0]["evidence"]["evidence_id"] == q.id
+
+
+# ── landscape (thick): competitor map + existing-solutions scan ───────────────
+
+
+class _FakeSource:
+    """A minimal ItemSource over canned records (or a pull that raises)."""
+
+    source_id = "producthunt"
+
+    def __init__(self, records: list[CorpusRecord] | None, *, raises: bool = False) -> None:
+        self._records = records or []
+        self._raises = raises
+
+    def pull(self, *, query: str, window: object, limit: int | None = None) -> Any:
+        if self._raises:
+            raise RuntimeError("source down")
+        return iter(self._records)
+
+    def comments_for(self, record_ids: Any) -> None:
+        return None
+
+    def latest_window(self) -> Any:
+        from metalworks.research.sources import SourceWindow
+
+        return SourceWindow()
+
+
+def _product(rid: str, title: str, *, votes: int = 100, url: str = "https://ph/x") -> CorpusRecord:
+    return CorpusRecord(
+        id=rid, source="producthunt", source_id=rid, title=title, text="", url=url, engagement=votes
+    )
+
+
+def test_landscape_wraps_map_and_scans_existing_solutions() -> None:
+    # cluster claim is "pain 1"; a product titled "pain 1" matches it (FakeEmbedding cosine 1.0).
+    report = _report(clusters=[_cluster(1, quotes=[_quote("PIE lingers", "https://r/1")])])
+    source = _FakeSource(
+        [_product("p1", "pain 1", votes=340), _product("p2", "unrelated", votes=9)]
+    )
+    ls = run_landscape(
+        _deps(_chat(competitors=[], harvest=_Harvest())), report, existing_source=source
+    )
+    assert ls.landscape_id == "ls:rpt-1"
+    assert ls.competitor_map.report_id == "rpt-1"  # the wrapped map is intact
+    # only the matching product survives (no-cluster-no-solution drops "unrelated")
+    assert [s.name for s in ls.existing_solutions] == ["pain 1"]
+    sol = ls.existing_solutions[0]
+    assert sol.traction == 340
+    assert sol.addresses_clusters == [1]
+    assert sol.evidence.kind == "cluster" and sol.evidence.cluster_rank == 1
+    # the existing-scan succeeded → its degrade caveat must be absent
+    assert "Existing-solutions scan unavailable" not in (ls.caveat or "")
+
+
+def test_landscape_partial_when_source_errors() -> None:
+    report = _report(clusters=[_cluster(1, quotes=[_quote("PIE lingers", "https://r/1")])])
+    source = _FakeSource(None, raises=True)
+    ls = run_landscape(
+        _deps(_chat(competitors=[], harvest=_Harvest())), report, existing_source=source
+    )
+    assert ls.partial is True
+    assert ls.existing_solutions == []
+    assert "Existing-solutions scan unavailable" in (ls.caveat or "")
+    assert ls.competitor_map.status_quo_alternative.kind == "status_quo"  # map still holds
+
+
+def test_landscape_no_clusters_scans_nothing_but_does_not_fail() -> None:
+    report = _report(clusters=[])
+    source = _FakeSource([_product("p1", "anything")])
+    ls = run_landscape(
+        _deps(_chat(competitors=[], harvest=_Harvest())), report, existing_source=source
+    )
+    assert ls.existing_solutions == []  # nothing to ground against
+    assert "Existing-solutions scan unavailable" not in (ls.caveat or "")  # not a failure

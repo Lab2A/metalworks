@@ -413,6 +413,39 @@ export interface CompetitorMap {
   caveat?: string | null;
 }
 
+export interface ExistingSolution {
+  /** The product name. */
+  name: string;
+  /** Resolvable link to the product. */
+  url?: string;
+  /** The product's one-line pitch, when available. */
+  tagline?: string;
+  /** Source-native traction signal (e.g. PH votes). */
+  traction?: number;
+  /** Where it was found: producthunt | web. */
+  source?: string;
+  /** Demand-cluster ranks this product speaks to. */
+  addresses_clusters?: number[];
+  /** The cluster ref this product was matched against. */
+  evidence: EvidenceRef;
+}
+
+export interface Landscape {
+  /** Stable id for this landscape (derived from report_id). */
+  landscape_id: string;
+  /** The DemandReport this landscape was derived from. */
+  report_id: string;
+  /** The grounded competitor map (Pillar A core). */
+  competitor_map: CompetitorMap;
+  /** Real shipped products, grounded to demand clusters. */
+  existing_solutions?: ExistingSolution[];
+  generated_at: string;
+  /** True when either half degraded. */
+  partial?: boolean;
+  /** What to treat as lower-confidence. */
+  caveat?: string | null;
+}
+
 export interface WedgeClaim {
   /** What the beachhead audience uses today, from real web findings. */
   competitive_alternative: string;
