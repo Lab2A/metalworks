@@ -17,6 +17,8 @@ from metalworks.contract import (
     CandidateWedge,
     DemandReport,
     Fork,
+    IdeaSketch,
+    Research,
     SegmentChoice,
 )
 from metalworks.contract.research import AudienceProfile
@@ -107,3 +109,16 @@ def test_wedge_id_is_stable_and_content_addressed() -> None:
     b = CandidateWedge(label="different label", pain="caffeine crash", scope="minimal")
     assert a.id == b.id  # id is content-addressed on (pain, scope), not the label
     assert a.id.startswith("w:")
+
+
+def test_research_bundle_carries_loop_pillars_additively() -> None:
+    """The Research bundle gained landscape/assessment/ideation — additive, default None."""
+    r = Research(demand=_report())
+    assert r.landscape is None and r.assessment is None and r.ideation is None
+    # and it accepts a loop pillar when present (frozen + composable)
+    with_idea = Research(
+        demand=_report(),
+        ideation=IdeaSketch(idea="x", hypothesis="x", provenance="idea-first"),
+    )
+    assert with_idea.ideation is not None
+    assert with_idea.evidence == with_idea.demand.evidence  # evidence still delegates

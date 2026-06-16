@@ -340,6 +340,9 @@ export interface Research {
   demand: DemandReport;
   competitors?: CompetitorMap | null;
   positioning?: PositioningBrief | null;
+  landscape?: Landscape | null;
+  assessment?: Assessment | null;
+  ideation?: IdeaSketch | null;
 }
 
 export interface ReportSummary {

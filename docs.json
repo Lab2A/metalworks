@@ -51,7 +51,7 @@
           },
           {
             "group": "Research",
-            "pages": ["docs/demand-research", "docs/positioning", "docs/competitors"]
+            "pages": ["docs/demand-research", "docs/validation-loop", "docs/positioning", "docs/competitors"]
           },
           {
             "group": "Design",
