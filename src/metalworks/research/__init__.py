@@ -19,6 +19,7 @@ from metalworks.research.pipeline import run_research
 from metalworks.research.site import build_marketing_site, render_site_html
 from metalworks.research.surface import build_ux_skeleton, decide_surface
 from metalworks.research.synthesis import build_positioning_brief
+from metalworks.research.validate import validate
 
 # Public surface: the entry point (`run_research`), the dependency bundle
 # (`ResearchDeps`), and the two injection protocols a caller implements to swap
@@ -44,4 +45,5 @@ __all__ = [
     "run_competitor_map",
     "run_landscape",
     "run_research",
+    "validate",
 ]

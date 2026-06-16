@@ -53,6 +53,7 @@ from metalworks.contract import (  # noqa: E402
     CorpusStats,
     CrossReference,
     Decision,
+    DecisionLogEntry,
     DemandReport,
     DesignBrief,
     DiscoveryContext,
@@ -106,6 +107,7 @@ from metalworks.contract import (  # noqa: E402
     TradeOff,
     TriageThresholds,
     UxSkeleton,
+    ValidationResult,
     WebFinding,
     WedgeClaim,
 )
@@ -158,6 +160,9 @@ MODELS: list[type[BaseModel]] = [
     GapAnalysis,
     PivotTarget,
     Assessment,
+    # validate loop
+    DecisionLogEntry,
+    ValidationResult,
     # positioning (Pillar B)
     WedgeClaim,
     PriceHypothesis,

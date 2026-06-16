@@ -518,6 +518,30 @@ export interface Assessment {
   generated_at: string;
 }
 
+export interface DecisionLogEntry {
+  /** 1-based round number. */
+  iteration: number;
+  /** The idea this round tested. */
+  idea: string;
+  /** The verdict for this round. */
+  decision: Decision;
+  /** Forks/ideas this round eliminated — the anti-repeat memory. */
+  ruled_out?: string[];
+  /** One-line reasoning for the verdict. */
+  why?: string;
+}
+
+export interface ValidationResult {
+  /** Why the loop stopped. */
+  outcome: "go" | "no_go" | "exhausted";
+  /** The last round's GO/PIVOT/NO-GO verdict. */
+  final_assessment?: Assessment | null;
+  /** One entry per round. */
+  decision_log?: DecisionLogEntry[];
+  /** Rounds run. */
+  iterations?: number;
+}
+
 export interface WedgeClaim {
   /** What the beachhead audience uses today, from real web findings. */
   competitive_alternative: string;

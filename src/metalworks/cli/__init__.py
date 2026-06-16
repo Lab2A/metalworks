@@ -1554,6 +1554,53 @@ def research_assess(
     _print_assessment(assessment)
 
 
+def _print_validation(v: object) -> None:
+    outcome = str(getattr(v, "outcome", ""))
+    color = {"go": "green", "no_go": "red", "exhausted": "yellow"}.get(outcome, "white")
+    console.print(
+        f"\n[bold {color}]{outcome.upper()}[/bold {color}] after "
+        f"{getattr(v, 'iterations', 0)} round(s)"
+    )
+    for e in getattr(v, "decision_log", []):
+        console.print(f"  {e.iteration}. [{e.decision}] {e.idea} — {e.why}")
+
+
+@research_app.command("validate")
+def research_validate(
+    idea: Annotated[str, typer.Argument(help="The idea to run through the validate loop.")],
+    max_iterations: Annotated[
+        int, typer.Option("--max-iterations", help="Loop cap before 'exhausted'.")
+    ] = 4,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
+    ] = None,
+) -> None:
+    """Run the validate loop (--auto): ideate → demand → landscape → assess, looping on PIVOT."""
+    from metalworks.research import validate as run_validate
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"[bold]Validating[/bold] '{idea}' (auto loop, ≤{max_iterations} rounds)...")
+    try:
+        result = run_validate(deps, idea, max_iterations=max_iterations)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote result[/green] {out}")
+    _print_validation(result)
+
+
 def _print_surface(rec: object, skeleton: object) -> None:
     console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
     console.print(

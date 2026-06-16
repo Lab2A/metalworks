@@ -115,6 +115,10 @@ from metalworks.contract.surface import (
     TradeOff,
     UxSkeleton,
 )
+from metalworks.contract.validate import (
+    DecisionLogEntry,
+    ValidationResult,
+)
 
 __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit), not globally sorted
     # Assess stage — the GO / PIVOT / NO-GO verdict over demand + landscape.
@@ -197,6 +201,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "BuildSpec",
     "FeatureSpec",
     "PricingTier",
+    # Validate loop — the discovery loop's result + decision log.
+    "DecisionLogEntry",
+    "ValidationResult",
     # Reddit + discovery — engagement surfaces and the compliance gate.
     "ComplianceVerdict",
     "DiscoveryContext",

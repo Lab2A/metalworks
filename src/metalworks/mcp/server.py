@@ -118,6 +118,13 @@ async def assess_from_report(report_id: str, store_path: str | None = None) -> d
     return tools.assess_from_report(report_id, store_path)
 
 
+async def validate_from_idea(
+    idea: str, max_iterations: int = 3, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Run the validate loop headlessly (--auto) from a raw idea (synchronous, slow)."""
+    return tools.validate_from_idea(idea, max_iterations, store_path)
+
+
 async def surface_recommend(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Recommend a product surface for a stored report (chat + embedding keys, sync)."""
     return tools.surface_recommend(report_id, store_path)
@@ -221,6 +228,7 @@ _TOOL_WRAPPERS = (
     ideate_from_idea,
     ideate_from_report,
     assess_from_report,
+    validate_from_idea,
     surface_recommend,
     ux_skeleton_build,
     site_render,

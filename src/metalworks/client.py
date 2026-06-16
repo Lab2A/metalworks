@@ -46,6 +46,7 @@ if TYPE_CHECKING:
         SurfaceKind,
         SurfaceRecommendation,
         UxSkeleton,
+        ValidationResult,
     )
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
@@ -393,6 +394,14 @@ class Metalworks:
         from metalworks.research import run_assessment
 
         return run_assessment(self.deps, _demand(research), landscape)
+
+    def validate(self, idea: str, *, max_iterations: int = 4) -> ValidationResult:
+        """Run the validate loop headlessly (--auto): ideate → demand → landscape → assess,
+        looping on PIVOT toward the under-served fork until GO, NO-GO, or exhausted. The
+        interactive, human-gated loop lives in the `validate` Claude Code skill."""
+        from metalworks.research import validate as _validate
+
+        return _validate(self.deps, idea, max_iterations=max_iterations)
 
     def surface(
         self, research: Research | DemandReport, positioning: PositioningBrief

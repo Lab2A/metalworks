@@ -438,6 +438,21 @@ def assess_from_report(report_id: str, store_path: str | None = None) -> ToolRes
     return {"assessment": assessment.model_dump(mode="json")}
 
 
+@guard
+def validate_from_idea(
+    idea: str, max_iterations: int = 3, store_path: str | None = None
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys). Run the validate loop headlessly (--auto) from a raw
+    idea — ideate → demand → landscape → assess, looping on PIVOT toward the under-served fork.
+    Synchronous and can be slow (runs demand each round); the human-gated loop lives in the
+    `validate` skill, which drives the discrete ideate / landscape / assess tools."""
+    from metalworks.research import validate as _validate
+
+    deps = _build_deps(store_path)
+    result = _validate(deps, idea, max_iterations=max_iterations)
+    return {"validation": result.model_dump(mode="json")}
+
+
 def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport | ToolResult:
     from metalworks import config
 
