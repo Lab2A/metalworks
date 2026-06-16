@@ -1,6 +1,8 @@
-"""The validate loop — GO exits, PIVOT loops to the target, NO-GO terminates,
-the cap holds, and a killed fork never reappears (semantic dedup). Offline: the four
-stages are injected, so no real corpus pull.
+"""The validate loop (light-by-default).
+
+GO exits, NO-GO terminates, the cap holds, and — the headline — a PIVOT to a fork the
+report already surfaced REUSES the corpus (no re-pull): research runs once. A pivot that
+leaves the corpus triggers a fresh pull. The four stages are injected, so no real pull.
 """
 
 from __future__ import annotations
@@ -9,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from metalworks.contract import (
+    CandidateWedge,
     Competitor,
     CompetitorMap,
     Decision,
@@ -17,7 +20,7 @@ from metalworks.contract import (
     Landscape,
     SignalStrength,
 )
-from metalworks.contract.assess import Assessment, GapAnalysis
+from metalworks.contract.assess import Assessment, GapAnalysis, PivotTarget
 from metalworks.contract.ideate import IdeaSketch
 from metalworks.embeddings import FakeEmbedding
 from metalworks.llm import FakeChatModel
@@ -26,6 +29,8 @@ from metalworks.research.validate import ValidationStep, validate
 from metalworks.stores import MemoryStores
 
 _CLOCK = datetime(2026, 2, 2, tzinfo=UTC)
+_W1 = CandidateWedge(label="wedge one", pain="pain one", scope="minimal", breadth_count=30)
+_W2 = CandidateWedge(label="wedge two", pain="pain two", scope="broad", breadth_count=20)
 
 
 class _NullReader:
@@ -64,6 +69,7 @@ def _report() -> DemandReport:
         total_threads=1,
         total_distinct_authors=50,
         ranked_clusters=[],
+        candidate_wedges=[_W1, _W2],
         generated_at=_CLOCK,
     )
 
@@ -76,12 +82,12 @@ def _landscape() -> Landscape:
     return Landscape(landscape_id="ls", report_id="rpt-1", competitor_map=cm, generated_at=_CLOCK)
 
 
-def _assessment(decision: Decision, *, open_wedge: str | None = None) -> Assessment:
+def _assessment(decision: Decision, *, pivot_to: str | None = None) -> Assessment:
+    pt = PivotTarget(kind="wedge", target_id=pivot_to, why="aim narrower") if pivot_to else None
     gap = GapAnalysis(
         demand_strength=SignalStrength.HIGH,
         demand_summary="strong",
         landscape_saturation=SignalStrength.LOW,
-        open_wedge=open_wedge,
         reasoning="because",
     )
     return Assessment(
@@ -90,6 +96,7 @@ def _assessment(decision: Decision, *, open_wedge: str | None = None) -> Assessm
         decision=decision,
         rationale="r",
         gap=gap,
+        pivot_target=pt,
         generated_at=_CLOCK,
     )
 
@@ -98,92 +105,86 @@ def _ideate(_deps: Any, idea: str) -> IdeaSketch:
     return IdeaSketch(idea=idea, hypothesis=idea, provenance="idea-first")
 
 
-def _stages(assess_fn: Any) -> dict[str, Any]:
-    return {
-        "ideate_fn": _ideate,
-        "research_fn": lambda _d, _s: _report(),
-        "landscape_fn": lambda _d, _r: _landscape(),
-        "assess_fn": assess_fn,
-    }
+def _run(
+    script: list[Assessment], *, max_iterations: int = 4, decide: Any = None
+) -> tuple[Any, dict[str, int]]:
+    """Drive validate with a scripted assess sequence; count fresh research pulls."""
+    counts = {"research": 0}
 
+    def research_fn(_d: Any, _s: Any) -> DemandReport:
+        counts["research"] += 1
+        return _report()
 
-class _Scripted:
-    """Returns a scripted (decision, open_wedge) per call, recording the ideas seen."""
+    seq = list(script)
 
-    def __init__(self, script: list[tuple[Decision, str | None]]) -> None:
-        self._script = script
-        self.ideas_assessed: list[str] = []
-
-    def __call__(self, _deps: Any, report: DemandReport, _landscape: Landscape) -> Assessment:
-        decision, open_wedge = self._script.pop(0)
-        return _assessment(decision, open_wedge=open_wedge)
-
-
-def test_go_exits_first_round() -> None:
-    result = validate(_deps(), "x", **_stages(_Scripted([(Decision.GO, None)])))
-    assert result.outcome == "go"
-    assert result.iterations == 1
-    assert result.decision_log[0].decision == Decision.GO
-    assert result.final_assessment is not None
-
-
-def test_no_go_terminates() -> None:
-    result = validate(_deps(), "x", **_stages(_Scripted([(Decision.NO_GO, None)])))
-    assert result.outcome == "no_go"
-    assert result.iterations == 1
-
-
-def test_pivot_loops_to_target_then_go() -> None:
-    seen_ideas: list[str] = []
-
-    def assess(_d: Any, _r: DemandReport, _l: Landscape) -> Assessment:
-        # round 1 → PIVOT to "idea2"; round 2 → GO
-        return script.pop(0)
-
-    script = [_assessment(Decision.PIVOT, open_wedge="idea2"), _assessment(Decision.GO)]
-
-    def ideate(_d: Any, idea: str) -> IdeaSketch:
-        seen_ideas.append(idea)
-        return IdeaSketch(idea=idea, hypothesis=idea, provenance="idea-first")
+    def assess_fn(_d: Any, _r: DemandReport, _l: Landscape) -> Assessment:
+        return seq.pop(0)
 
     result = validate(
         _deps(),
-        "idea1",
-        ideate_fn=ideate,
-        research_fn=lambda _d, _s: _report(),
+        "idea",
+        decide=decide,
+        max_iterations=max_iterations,
+        ideate_fn=_ideate,
+        research_fn=research_fn,
         landscape_fn=lambda _d, _r: _landscape(),
-        assess_fn=assess,
+        assess_fn=assess_fn,
     )
+    return result, counts
+
+
+def test_go_exits_first_round() -> None:
+    result, counts = _run([_assessment(Decision.GO)])
+    assert result.outcome == "go"
+    assert result.iterations == 1
+    assert counts["research"] == 1
+    assert result.decision_log[0].fresh_pull is True
+
+
+def test_no_go_terminates() -> None:
+    result, counts = _run([_assessment(Decision.NO_GO)])
+    assert result.outcome == "no_go"
+    assert counts["research"] == 1
+
+
+def test_in_corpus_pivot_reuses_corpus_then_go() -> None:
+    # round 1 PIVOT to a fork ALREADY in the report → reuse (no re-pull); round 2 GO
+    result, counts = _run([_assessment(Decision.PIVOT, pivot_to=_W1.id), _assessment(Decision.GO)])
     assert result.outcome == "go"
     assert result.iterations == 2
-    assert seen_ideas == ["idea1", "idea2"]  # the loop pivoted to the target
+    assert counts["research"] == 1  # the headline: corpus reused, NOT re-pulled
     assert result.decision_log[0].decision == Decision.PIVOT
-    assert result.decision_log[0].ruled_out == ["idea1"]
+    assert result.decision_log[0].fresh_pull is True  # round 1 = the one pull
+    assert result.decision_log[1].fresh_pull is False  # round 2 reused the corpus
+
+
+def test_out_of_corpus_pivot_triggers_fresh_pull() -> None:
+    # PIVOT to an id NOT in the report → the loop must re-pull
+    result, counts = _run(
+        [_assessment(Decision.PIVOT, pivot_to="w:not-in-report"), _assessment(Decision.GO)]
+    )
+    assert result.outcome == "go"
+    assert counts["research"] == 2  # a fresh pull happened
+    assert result.decision_log[1].fresh_pull is True
+
+
+def test_pivot_with_no_target_is_exhausted() -> None:
+    result, counts = _run([_assessment(Decision.PIVOT, pivot_to=None)])
+    assert result.outcome == "exhausted"
+    assert counts["research"] == 1
 
 
 def test_max_iterations_cap_yields_exhausted() -> None:
-    # always PIVOT to a fresh fork → never converges → cap → exhausted
-    script = [
-        (Decision.PIVOT, "a"),
-        (Decision.PIVOT, "b"),
-        (Decision.PIVOT, "c"),
-    ]
-    result = validate(_deps(), "start", max_iterations=2, **_stages(_Scripted(list(script))))
+    # keep pivoting to in-corpus forks → never converges → cap → exhausted, still ONE pull
+    result, counts = _run([_assessment(Decision.PIVOT, pivot_to=_W1.id)] * 3, max_iterations=2)
     assert result.outcome == "exhausted"
-    assert result.iterations == 2  # stopped at the cap
+    assert result.iterations == 2
+    assert counts["research"] == 1  # all reuse, no re-pulls
 
 
-def test_pivot_back_to_seen_fork_is_exhausted() -> None:
-    # PIVOT points back at the starting idea → already seen → exhausted, not an infinite loop
-    result = validate(_deps(), "x", **_stages(_Scripted([(Decision.PIVOT, "x")])))
-    assert result.outcome == "exhausted"
-    assert result.iterations == 1
-
-
-def test_custom_decide_callback_overrides_recommendation() -> None:
-    # assessment says GO, but the human callback says NO-GO — the human wins
+def test_custom_decide_overrides_recommendation() -> None:
     def human(_step: ValidationStep) -> Decision:
         return Decision.NO_GO
 
-    result = validate(_deps(), "x", decide=human, **_stages(_Scripted([(Decision.GO, None)])))
+    result, _ = _run([_assessment(Decision.GO)], decide=human)
     assert result.outcome == "no_go"

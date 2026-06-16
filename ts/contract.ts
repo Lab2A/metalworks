@@ -532,6 +532,8 @@ export interface DecisionLogEntry {
   ruled_out?: string[];
   /** One-line reasoning for the verdict. */
   why?: string;
+  /** True if this round ran a fresh corpus pull; False if it reused the corpus (a PIVOT to a fork already in the report needs no re-pull). */
+  fresh_pull?: boolean;
 }
 
 export interface ValidationResult {

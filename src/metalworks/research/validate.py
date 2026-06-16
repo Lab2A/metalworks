@@ -87,44 +87,59 @@ def validate(
 
     seen: set[str] = set()
     log: list[DecisionLogEntry] = []
-    current = idea
     final: Assessment | None = None
     outcome: str = "exhausted"
 
+    # Round 1: the one fresh pull. Every later PIVOT to a fork the report already
+    # surfaced reuses THIS corpus — no re-pull (the expensive part). A fresh pull
+    # only happens if a pivot leaves the corpus (a brand-new idea).
+    sketch = do_ideate(deps, idea)
+    report = do_research(deps, sketch)
+    landscape = do_landscape(deps, report)
+    focus = idea.strip().lower()
+    pulled = True
+
     for i in range(1, max_iterations + 1):
-        norm = current.strip().lower()
-        if norm in seen:  # circled back to a fork we already tried → done
+        if focus in seen:  # circled back to a fork we already tried → done
             outcome = "exhausted"
             break
-        seen.add(norm)
+        seen.add(focus)
 
-        sketch = do_ideate(deps, current)
-        report = do_research(deps, sketch)
-        landscape = do_landscape(deps, report)
         assessment = do_assess(deps, report, landscape)
         final = assessment
         decision = choose(
             ValidationStep(
-                iteration=i, idea=current, report=report, landscape=landscape, assessment=assessment
+                iteration=i, idea=focus, report=report, landscape=landscape, assessment=assessment
             )
         )
-
         if decision is Decision.GO:
-            log.append(_entry(i, current, decision, [], assessment))
+            log.append(_entry(i, focus, decision, [], assessment, pulled))
             outcome = "go"
             break
         if decision is Decision.NO_GO:
-            log.append(_entry(i, current, decision, [current], assessment))
+            log.append(_entry(i, focus, decision, [focus], assessment, pulled))
             outcome = "no_go"
             break
 
-        # PIVOT — aim at the under-served fork next round (its label is the seed).
-        nxt = assessment.gap.open_wedge
-        log.append(_entry(i, current, decision, [current], assessment))
-        if not nxt or nxt.strip().lower() in seen:
-            outcome = "exhausted"  # nothing new to pivot to
+        # PIVOT — decide whether the next angle needs a fresh pull.
+        log.append(_entry(i, focus, decision, [focus], assessment, pulled))
+        pt = assessment.pivot_target
+        if pt is None:
+            outcome = "exhausted"
             break
-        current = nxt
+        if _fork_in_report(report, pt):
+            # LIGHT round: the fork is already in the corpus → reuse the report
+            # (narrowed to the fork) and the SAME landscape. No re-pull, no re-synthesis.
+            report = _narrow(report, pt)
+            pulled = False
+            focus = pt.target_id
+        else:
+            # FRESH PULL: the pivot left the corpus (a genuinely new idea/space).
+            sketch = do_ideate(deps, pt.why or pt.target_id)
+            report = do_research(deps, sketch)
+            landscape = do_landscape(deps, report)
+            pulled = True
+            focus = (pt.why or pt.target_id).strip().lower()
 
     return ValidationResult(
         outcome=outcome,  # type: ignore[arg-type]
@@ -134,9 +149,34 @@ def validate(
     )
 
 
+def _fork_in_report(report: DemandReport, pt: object) -> bool:
+    """True when the pivot target is a fork the report already surfaced (in-corpus →
+    reuse, no fresh pull needed)."""
+    kind = getattr(pt, "kind", None)
+    target_id = getattr(pt, "target_id", None)
+    if kind == "wedge":
+        return any(w.id == target_id for w in report.candidate_wedges)
+    if kind == "segment":
+        return any(s.id == target_id for s in report.segments)
+    return False
+
+
+def _narrow(report: DemandReport, pt: object) -> DemandReport:
+    """Return the report narrowed to the pivot fork (sets chosen_* so the next
+    assess evaluates that fork). Reuses the same corpus — no re-pull."""
+    if getattr(pt, "kind", None) == "wedge":
+        return report.model_copy(update={"chosen_wedge_id": getattr(pt, "target_id", None)})
+    return report.model_copy(update={"chosen_segment_id": getattr(pt, "target_id", None)})
+
+
 def _entry(
-    i: int, idea: str, decision: Decision, ruled_out: list[str], a: Assessment
+    i: int, idea: str, decision: Decision, ruled_out: list[str], a: Assessment, fresh_pull: bool
 ) -> DecisionLogEntry:
     return DecisionLogEntry(
-        iteration=i, idea=idea, decision=decision, ruled_out=ruled_out, why=a.gap.reasoning
+        iteration=i,
+        idea=idea,
+        decision=decision,
+        ruled_out=ruled_out,
+        why=a.gap.reasoning,
+        fresh_pull=fresh_pull,
     )

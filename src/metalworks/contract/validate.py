@@ -29,6 +29,11 @@ class DecisionLogEntry(BaseModel):
         description="Forks/ideas this round eliminated — the anti-repeat memory.",
     )
     why: str = Field(default="", description="One-line reasoning for the verdict.")
+    fresh_pull: bool = Field(
+        default=True,
+        description="True if this round ran a fresh corpus pull; False if it reused the corpus "
+        "(a PIVOT to a fork already in the report needs no re-pull).",
+    )
 
 
 class ValidationResult(BaseModel):

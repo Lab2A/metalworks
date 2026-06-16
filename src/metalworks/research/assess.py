@@ -57,16 +57,31 @@ def _decide(
 ) -> tuple[Decision, SignalStrength, SignalStrength, PivotTarget | None, str | None, str]:
     """The pure verdict function. Returns
     (decision, demand_strength, saturation, pivot_target, open_label, reasoning)."""
-    n = report.total_distinct_authors
+    # Demand: when the run is narrowed to a chosen wedge (a PIVOT round), evaluate
+    # THAT wedge's breadth, not the whole report — so a narrowed re-assess reflects
+    # the fork actually under consideration.
+    active = report.active_wedge if report.chosen_wedge_id else None
+    n = (
+        (active.breadth_count or active.distinct_author_count)
+        if active
+        else report.total_distinct_authors
+    )
     demand, demand_word = _demand_strength(n)
     saturation = _saturation(landscape)
     moderate_plus = demand in (SignalStrength.MEDIUM, SignalStrength.HIGH)
 
-    # The fork to pivot to (prefer the narrowest wedge, else the strongest segment).
-    wedge, seg = report.default_wedge, report.default_segment
-    if wedge is not None:
-        fork_kind, fork_id, open_label = "wedge", wedge.id, wedge.label
-    elif seg is not None:
+    # The fork to pivot to: the strongest wedge we are NOT already focused on, else
+    # the strongest (not-yet-chosen) segment. Excluding the active fork lets the loop
+    # explore a genuinely new angle each PIVOT — and terminate when it runs out.
+    pivot_wedge = max(
+        (w for w in report.candidate_wedges if w.id != report.chosen_wedge_id),
+        key=lambda w: w.breadth_count,
+        default=None,
+    )
+    seg = report.default_segment
+    if pivot_wedge is not None:
+        fork_kind, fork_id, open_label = "wedge", pivot_wedge.id, pivot_wedge.label
+    elif seg is not None and seg.id != report.chosen_segment_id:
         fork_kind, fork_id, open_label = "segment", seg.id, seg.name
     else:
         fork_kind, fork_id, open_label = None, None, None
