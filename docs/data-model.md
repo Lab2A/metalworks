@@ -43,6 +43,12 @@ else you generate later reads from this one report.
   real quote.
 - **`WebFinding`** — a fact pulled from the web. Its `source_url` comes from the search
   tool's citation data, never from model prose. No source, no finding.
+- **`SegmentChoice` / `CandidateWedge`** — the forks the report surfaces instead of silently
+  collapsing: distinct audiences you could target (each with an `overlap` guard so near-identical
+  ones aren't offered as a real choice) and the narrowest things someone would pay for (each tied
+  to the clusters behind it). The [validation loop](/docs/validation-loop)'s PIVOT aims at one of
+  these. Deterministic callers read `report.default_segment` / `default_wedge`; interactive ones
+  set `chosen_*`.
 - **`ReportDiff`** — what changed between two versions of a report: count deltas (threads,
   distinct voices, clusters, source distribution) plus themes added / faded / shifted. You
   get one back from `mw.refresh(...)` or `metalworks research diff`. See [the corpus](/docs/corpus).
@@ -75,6 +81,11 @@ Each one is generated from the report and links its claims back to the same quot
   can't be tied to a quote is dropped.
 - **`LaunchAsset` / `ChannelPlan` / `ContentPlan`** — launch drafts and a human-run plan,
   each line backed by a quote. metalworks never posts.
+- **`Landscape` / `ExistingSolution`** — the full "what exists today": the `CompetitorMap` plus
+  real shipped products (Product Hunt / web) matched to demand clusters with their traction.
+- **`Assessment`** — the **GO / PIVOT / NO-GO** verdict, a deterministic gap over demand ×
+  landscape (the model only writes the rationale); a PIVOT carries the under-served fork to aim at.
+  **`ValidationResult`** is the [validation loop](/docs/validation-loop)'s outcome + decision log.
 
 So whatever you generate, the chain runs from a real comment all the way to the line on your
 landing page — see [why you can trust the output](/docs/how-it-works).

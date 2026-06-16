@@ -110,7 +110,8 @@ flat, resolvable evidence list every downstream method's `EvidenceRef`s point at
 | --- | --- | --- |
 | `.demand` | `DemandReport` | The report (see [Data model](/docs/data-model)). |
 | `.evidence` | `list[EvidenceRecord]` | The grounded evidence, surfaced for resolving refs. |
-| `.competitors` / `.positioning` | `… \| None` | Reserved accessors; `None` today (forward-compatible). |
+| `.competitors` / `.positioning` | `CompetitorMap \| None` / `PositioningBrief \| None` | The Pillar-A/B outputs, when composed onto the bundle. |
+| `.landscape` / `.assessment` / `.ideation` | `Landscape` / `Assessment` / `IdeaSketch`, each `\| None` | The validation-loop outputs, when composed on. All default `None` (additive). |
 
 Key fields you'll read on `.demand`:
 
@@ -155,6 +156,42 @@ comp = mw.competitors(research)
 for rival in comp.competitors:
     for gap in rival.gaps:
         print(rival.name, "misses:", gap.claim)   # each gap has a resolvable EvidenceRef
+```
+
+### The validation loop
+
+The discovery loop — frame an idea, weigh demand against what already exists, get an honest
+verdict. See the [validation loop](/docs/validation-loop) for the full picture.
+
+```python
+def ideate(self, idea: str) -> IdeaSketch: ...
+def ideate_from_evidence(self, research: Research | DemandReport) -> IdeationResult: ...
+def landscape(self, research: Research | DemandReport) -> Landscape: ...
+def assess(self, research: Research | DemandReport, landscape: Landscape) -> Assessment: ...
+def validate(self, idea: str, *, max_iterations: int = 4) -> ValidationResult: ...
+```
+
+- `ideate` (idea-first) sharpens a raw idea into a testable hypothesis + a `ResearchBrief`;
+  `ideate_from_evidence` (evidence-first) surfaces a report's forks — candidate wedges, else top
+  clusters — as grounded `IdeaSketch`es to pick from.
+- `landscape` is the thick "what exists today": it wraps `competitors()` (the `CompetitorMap`) and
+  adds an empirical existing-solutions scan (real shipped products, matched to demand clusters).
+- `assess` is the heart: a **deterministic** GO / PIVOT / NO-GO gap over demand × landscape (the LLM
+  only writes the rationale). PIVOT carries a `pivot_target` — a real fork id to aim at. A partial
+  landscape never yields a hard GO.
+- `validate` runs the loop headlessly: ideate → demand → landscape → assess, looping on PIVOT. It
+  pulls the corpus **once** and reuses it for every in-corpus pivot — a fresh pull happens only if a
+  pivot leaves the corpus.
+
+```python
+landscape = mw.landscape(research)
+verdict = mw.assess(research, landscape)
+print(verdict.decision)                    # "go" | "pivot" | "no_go"
+if verdict.pivot_target:
+    print("aim at:", verdict.pivot_target.target_id, "—", verdict.gap.reasoning)
+
+result = mw.validate("a privacy-first habit tracker for therapists")
+print(result.outcome, "in", result.iterations, "round(s)")
 ```
 
 ### Design stage

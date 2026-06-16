@@ -56,9 +56,22 @@ report-grounded commands (`position`, `competitor-map`, `surface`, `site`, `laun
 | `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
 | `metalworks research content-plan REPORT_ID` | Project a stored report into a deterministic content/SEO plan. **No LLM.** | zero-key |
 
+The **[validation loop](/docs/validation-loop)** — frame an idea, then decide if it's worth building:
+
+| Command | Description | Keys |
+| --- | --- | --- |
+| `metalworks research ideate "<idea>"` | Idea-first: sharpen a raw idea into a testable hypothesis + a brief to run demand on. | chat key |
+| `metalworks research ideate --from-report REPORT_ID` | Evidence-first: surface a stored report's forks (candidate wedges / top clusters) as grounded idea sketches to pick from. | chat key |
+| `metalworks research landscape REPORT_ID` | The full "what exists today" — the competitor map **plus** an empirical existing-solutions scan (real shipped products, matched to demand clusters). | chat key |
+| `metalworks research assess REPORT_ID` | The **GO / PIVOT / NO-GO** verdict — a deterministic gap over demand × landscape. PIVOT names an under-served fork to aim at. | chat key |
+| `metalworks research validate "<idea>"` | Run the whole loop headlessly (`--auto`): ideate → demand → landscape → assess, looping on PIVOT until GO, NO-GO, or exhausted. | chat key |
+
 Options:
 
 - `research plan` — `--out, -o PATH` (default `brief.json`).
+- `research ideate` — `IDEA` argument (idea-first) **or** `--from-report REPORT_ID` (evidence-first); `--out, -o PATH`.
+- `research landscape` / `assess` — `REPORT_ID` argument; `--out, -o PATH` to write the JSON.
+- `research validate` — `IDEA` argument; `--max-iterations INT` (loop cap before `exhausted`, default 4); `--out, -o PATH`.
 - `research run` — `--question, -q TEXT` *or* `--brief PATH` (pass exactly one); `--subreddit TEXT` (repeatable, else auto); `--source TEXT` (repeatable — which [sources](/docs/sources) to ingest from; else configured/Reddit); `--months INT` (corpus window, default 12); `--out, -o PATH` to write the report JSON.
 - `research list` — `--limit INT` (max runs to show, default 20).
 - `research refresh` — `REPORT_ID` argument (any version of the report; updates from the latest one); `--out, -o PATH` to write the new report JSON.
