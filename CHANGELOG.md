@@ -6,6 +6,43 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [0.0.3] - 2026-06-16
+
+Research becomes a **validation loop**: ideate → demand + landscape → assess
+(GO / PIVOT / NO-GO) → loop. Every new primitive is exposed on all four surfaces
+(Python facade, CLI, MCP server, Claude Code plugin) and follows the no-cite-no-claim
+rule. Pre-1.0; anything outside `metalworks.contract` may still change.
+
+### Added
+
+- **Decision-bearing forks.** `DemandReport` now surfaces the choices it used to
+  collapse: `segments` (decision-bearing `SegmentChoice`, with an `overlap` guard so
+  near-identical audiences aren't offered as a real choice) and `candidate_wedges`
+  (`CandidateWedge` — the narrowest things someone would pay for), plus `None`-safe
+  `default_*` / `active_*` selectors.
+- **`landscape()`** — the full "what exists today": wraps the `CompetitorMap` and adds
+  an empirical existing-solutions scan (real shipped products from Product Hunt + web,
+  matched to demand clusters). CLI `research landscape`, MCP `landscape_from_report`,
+  skill `/market-landscape`.
+- **`assess()` → `Assessment`** — the **GO / PIVOT / NO-GO** verdict, a *deterministic*
+  gap over demand × landscape (the model only writes the rationale). PIVOT carries a real
+  `pivot_target` fork; a partial landscape never yields a hard GO. CLI `research assess`,
+  MCP `assess_from_report`, skill `/go-no-go`.
+- **`ideate()`** — idea-first (sharpen a raw idea into a hypothesis + a brief) and
+  evidence-first (surface a report's forks as grounded sketches). CLI `research ideate`
+  (+ `--from-report`), MCP `ideate_from_idea` / `ideate_from_report`, skill `/ideate`.
+- **`validate()`** — the loop orchestrator. Pulls the corpus **once** and reuses it for
+  in-corpus pivots; a fresh pull happens only when a pivot leaves the corpus. CLI
+  `research validate`, MCP `validate_from_idea`, skill `/validate`. MCP tools: 26 → **31**.
+- New "Validation loop" docs page + reference updates (CLI, SDK, MCP, data-model).
+
+### Fixed
+
+- **Vertex web grounding** now fires reliably — competitor enumeration mandates a web
+  search instead of answering from memory (verified on Vertex `gemini-3.1-pro-preview`).
+- **`DemandReport.source`** is derived from the sources actually read (e.g. `hackernews`,
+  `mixed`) instead of always reporting `reddit_arctic_shift`.
+
 ## [0.0.2] - 2026-06-15
 
 Multi-source corpus-as-core, live versioned reports, and keyless-by-default
