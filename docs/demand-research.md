@@ -124,5 +124,6 @@ plan on signal that isn't there.
 ## Next
 
 You have the report. Now turn it into the things you need to launch:
-→ [Positioning & competitors](/docs/positioning) · [Design & marketing site](/docs/design) ·
-[the full walkthrough](/docs/walkthrough) · [why you can trust it](/docs/how-it-works)
+→ [Positioning](/docs/positioning) · [Competitors](/docs/competitors) ·
+[Surface & screens](/docs/design) · [Marketing site](/docs/marketing-site) ·
+[the full walkthrough](/docs/walkthrough)

@@ -46,12 +46,16 @@
             "pages": ["docs/walkthrough"]
           },
           {
+            "group": "Your project",
+            "pages": ["docs/projects", "docs/corpus", "docs/sources"]
+          },
+          {
             "group": "Research",
-            "pages": ["docs/demand-research", "docs/positioning"]
+            "pages": ["docs/demand-research", "docs/positioning", "docs/competitors"]
           },
           {
             "group": "Design",
-            "pages": ["docs/design"]
+            "pages": ["docs/design", "docs/marketing-site"]
           },
           {
             "group": "Build",
@@ -66,12 +70,8 @@
             "pages": ["docs/content-seo", "docs/reddit-engagement"]
           },
           {
-            "group": "Sources & your data",
-            "pages": ["docs/sources", "docs/corpus"]
-          },
-          {
             "group": "How it works",
-            "pages": ["docs/how-it-works", "docs/projects", "docs/data-model"]
+            "pages": ["docs/how-it-works", "docs/data-model"]
           }
         ]
       },
