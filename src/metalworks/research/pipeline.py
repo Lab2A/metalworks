@@ -333,6 +333,7 @@ def run_research(
         slot_plan=synthesis_out.slot_plan,
         audience_profile=synthesis_out.audience_profile,
         segments=synthesis_out.segments,
+        candidate_wedges=synthesis_out.candidate_wedges,
         market_sizing=synthesis_out.market_sizing,
         price_finding=synthesis_out.price_finding,
         source_map=synthesis_out.source_map,

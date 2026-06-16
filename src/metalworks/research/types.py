@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from metalworks.contract import (
     AudienceProfile,
     AudienceSegment,
+    CandidateWedge,
     CrossReference,
     InsightCluster,
     MarketSizing,
@@ -180,6 +181,7 @@ class SynthesisOutput:
     slot_plan: SlotPlan | None
     audience_profile: AudienceProfile | None
     segments: list[AudienceSegment]
+    candidate_wedges: list[CandidateWedge]
     market_sizing: MarketSizing | None
     price_finding: PriceFinding | None
     source_map: list[SourceMapEntry]

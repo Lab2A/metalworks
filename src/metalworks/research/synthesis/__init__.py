@@ -52,6 +52,7 @@ from metalworks.research.synthesis import (
     pricing,
     segments,
     verdict,
+    wedges,
 )
 from metalworks.research.synthesis.positioning import build_positioning_brief
 from metalworks.research.types import LoadedComment, LoadedPost, SynthesisOutput
@@ -148,6 +149,7 @@ def synthesize(
             slot_plan=_slot_plan_from_brief(brief),
             audience_profile=None,
             segments=[],
+            candidate_wedges=[],
             market_sizing=None,
             price_finding=None,
             source_map=_build_source_map(posts, {}),
@@ -201,6 +203,9 @@ def synthesize(
     # 8. Segmentation (best-effort).
     seg_list = segments.build_segments(deps, clusters, cluster_authors, audience_profile)
 
+    # 8b. Candidate wedges (deterministic, grounded — the buildable forks).
+    wedge_list = wedges.build_wedges(clusters, seg_list)
+
     # 9. Verdict + source_map (both deterministic).
     verdict_str = verdict.derive_verdict(
         total_distinct_authors=total_distinct,
@@ -226,6 +231,7 @@ def synthesize(
         slot_plan=slot_plan,
         audience_profile=audience_profile,
         segments=seg_list,
+        candidate_wedges=wedge_list,
         market_sizing=market_sizing,
         price_finding=price_finding,
         source_map=source_map,
