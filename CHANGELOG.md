@@ -6,6 +6,28 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [Unreleased]
+
+### Added
+
+- **Deploy + billing.** Two new verbs take a validated idea the rest of the way:
+  `metalworks deploy` pushes the rendered marketing site to Vercel for a live URL,
+  and `metalworks billing create` turns the report's cited pricing tiers into a
+  real Stripe product + recurring price + payment link. Preview and test mode are
+  the defaults; production and live charges are human-gated, the same way Reddit
+  posting is. New `metalworks.deploy` / `metalworks.billing` packages, the
+  `DeployProvider` / `BillingProvider` / `SubscriptionStore` protocols, the
+  `Deployment` / `BillingProduct` / `Subscription` contracts, a Vercel adapter
+  (REST over the core `httpx` dep, gated by `VERCEL_TOKEN`), a Stripe adapter
+  (behind the new `[stripe]` extra), and `deploy_marketing_site` /
+  `billing_create_product` MCP tools.
+- **A paywall you can import.** The subscription gate
+  (`require_active_subscription`) and the Stripe webhook mapper
+  (`subscription_event_to_record`) are pure, framework-agnostic functions a
+  downstream app uses to enforce access — no metalworks runtime, no SDK, no
+  network. `FakeBillingProvider`, `FakeDeploy`, and `FakeSubscriptionStore` ship
+  in `metalworks.testing` so you can test against the seams offline.
+
 ## [0.0.4] - 2026-06-17
 
 Sharper decisions and a friendlier front door. The verdict stops collapsing the

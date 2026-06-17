@@ -58,6 +58,8 @@ source of truth for its tier.
 | `site_render` | Build a grounded marketing site + a self-contained `index.html` (chat + embeddings). | `report_id`, `store_path` |
 | `launch_assets_build` | Draft grounded, channel-native launch assets — one LLM call per surface; `[]` on a no-go report. Drafting only (chat key). | `report_id`, `store_path` |
 | `build_spec` | Derive an evidence-grounded `BuildSpec` — each feature maps to a real demand cluster with quotes; un-grounded features dropped. Returns the spec; does **not** write files (that is the `metalworks build init` CLI) (chat + embedding keys). | `report_id`, `surface` (`web`), `stack` (`empty`), `store_path` |
+| `deploy_marketing_site` | Render a stored report's marketing site and deploy it to Vercel, returning the live URL. `target="preview"` (default) is safe; `target="production"` requires `METALWORKS_ALLOW_DEPLOY=1` (chat + embeddings + `VERCEL_TOKEN`). | `report_id`, `target` (`preview`), `store_path` |
+| `billing_create_product` | Derive a report's `BuildSpec`, take its first priced tier, and create a real Stripe product + recurring price + payment link. Test mode by default; `live=True` requires `METALWORKS_ALLOW_BILLING=1` (chat + embeddings + `STRIPE_SECRET_KEY`). | `report_id`, `live` (`false`), `store_path` |
 | `research_start` | Start the pipeline as a background job and return a `run_id` immediately (chat + embedding keys). | `brief`, `months`, `store_path` |
 | `research_status` | Status of a background research job. | `run_id`, `store_path` |
 | `research_result` | The finished report for a completed job, or a status payload while running. | `run_id`, `store_path` |

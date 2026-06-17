@@ -66,6 +66,10 @@
             "pages": ["docs/launch"]
           },
           {
+            "group": "Deploy & bill",
+            "pages": ["docs/deploy-billing"]
+          },
+          {
             "group": "Grow",
             "pages": ["docs/content-seo", "docs/reddit-engagement"]
           },

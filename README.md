@@ -88,6 +88,7 @@ pip install "metalworks[all]"
 | `supabase` | `arctic` + `supabase` | `ArcticMirrorReader` — Arctic corpus from a Supabase Storage bucket (`ARCTIC_SHIFT_SOURCE=mirror`) |
 | `exa` | `exa-py` | Exa `SearchProvider` adapter |
 | `tavily` | `tavily-python` | Tavily `SearchProvider` adapter |
+| `stripe` | `stripe` | Stripe `BillingProvider` adapter (product + price + pay link) |
 | `mcp` | `mcp[cli]` | MCP server surface |
 | `all` | everything above | Kitchen sink |
 | `dev` | pytest, ruff, pyright, respx | Contributors |
@@ -113,7 +114,7 @@ default. The protocols are the seam your code and the pipeline speak through:
 
 See [docs/protocols.md](https://metalworks.lab2a.ai/docs/protocols) for signatures.
 
-Two verticals sit on top of those protocols:
+Three verticals sit on top of those protocols:
 
 - **Research** (`metalworks.research`) — turns an idea into a clustered
   `DemandReport` of real, permalinked Reddit quotes. Entry point:
@@ -127,6 +128,14 @@ Two verticals sit on top of those protocols:
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.
+- **Deploy & bill** (`metalworks.deploy` / `metalworks.billing`) — push the
+  rendered marketing site to Vercel for a live URL (`DeployProvider`), and turn
+  the report's cited pricing tiers into a real Stripe product + recurring price +
+  payment link (`BillingProvider`). The subscription gate and webhook mapper are
+  pure, framework-agnostic functions a downstream app imports to enforce a
+  paywall (`require_active_subscription`, `subscription_event_to_record`).
+  Preview/test by default; going live or to production is human-gated, the same
+  way Reddit posting is.
 
 Four form factors share that contract:
 
@@ -134,7 +143,7 @@ Four form factors share that contract:
    protocols underneath.
 2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report
    commands (`metalworks research position|landscape|surface|site|launch|content-plan`,
-   `metalworks build init`),
+   `metalworks build init`), `metalworks deploy` and `metalworks billing create`,
    `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
    or SSE.
