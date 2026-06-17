@@ -315,16 +315,23 @@ def test_market_sizing_zero_authors() -> None:
     assert m.addressable_market == 0
 
 
-def test_verdict_strength_bands() -> None:
-    assert verdict.derive_verdict(total_distinct_authors=150).startswith("Strong demand")
-    assert verdict.derive_verdict(total_distinct_authors=30).startswith("Moderate demand")
-    thin = verdict.derive_verdict(total_distinct_authors=5)
+def test_verdict_formats_the_given_strength_label() -> None:
+    # derive_verdict is now a pure formatter — the strength is computed in demand.py
+    # and handed in. (The band logic itself is covered by test_synthesis_demand.py.)
+    assert verdict.derive_verdict(
+        strength_label="Strong demand", total_distinct_authors=150
+    ).startswith("Strong demand")
+    assert verdict.derive_verdict(
+        strength_label="Moderate demand", total_distinct_authors=30
+    ).startswith("Moderate demand")
+    thin = verdict.derive_verdict(strength_label="Thin signal", total_distinct_authors=5)
     assert thin.startswith("Thin signal")
     assert thin.endswith("Treat as exploratory.")
 
 
 def test_verdict_includes_market_and_price() -> None:
     out = verdict.derive_verdict(
+        strength_label="Strong demand",
         total_distinct_authors=120,
         market=MarketSizing(reddit_floor=120, addressable_market=12000, penetration={}),
         price=PriceFinding(low=10.0, high=25.0, currency="USD"),

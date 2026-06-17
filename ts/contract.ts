@@ -490,6 +490,14 @@ export interface GapAnalysis {
   open_wedge?: string | null;
   /** One line: why these signals imply the decision. */
   reasoning?: string;
+  /** Top fork's distinct authors as a fraction of the pull (0..1). */
+  demand_prevalence?: number;
+  /** Top fork's standing among peer forks (0..1); None if no peers. */
+  demand_percentile?: number | null;
+  /** Distance from a band edge (0..1); None if uncomputed. */
+  confidence?: number | null;
+  /** What the strength self-calibrated against (e.g. 'top of 4 forks'). */
+  reference?: string;
 }
 
 export interface PivotTarget {
@@ -499,6 +507,28 @@ export interface PivotTarget {
   target_id: string;
   /** Why this fork is the better bet. */
   why?: string;
+}
+
+export interface ForkVerdict {
+  /** Which kind of fork this scores. */
+  kind: "wedge" | "segment";
+  /** A real CandidateWedge.id / SegmentChoice.id in the report. */
+  fork_id: string;
+  /** The fork's human label. */
+  label: string;
+  /** GO | NO_GO at the fork level. */
+  decision: Decision;
+  /** Relative strength band for this fork. */
+  demand_strength: SignalStrength;
+  /** Supply crowding (space-level for now — see ForkVerdict v2). */
+  landscape_saturation: SignalStrength;
+  /** Fraction of the pull (0..1). */
+  demand_prevalence?: number;
+  /** Standing among peer forks (0..1). */
+  demand_percentile?: number;
+  /** Distance from a band edge (0..1). */
+  confidence?: number;
+  distinct_author_count?: number;
 }
 
 export interface Assessment {
@@ -514,6 +544,8 @@ export interface Assessment {
   gap: GapAnalysis;
   /** Where to aim instead — set iff decision == PIVOT. */
   pivot_target?: PivotTarget | null;
+  /** Per-fork GO/NO-GO — the un-collapsed answer behind the top-line decision. */
+  fork_verdicts?: ForkVerdict[];
   /** Backing forks for the verdict. */
   evidence?: EvidenceRef[];
   partial?: boolean;
