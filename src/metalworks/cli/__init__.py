@@ -27,17 +27,32 @@ from metalworks import config
 
 if TYPE_CHECKING:
     from metalworks.contract import DemandReport
+    from metalworks.contract.assess import Decision
+    from metalworks.contract.ideate import IdeaSketch
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.validate import ResearchFn, ValidationStep
     from metalworks.stores.repos import RunRepo
 
 app = typer.Typer(
     name="metalworks",
     help="Marketing research and Reddit engagement toolkit.",
-    no_args_is_help=True,
 )
 console = Console()
 err_console = Console(stderr=True)
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context) -> None:
+    """Marketing research and Reddit engagement toolkit.
+
+    Run with no command for a guided session (idea → demand → landscape → verdict),
+    or call any sub-command directly (`metalworks --help`).
+    """
+    if ctx.invoked_subcommand is None:
+        _guided_session()
+
 
 # Sub-apps registered at the bottom of the module.
 research_app = typer.Typer(help="Plan and run demand-research reports.", no_args_is_help=True)
@@ -442,6 +457,112 @@ def _setup_sources_step(yes: bool) -> None:
         return
     path = config.save_sources_config(chosen)
     console.print(f"  [green]Wrote[/green] sources = {chosen} [dim]({path})[/dim]")
+
+
+# ── guided session ───────────────────────────────────────────────────────────
+
+
+@app.command()
+def start() -> None:
+    """Guided session: idea → demand → landscape → verdict, then build next-steps.
+
+    The same flow you get by running bare `metalworks`. Walks you through one idea
+    end to end with the GO/PIVOT/NO-GO call in your hands at each round, and offers
+    positioning / site / scaffold once an idea earns a GO.
+    """
+    _guided_session()
+
+
+def _next_steps_menu(report_id: str) -> None:
+    """After a GO, dispatch to the build pillars (reusing the existing commands)."""
+    import contextlib
+
+    actions: list[tuple[str, Any]] = [
+        ("Draft positioning", lambda: research_position(report_id=report_id)),
+        ("Generate marketing site", lambda: research_site(report_id=report_id)),
+        ("Scaffold build harness", lambda: build_init(report=report_id)),
+        ("Done", None),
+    ]
+    while True:
+        console.print("\n[bold]What next?[/bold]")
+        for i, (label, _action) in enumerate(actions, start=1):
+            console.print(f"  [bold]{i}[/bold]) {label}")
+        choice = str(typer.prompt("  Pick", default=str(len(actions)))).strip()
+        idx = int(choice) - 1 if choice.isdigit() else len(actions) - 1
+        if not 0 <= idx < len(actions):
+            idx = len(actions) - 1
+        action = actions[idx][1]
+        if action is None:
+            break
+        # A pillar may exit with its own guidance (e.g. missing key); stay in the menu.
+        with contextlib.suppress(typer.Exit):
+            action()
+
+
+def _guided_session() -> None:
+    """The guided flow behind bare `metalworks` and `metalworks start`."""
+    from metalworks.project import Project
+
+    console.print("[bold]metalworks[/bold] — let's validate an idea.")
+    console.print("[dim]type 'metalworks --help' for the full command list.[/dim]")
+
+    # 1. Preflight. A chat key (or Vertex ADC) is required; a project is optional.
+    if not _present_providers() and not config.vertex_enabled():
+        console.print("\n[yellow]No provider key found in the environment.[/yellow]")
+        console.print(
+            "  Set one, e.g.:  [bold]export OPENAI_API_KEY=…[/bold]  "
+            "(or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY), then run me again."
+        )
+        return
+    no_project = Project.find() is None
+    if no_project and typer.confirm("\nNo project here yet — set one up?", default=True):
+        project = Project.init(Path.cwd())
+        console.print(f"  [green]Created[/green] .metalworks/ (project '{project.slug}')")
+
+    # 2. The idea.
+    idea = str(typer.prompt("\nWhat's your idea?", default="")).strip()
+    if not idea:
+        console.print("[dim]No idea entered — nothing to do.[/dim]")
+        return
+
+    # 3. The interactive validate loop (you make the GO/PIVOT/NO-GO call each round).
+    from metalworks.research import validate as run_validate
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+    )
+    console.print(f"\n[bold]Running demand research[/bold] for: {idea}")
+    try:
+        result = run_validate(
+            deps,
+            idea,
+            decide=_interactive_decide,
+            research_fn=_saving_research(store),
+            max_iterations=4,
+        )
+    finally:
+        reader.close()
+    _print_validation(result)
+
+    # 4. After a GO, carry momentum into the build pillars.
+    if result.outcome == "go":
+        rid = _resolve_report_id(
+            store, result.final_assessment.report_id if result.final_assessment else None
+        )
+        _next_steps_menu(rid)
+    else:
+        console.print(
+            "\n[dim]Not a GO this round — refine the idea and run `metalworks` again.[/dim]"
+        )
 
 
 # ── config sub-app ──────────────────────────────────────────────────────────
@@ -952,7 +1073,7 @@ def corpus_stats() -> None:
 # ── research sub-app ────────────────────────────────────────────────────────
 
 
-@research_app.command("plan")
+@research_app.command("plan", rich_help_panel="Core flow")
 def research_plan(
     prompt: str,
     out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the brief.")] = Path(
@@ -1001,7 +1122,7 @@ def research_plan(
     console.print(f"\n[green]Wrote brief[/green] {out}")
 
 
-@research_app.command("run")
+@research_app.command("run", rich_help_panel="Core flow")
 def research_run(
     question: Annotated[
         str | None,
@@ -1095,7 +1216,7 @@ def research_run(
     _print_report(report)
 
 
-@research_app.command("list")
+@research_app.command("list", rich_help_panel="History")
 def research_list(
     limit: Annotated[int, typer.Option("--limit", help="Max runs to show.")] = 20,
 ) -> None:
@@ -1158,11 +1279,12 @@ def _lineage_head(store: RunRepo, prior: DemandReport) -> DemandReport:
     return head or prior
 
 
-@research_app.command("refresh")
+@research_app.command("refresh", rich_help_panel="History")
 def research_refresh(
     report_id: Annotated[
-        str, typer.Argument(help="A stored report id (any version in the lineage).")
-    ],
+        str | None,
+        typer.Argument(help="Report id/prefix in the lineage; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the new report JSON here.")
     ] = None,
@@ -1174,6 +1296,7 @@ def research_refresh(
     from metalworks.research.refresh import refresh_report
 
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     prior = store.get_report(report_id)
     if prior is None:
         err_console.print(
@@ -1217,14 +1340,18 @@ def research_refresh(
     console.print(f"[green]New version[/green] {new_report.report_id} (v{new_report.version})")
 
 
-@research_app.command("versions")
+@research_app.command("versions", rich_help_panel="History")
 def research_versions(
-    report_id: Annotated[str, typer.Argument(help="Any report id in the lineage.")],
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id/prefix in the lineage; defaults to your latest run."),
+    ] = None,
 ) -> None:
     """List the versions in a report's lineage, oldest → newest."""
     from metalworks.contract import RunSummary
 
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     prior = store.get_report(report_id)
     if prior is None:
         err_console.print(f"[red]No stored report {report_id}.[/red]")
@@ -1247,7 +1374,7 @@ def research_versions(
     console.print(table)
 
 
-@research_app.command("diff")
+@research_app.command("diff", rich_help_panel="History")
 def research_diff_cmd(
     report_a: Annotated[str, typer.Argument(help="The earlier report id.")],
     report_b: Annotated[str, typer.Argument(help="The later report id.")],
@@ -1286,11 +1413,12 @@ def _print_positioning(brief: object) -> None:
         console.print(f"  [yellow]partial:[/yellow] {getattr(brief, 'caveat', '')}")
 
 
-@research_app.command("position")
+@research_app.command("position", rich_help_panel="Pillars & build")
 def research_position(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the positioning brief JSON here.")
     ] = None,
@@ -1302,6 +1430,7 @@ def research_position(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(
@@ -1337,11 +1466,12 @@ def _print_competitor_map(cmap: object) -> None:
             console.print(f"    [red]gap[/red] [{g.severity}]: {g.claim}")
 
 
-@research_app.command("competitor-map")
+@research_app.command("competitor-map", rich_help_panel="Pillars & build")
 def research_competitor_map(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the competitor map JSON here.")
     ] = None,
@@ -1353,6 +1483,7 @@ def research_competitor_map(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(
@@ -1391,11 +1522,12 @@ def _print_landscape(landscape: object) -> None:
         console.print(f"  [yellow]partial:[/yellow] {getattr(landscape, 'caveat', '')}")
 
 
-@research_app.command("landscape")
+@research_app.command("landscape", rich_help_panel="Core flow")
 def research_landscape(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the landscape JSON here.")
     ] = None,
@@ -1407,6 +1539,7 @@ def research_landscape(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(
@@ -1450,7 +1583,7 @@ def _print_ideation(r: object) -> None:
         console.print(f"  [yellow]{getattr(r, 'caveat', '')}[/yellow]")
 
 
-@research_app.command("ideate")
+@research_app.command("ideate", rich_help_panel="Core flow")
 def research_ideate(
     idea: Annotated[str | None, typer.Argument(help="A raw idea to sharpen (idea-first).")] = None,
     from_report: Annotated[
@@ -1481,6 +1614,7 @@ def research_ideate(
     )
     try:
         if from_report:
+            from_report = _resolve_report_id(store, from_report)
             report = store.get_report(from_report)
             if report is None:
                 err_console.print(f"[red]No report {from_report!r} in the local store.[/red]")
@@ -1505,20 +1639,38 @@ def _print_assessment(a: object) -> None:
     console.print(f"\n[bold {color}]{label}[/bold {color}] — report {getattr(a, 'report_id', '')}")
     gap = getattr(a, "gap", None)
     if gap is not None:
-        console.print(f"  demand: {gap.demand_strength} · saturation: {gap.landscape_saturation}")
+        line = f"  demand: {gap.demand_strength} · saturation: {gap.landscape_saturation}"
+        conf = getattr(gap, "confidence", None)
+        if conf is not None:
+            line += f" · confidence: {conf:.0%}"
+        console.print(line)
+        if getattr(gap, "reference", ""):
+            console.print(f"  [dim]{gap.reference}[/dim]")
     console.print(f"  {getattr(a, 'rationale', '')}")
     pt = getattr(a, "pivot_target", None)
     if pt is not None:
         console.print(f"  [bold]pivot →[/bold] {pt.kind} {pt.target_id}: {pt.why}")
+    forks = getattr(a, "fork_verdicts", [])
+    if forks:
+        console.print("  [bold]per fork:[/bold]")
+        colors = {"go": "green", "pivot": "yellow", "no_go": "red"}
+        for f in forks:
+            fc = colors.get(str(f.decision), "white")
+            verdict = str(f.decision).upper().replace("_", "-")
+            console.print(
+                f"    [{fc}]{verdict:<5}[/{fc}] {f.kind:<7} {f.label} "
+                f"[dim]({f.demand_strength}, {f.confidence:.0%} conf)[/dim]"
+            )
     if getattr(a, "partial", False):
         console.print(f"  [yellow]partial:[/yellow] {getattr(a, 'caveat', '')}")
 
 
-@research_app.command("assess")
+@research_app.command("assess", rich_help_panel="Core flow")
 def research_assess(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the assessment JSON here.")
     ] = None,
@@ -1530,6 +1682,7 @@ def research_assess(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
@@ -1565,9 +1718,71 @@ def _print_validation(v: object) -> None:
         console.print(f"  {e.iteration}. [{e.decision}] {e.idea} — {e.why}")
 
 
-@research_app.command("validate")
+def _prompt_decision(default: Decision) -> Decision:
+    """Ask the human GO / PIVOT / NO-GO, pre-filled with the engine's recommendation.
+
+    Accepts the number, the word, or just Enter (= the recommendation). Anything
+    unrecognized falls back to the recommendation rather than erroring the loop.
+    """
+    from metalworks.contract.assess import Decision
+
+    options = [Decision.GO, Decision.PIVOT, Decision.NO_GO]
+    labels = {Decision.GO: "GO", Decision.PIVOT: "PIVOT", Decision.NO_GO: "NO-GO"}
+    default_idx = options.index(default) + 1
+    menu = "   ".join(
+        f"[bold]{i}[/bold]) {labels[o]}" + (" [dim](recommended)[/dim]" if o is default else "")
+        for i, o in enumerate(options, start=1)
+    )
+    console.print(f"  {menu}")
+    choice = str(typer.prompt("  Your call", default=str(default_idx))).strip()
+    if choice.isdigit() and 1 <= int(choice) <= len(options):
+        return options[int(choice) - 1]
+    word = choice.lower().replace("-", "_")
+    for o in options:
+        if word in (o.value, labels[o].lower().replace("-", "_")):
+            return o
+    console.print("  [yellow]Unrecognized — using the recommendation.[/yellow]")
+    return default
+
+
+def _interactive_decide(step: ValidationStep) -> Decision:
+    """The human-gated `decide` callback: show the round's verdict, then ask."""
+    console.print(f"\n[bold]Round {step.iteration}[/bold] — {step.idea}")
+    _print_assessment(step.assessment)
+    return _prompt_decision(step.assessment.decision)
+
+
+def _saving_research(store: RunRepo) -> ResearchFn:
+    """Wrap the loop's research stage so each pulled report is persisted.
+
+    The validate loop returns only the final assessment (which references a
+    report_id) and never saves — so without this the post-GO build menu and
+    `_resolve_report_id(None)` would find nothing. Decorating the injectable
+    research_fn keeps the loop pure while leaving the report in the store.
+    """
+    from metalworks.contract import RunSummary
+    from metalworks.research.validate import default_research
+
+    def _run(deps: ResearchDeps, sketch: IdeaSketch) -> DemandReport:
+        report = default_research(deps, sketch)
+        store.save_report(report)
+        store.save_run(RunSummary.from_report(report, question=sketch.idea))
+        return report
+
+    return _run
+
+
+@research_app.command("validate", rich_help_panel="Core flow")
 def research_validate(
     idea: Annotated[str, typer.Argument(help="The idea to run through the validate loop.")],
+    auto: Annotated[
+        bool,
+        typer.Option(
+            "--auto/--no-auto",
+            help="Auto-take the engine's recommendation each round "
+            "(default: ask you at every GO/PIVOT/NO-GO gate).",
+        ),
+    ] = False,
     max_iterations: Annotated[
         int, typer.Option("--max-iterations", help="Loop cap before 'exhausted'.")
     ] = 4,
@@ -1575,7 +1790,12 @@ def research_validate(
         Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
     ] = None,
 ) -> None:
-    """Run the validate loop (--auto): ideate → demand → landscape → assess, looping on PIVOT."""
+    """Validate loop: ideate → demand → landscape → assess, looping on PIVOT.
+
+    Interactive by default — you make the GO/PIVOT/NO-GO call at each round (the
+    engine's recommendation is the pre-filled default). Pass --auto to run it
+    headlessly. Either way the final report is saved to the store.
+    """
     from metalworks.research import validate as run_validate
     from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
@@ -1590,9 +1810,16 @@ def research_validate(
         reader=reader,
         search=config.resolve_search(),
     )
-    console.print(f"[bold]Validating[/bold] '{idea}' (auto loop, ≤{max_iterations} rounds)...")
+    mode = "auto loop" if auto else "interactive"
+    console.print(f"[bold]Validating[/bold] '{idea}' ({mode}, ≤{max_iterations} rounds)...")
     try:
-        result = run_validate(deps, idea, max_iterations=max_iterations)
+        result = run_validate(
+            deps,
+            idea,
+            decide=None if auto else _interactive_decide,
+            research_fn=_saving_research(store),
+            max_iterations=max_iterations,
+        )
     finally:
         reader.close()
     if out is not None:
@@ -1620,11 +1847,12 @@ def _print_surface(rec: object, skeleton: object) -> None:
         console.print(f"    - {s.name}: {s.purpose} → {s.primary_action}  [dim]({mark})[/dim]")
 
 
-@research_app.command("surface")
+@research_app.command("surface", rich_help_panel="Pillars & build")
 def research_surface(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the surface recommendation JSON here.")
     ] = None,
@@ -1637,6 +1865,7 @@ def research_surface(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(
@@ -1665,11 +1894,12 @@ def research_surface(
     _print_surface(rec, skeleton)
 
 
-@research_app.command("site")
+@research_app.command("site", rich_help_panel="Pillars & build")
 def research_site(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the rendered index.html here.")
     ] = None,
@@ -1685,6 +1915,7 @@ def research_site(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
@@ -1709,11 +1940,12 @@ def research_site(
         console.print(f"  [bold]{s.role}[/bold] [{s.provenance}]: {s.copy[:70]}")
 
 
-@research_app.command("launch")
+@research_app.command("launch", rich_help_panel="Pillars & build")
 def research_launch(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the launch assets JSON here.")
     ] = None,
@@ -1726,6 +1958,7 @@ def research_launch(
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
@@ -1757,11 +1990,12 @@ def research_launch(
         console.print(f"[green]Wrote launch assets[/green] {out}")
 
 
-@research_app.command("content-plan")
+@research_app.command("content-plan", rich_help_panel="Pillars & build")
 def research_content_plan(
     report_id: Annotated[
-        str, typer.Argument(help="Report id (from `research run` / `research list`).")
-    ],
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the content plan JSON here.")
     ] = None,
@@ -1771,6 +2005,7 @@ def research_content_plan(
     from metalworks.research.marketing import render_content_markdown
 
     store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
     report = store.get_report(report_id)
     if report is None:
         err_console.print(
@@ -1792,19 +2027,19 @@ build_app = typer.Typer(
 )
 
 
-def _load_report_for_build(report: str):
-    """Resolve a report id or a report.json path into a DemandReport (or exit)."""
+def _load_report_for_build(report: str | None):
+    """Resolve a report id/prefix, a report.json path, or the latest run into a DemandReport."""
     from metalworks.contract import DemandReport
 
-    candidate = Path(report)
-    if candidate.exists() and candidate.suffix == ".json":
-        return DemandReport.model_validate_json(candidate.read_text(encoding="utf-8"))
-    stored = config.default_store().get_report(report)
-    if stored is None:
-        err_console.print(
-            f"[red]No report {report!r}[/red] — pass a stored report id "
-            "(`metalworks research list`) or a path to a report.json."
-        )
+    if report:
+        candidate = Path(report)
+        if candidate.exists() and candidate.suffix == ".json":
+            return DemandReport.model_validate_json(candidate.read_text(encoding="utf-8"))
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report)
+    stored = store.get_report(report_id)
+    if stored is None:  # run row exists but the report blob is missing — defensive
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
         raise typer.Exit(code=1)
     return stored
 
@@ -1812,8 +2047,9 @@ def _load_report_for_build(report: str):
 @build_app.command("init")
 def build_init(
     report: Annotated[
-        str, typer.Argument(help="Report id (from `research list`) or a path to report.json.")
-    ],
+        str | None,
+        typer.Argument(help="Report id/prefix or report.json path; defaults to latest run."),
+    ] = None,
     dest: Annotated[
         Path, typer.Option("--dest", "-d", help="Directory to scaffold the build harness into.")
     ] = Path("./build"),
@@ -2164,6 +2400,41 @@ def _module_available(module: str) -> bool:
         return importlib.util.find_spec(module) is not None
     except (ImportError, ValueError):
         return False
+
+
+def _resolve_report_id(store: RunRepo, report_id: str | None) -> str:
+    """Resolve a report id the user may omit or abbreviate.
+
+    With no id, returns the latest run — so the pillar commands "just work" on the
+    report you ran most recently, with no copy/paste. With an id, accepts an exact
+    match or a unique prefix. Exits 1 with a friendly message when there are no
+    runs, nothing matches, or a prefix is ambiguous.
+    """
+    if report_id:
+        if store.get_report(report_id) is not None:
+            return report_id  # exact hit (the fast path)
+        matches = [r for r in store.list_runs(limit=10_000) if r.report_id.startswith(report_id)]
+        if len(matches) == 1:
+            return matches[0].report_id
+        if len(matches) > 1:
+            err_console.print(
+                f"[red]'{report_id}' is ambiguous[/red] — it matches {len(matches)} runs. "
+                "Run `metalworks research list` and pass more of the id."
+            )
+            raise typer.Exit(code=1)
+        err_console.print(
+            f"[red]No report matching {report_id!r}.[/red] "
+            "Run `metalworks research list` to see stored ids."
+        )
+        raise typer.Exit(code=1)
+    runs = store.list_runs(limit=1)
+    if not runs:
+        err_console.print(
+            "[red]No runs yet.[/red] Run [bold]metalworks start[/bold] or "
+            '[bold]metalworks research run -q "…"[/bold] first.'
+        )
+        raise typer.Exit(code=1)
+    return runs[0].report_id
 
 
 def _resolve_chat_or_exit() -> ChatModel:

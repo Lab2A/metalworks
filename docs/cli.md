@@ -17,11 +17,17 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 
 | Command | Description | Keys |
 | --- | --- | --- |
+| `metalworks` / `metalworks start` | **Guided session** — the easiest way in. Walks one idea end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / site / scaffold once it earns a GO. | chat key |
+| `metalworks setup` | Interactive onboarding: detect provider keys, pick a model, choose sources, scaffold a project, warm embeddings. `--yes` accepts every default non-interactively. | zero-key |
 | `metalworks version` | Print the installed metalworks version. | zero-key |
 | `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the store path, connected Reddit accounts, and actionable hints. | zero-key |
 | `metalworks init` | Create a `.metalworks/` project in the cwd (like `git init`) — a `project.json` manifest, a `config.toml`, a gitignored `corpus.db`, and a `.env.example`. Idempotent. | zero-key |
 
 **`metalworks init`** option: `--idea TEXT` — one line on what you're building (seeds the project slug).
+
+> **New to metalworks?** Just run `metalworks` with no arguments — the guided
+> session handles setup and walks you through validating an idea without your
+> having to memorize the command chain below.
 
 ## models
 
@@ -38,8 +44,10 @@ Inspect and set the chat/fast/embedding models.
 
 Plan and run demand-research reports, then derive everything else from them. The
 report-grounded commands (`position`, `competitor-map`, `surface`, `site`, `launch`,
-`content-plan`) all take a **report id** from a prior `research run` (or
-`research list`).
+`content-plan`, `landscape`, `assess`, `refresh`, `versions`) take a **report id** —
+but it's **optional**: omit it to use your latest run, or pass a unique **prefix**
+instead of the full id. No more copy/pasting UUIDs between steps. (`research --help`
+groups these by *Core flow* / *Pillars & build* / *History*.)
 
 | Command | Description | Keys |
 | --- | --- | --- |
@@ -64,19 +72,19 @@ The **[validation loop](/docs/validation-loop)** — frame an idea, then decide 
 | `metalworks research ideate --from-report REPORT_ID` | Evidence-first: surface a stored report's forks (candidate wedges / top clusters) as grounded idea sketches to pick from. | chat key |
 | `metalworks research landscape REPORT_ID` | The full "what exists today" — the competitor map **plus** an empirical existing-solutions scan (real shipped products, matched to demand clusters). | chat key |
 | `metalworks research assess REPORT_ID` | The **GO / PIVOT / NO-GO** verdict — a deterministic gap over demand × landscape. PIVOT names an under-served fork to aim at. | chat key |
-| `metalworks research validate "<idea>"` | Run the whole loop headlessly (`--auto`): ideate → demand → landscape → assess, looping on PIVOT until GO, NO-GO, or exhausted. | chat key |
+| `metalworks research validate "<idea>"` | Run the whole loop: ideate → demand → landscape → assess, looping on PIVOT until GO, NO-GO, or exhausted. **Interactive by default** — you make the call each round (the engine's recommendation is the default); pass `--auto` to run it headlessly. The final report is saved. | chat key |
 
 Options:
 
 - `research plan` — `--out, -o PATH` (default `brief.json`).
-- `research ideate` — `IDEA` argument (idea-first) **or** `--from-report REPORT_ID` (evidence-first); `--out, -o PATH`.
-- `research landscape` / `assess` — `REPORT_ID` argument; `--out, -o PATH` to write the JSON.
-- `research validate` — `IDEA` argument; `--max-iterations INT` (loop cap before `exhausted`, default 4); `--out, -o PATH`.
+- `research ideate` — `IDEA` argument (idea-first) **or** `--from-report REPORT_ID` (evidence-first; id or prefix); `--out, -o PATH`.
+- `research landscape` / `assess` — optional `REPORT_ID` (id or prefix; defaults to your latest run); `--out, -o PATH` to write the JSON.
+- `research validate` — `IDEA` argument; `--auto/--no-auto` (headless vs interactive, default interactive); `--max-iterations INT` (loop cap before `exhausted`, default 4); `--out, -o PATH`.
 - `research run` — `--question, -q TEXT` *or* `--brief PATH` (pass exactly one); `--subreddit TEXT` (repeatable, else auto); `--source TEXT` (repeatable — which [sources](/docs/sources) to ingest from; else configured/Reddit); `--months INT` (corpus window, default 12); `--out, -o PATH` to write the report JSON.
 - `research list` — `--limit INT` (max runs to show, default 20).
-- `research refresh` — `REPORT_ID` argument (any version of the report; updates from the latest one); `--out, -o PATH` to write the new report JSON.
-- `research diff` — `REPORT_A REPORT_B` arguments (earlier, later).
-- `research position` / `competitor-map` / `surface` / `launch` / `content-plan` — `REPORT_ID` argument; `--out, -o PATH` to write the artifact JSON.
+- `research refresh` / `versions` — optional `REPORT_ID` (id or prefix, any version of the report; defaults to latest); refresh updates from the lineage head and takes `--out, -o PATH`.
+- `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
+- `research position` / `competitor-map` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
 - `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON.
 
 ## corpus
@@ -110,7 +118,7 @@ Scaffold an evidence-grounded build harness from a report (see the
 
 | Command | Description | Keys |
 | --- | --- | --- |
-| `metalworks build init REPORT` | Turn a stored report into a build plan and scaffold a project for your coding agent (no product code). | chat key |
+| `metalworks build init [REPORT]` | Turn a stored report into a build plan and scaffold a project for your coding agent (no product code). `REPORT` is optional — an id/prefix, a `report.json` path, or omitted for your latest run. | chat key |
 
 `REPORT` is a stored report id (from `research list`) **or** a path to a
 `report.json`. Options:
