@@ -195,18 +195,53 @@ def test_validate_default_is_interactive(monkeypatch: pytest.MonkeyPatch) -> Non
     assert callable(captured["decide"])
 
 
-# ── the guided session (bare `metalworks`) ──────────────────────────────────
+# ── the main menu (bare `metalworks`) ───────────────────────────────────────
 
 
-def test_guided_session_no_key_exits_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bare_metalworks_shows_main_menu_and_quits() -> None:
+    # No project, no key, no idea — the menu must still appear and Quit must exit cleanly.
+    result = runner.invoke(app, [], input="8\n")
+    assert result.exit_code == 0, result.output
+    assert "what do you want to do" in result.output.lower()
+    assert "Validate an idea" in result.output
+    assert "Configure models" in result.output
+
+
+def test_main_menu_reaches_config_without_a_project(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The reported bug: you couldn't reach config without entering an idea / making a project.
+    monkeypatch.setattr(config, "default_store", lambda *a, **k: MemoryStores())
+    # 4 = View/edit config → 2 = Back → 8 = Quit. Never prompts for an idea or a project.
+    result = runner.invoke(app, [], input="4\n2\n8\n")
+    assert result.exit_code == 0, result.output
+    assert "Config" in result.output
+
+
+def test_config_subcommand_opens_interactive_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "default_store", lambda *a, **k: MemoryStores())
+    result = runner.invoke(app, ["config"], input="2\n")  # Back
+    assert result.exit_code == 0, result.output
+    assert "Config" in result.output
+
+
+def test_models_subcommand_opens_interactive_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "models_list", lambda: None)  # skip provider resolution
+    result = runner.invoke(app, ["models"], input="4\n")  # Back
+    assert result.exit_code == 0, result.output
+    assert "Set chat model" in result.output
+
+
+# ── the idea flow (metalworks start) ────────────────────────────────────────
+
+
+def test_start_no_key_exits_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "_present_providers", lambda: [])
     monkeypatch.setattr(config, "vertex_enabled", lambda: False)
-    result = runner.invoke(app, [], input="")
+    result = runner.invoke(app, ["start"], input="")
     assert result.exit_code == 0, result.output
     assert "No provider key" in result.output
 
 
-def test_guided_session_go_offers_build_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_go_offers_build_menu(monkeypatch: pytest.MonkeyPatch) -> None:
     from metalworks.project import Project
 
     store = MemoryStores()
@@ -228,7 +263,7 @@ def test_guided_session_go_offers_build_menu(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(research_pkg, "validate", _fake_validate)
 
     # idea, then "4" = Done in the next-steps menu.
-    result = runner.invoke(app, [], input="a focus supplement\n4\n")
+    result = runner.invoke(app, ["start"], input="a focus supplement\n4\n")
     assert result.exit_code == 0, result.output
     assert "GO" in result.output
     assert "What next?" in result.output
