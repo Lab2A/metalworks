@@ -174,8 +174,14 @@ def test_embedding_path_used_when_provided() -> None:
     matcher = ShapeMatcher(embedder=_StubEmbedder())
     hit = Research(demand=_report([_cluster(1, "a client upload portal")]))
     miss = Research(demand=_report([_cluster(1, _UNRELATED_CLAIM)]))
-    assert matcher.match(hit), "embedding path should match portal vocabulary"
-    assert matcher.match(miss) == [], "embedding path should reject unrelated demand"
+    # Scope the assertion to the shape under test: with the full catalog registered,
+    # the crude stub maps every non-portal text to one axis, so other shapes collide.
+    # What this test owns is that the embedding path fires for portal demand and not
+    # for unrelated demand, FOR submission-portal.
+    hit_names = [m.shape.name for m in matcher.match(hit)]
+    miss_names = [m.shape.name for m in matcher.match(miss)]
+    assert "submission-portal" in hit_names, "embedding path should match portal vocabulary"
+    assert "submission-portal" not in miss_names, "embedding path should reject unrelated demand"
 
 
 def test_ranks_higher_relevance_first() -> None:
