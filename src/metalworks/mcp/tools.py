@@ -331,8 +331,6 @@ def positioning_from_report(report_id: str, store_path: str | None = None) -> To
 
 
 @guard
-
-
 @guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
