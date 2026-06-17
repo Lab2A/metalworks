@@ -152,18 +152,26 @@ metalworks research assess <report_id>
 
 The decision is a gap function, not an opinion:
 
-- **Demand strength** — how many distinct people voiced the pain (50 voices outweighs one viral post).
+- **Demand strength** — *relative*, not an absolute headcount. Each fork is scored by its prevalence
+  (its share of the pulled crowd) and its standing among the report's other forks, so the bands
+  self-calibrate to the run instead of leaning on a hardcoded "100 = strong" cutoff. (A report with
+  no forks falls back to a surfaced, overridable policy on the whole-report count.)
 - **Landscape saturation** — how crowded the supply is (named competitors + real shipped products),
   held down by competitors who badly miss something (an opening).
 
+The verdict is computed **per fork** and synthesized — `assessment.fork_verdicts` carries the
+un-collapsed answer ("GO on the sleep wedge, NO-GO on the broad market, GO on the enterprise
+segment"), each with its own demand band and a `confidence` (how far the call sits from a band edge):
+
 | Demand | Landscape | Verdict |
 | --- | --- | --- |
-| moderate+ | open | **GO** |
-| moderate+ | crowded, but an under-served fork exists | **PIVOT** (aimed at that fork) |
+| a fork clears moderate+ | open | **GO** |
+| real demand | crowded, but an under-served fork exists | **PIVOT** (aimed at that fork) |
 | thin, or crowded with no opening | — | **NO-GO** |
 
-One honest guardrail: if the landscape scan couldn't fully ground (no product source configured),
-a hard **GO** is withheld — absence of evidence is not absence of competition.
+Two honest guardrails: if the landscape scan couldn't fully ground (no product source configured),
+a hard **GO** is withheld — absence of evidence is not absence of competition; and a pull too thin to
+trust is flagged as low-confidence rather than dressed up as a strong signal.
 
 ## Not to be confused with
 

@@ -65,6 +65,7 @@ from metalworks.contract import (  # noqa: E402
     FaqItem,
     FeatureSpec,
     Fork,
+    ForkVerdict,
     GapAnalysis,
     GapClaim,
     IdeaSketch,
@@ -159,6 +160,7 @@ MODELS: list[type[BaseModel]] = [
     # assess (GO / PIVOT / NO-GO)
     GapAnalysis,
     PivotTarget,
+    ForkVerdict,
     Assessment,
     # validate loop
     DecisionLogEntry,

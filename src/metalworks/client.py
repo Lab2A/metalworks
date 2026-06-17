@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from metalworks.research import ResearchDeps
     from metalworks.research.deps import CommentSource, CorpusReader
     from metalworks.research.sources import ItemSource
+    from metalworks.research.synthesis.demand import AssessPolicy
     from metalworks.search import SearchProvider
     from metalworks.stores import MemoryStores, SqliteStores
 
@@ -387,13 +388,24 @@ class Metalworks:
 
         return ideate_from_report(self.deps, _demand(research))
 
-    def assess(self, research: Research | DemandReport, landscape: Landscape) -> Assessment:
+    def assess(
+        self,
+        research: Research | DemandReport,
+        landscape: Landscape,
+        *,
+        policy: AssessPolicy | None = None,
+    ) -> Assessment:
         """The GO / PIVOT / NO-GO verdict — a deterministic gap over demand (does the
-        pain exist) and landscape (can people already solve it). PIVOT carries a target:
-        an under-served fork the report surfaced. A partial landscape never yields GO."""
+        pain exist) and landscape (can people already solve it). Demand is relative and
+        self-calibrating; the verdict is computed per fork (see ``assessment.fork_verdicts``)
+        and synthesized. PIVOT carries a target fork; a partial landscape never yields GO.
+        Pass ``policy`` (an ``AssessPolicy``) to override the surfaced thresholds."""
         from metalworks.research import run_assessment
+        from metalworks.research.synthesis.demand import DEFAULT_POLICY
 
-        return run_assessment(self.deps, _demand(research), landscape)
+        return run_assessment(
+            self.deps, _demand(research), landscape, policy=policy or DEFAULT_POLICY
+        )
 
     def validate(self, idea: str, *, max_iterations: int = 4) -> ValidationResult:
         """Run the validate loop headlessly (--auto): ideate → demand → landscape → assess,

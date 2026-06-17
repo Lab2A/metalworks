@@ -51,6 +51,18 @@ class GapAnalysis(BaseModel):
     reasoning: str = Field(
         default="", description="One line: why these signals imply the decision."
     )
+    demand_prevalence: float = Field(
+        default=0.0, description="Top fork's distinct authors as a fraction of the pull (0..1)."
+    )
+    demand_percentile: float | None = Field(
+        default=None, description="Top fork's standing among peer forks (0..1); None if no peers."
+    )
+    confidence: float | None = Field(
+        default=None, description="Distance from a band edge (0..1); None if uncomputed."
+    )
+    reference: str = Field(
+        default="", description="What the strength self-calibrated against (e.g. 'top of 4 forks')."
+    )
 
 
 class PivotTarget(BaseModel):
@@ -59,6 +71,29 @@ class PivotTarget(BaseModel):
     kind: Literal["segment", "wedge"] = Field(description="Which kind of fork to pivot to.")
     target_id: str = Field(description="A real SegmentChoice / CandidateWedge id in the report.")
     why: str = Field(default="", description="Why this fork is the better bet.")
+
+
+class ForkVerdict(BaseModel):
+    """A per-fork GO/NO-GO — the verdict for ONE candidate wedge or segment.
+
+    PIVOT is a report-level move *between* forks, so a single fork is only ever
+    GO (real demand, open lane) or NO_GO. The list of these on an ``Assessment``
+    is the un-collapsed answer: "GO on the sleep wedge, NO_GO on the broad market,
+    GO on the enterprise segment" — instead of one flattened label.
+    """
+
+    kind: Literal["wedge", "segment"] = Field(description="Which kind of fork this scores.")
+    fork_id: str = Field(description="A real CandidateWedge.id / SegmentChoice.id in the report.")
+    label: str = Field(description="The fork's human label.")
+    decision: Decision = Field(description="GO | NO_GO at the fork level.")
+    demand_strength: SignalStrength = Field(description="Relative strength band for this fork.")
+    landscape_saturation: SignalStrength = Field(
+        description="Supply crowding (space-level for now — see ForkVerdict v2)."
+    )
+    demand_prevalence: float = Field(default=0.0, description="Fraction of the pull (0..1).")
+    demand_percentile: float = Field(default=0.0, description="Standing among peer forks (0..1).")
+    confidence: float = Field(default=0.0, description="Distance from a band edge (0..1).")
+    distinct_author_count: int = Field(default=0)
 
 
 class Assessment(BaseModel):
@@ -76,6 +111,10 @@ class Assessment(BaseModel):
     gap: GapAnalysis = Field(description="The computed demand-vs-landscape gap.")
     pivot_target: PivotTarget | None = Field(
         default=None, description="Where to aim instead — set iff decision == PIVOT."
+    )
+    fork_verdicts: list[ForkVerdict] = Field(
+        default_factory=list[ForkVerdict],
+        description="Per-fork GO/NO-GO — the un-collapsed answer behind the top-line decision.",
     )
     evidence: list[EvidenceRef] = Field(
         default_factory=list[EvidenceRef], description="Backing forks for the verdict."

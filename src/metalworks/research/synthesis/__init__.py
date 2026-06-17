@@ -46,6 +46,7 @@ from metalworks.research.synthesis import (
 )
 from metalworks.research.synthesis import (
     cluster_ranker,
+    demand,
     embed_group,
     loader,
     market,
@@ -145,7 +146,7 @@ def synthesize(
     if not units:
         return SynthesisOutput(
             ranked_clusters=[],
-            verdict=verdict.derive_verdict(total_distinct_authors=0),
+            verdict=verdict.derive_verdict(strength_label="Thin signal", total_distinct_authors=0),
             slot_plan=_slot_plan_from_brief(brief),
             audience_profile=None,
             segments=[],
@@ -207,7 +208,13 @@ def synthesize(
     wedge_list = wedges.build_wedges(clusters, seg_list)
 
     # 9. Verdict + source_map (both deterministic).
+    strength_label = demand.report_demand_label(
+        [w.breadth_count for w in wedge_list],
+        [s.distinct_author_count for s in seg_list],
+        total_distinct,
+    )
     verdict_str = verdict.derive_verdict(
+        strength_label=strength_label,
         total_distinct_authors=total_distinct,
         market=market_sizing,
         price=price_finding,

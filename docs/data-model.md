@@ -83,9 +83,12 @@ Each one is generated from the report and links its claims back to the same quot
   each line backed by a quote. metalworks never posts.
 - **`Landscape` / `ExistingSolution`** — the full "what exists today": the `CompetitorMap` plus
   real shipped products (Product Hunt / web) matched to demand clusters with their traction.
-- **`Assessment`** — the **GO / PIVOT / NO-GO** verdict, a deterministic gap over demand ×
-  landscape (the model only writes the rationale); a PIVOT carries the under-served fork to aim at.
-  **`ValidationResult`** is the [validation loop](/docs/validation-loop)'s outcome + decision log.
+- **`Assessment` / `ForkVerdict`** — the **GO / PIVOT / NO-GO** verdict, a deterministic gap over
+  *relative* demand × landscape (the model only writes the rationale); a PIVOT carries the
+  under-served fork to aim at. `fork_verdicts` is the un-collapsed per-fork answer (each fork's
+  GO/NO-GO + demand band + `confidence`); `gap` carries the prevalence/percentile the strength
+  self-calibrated from. **`ValidationResult`** is the [validation loop](/docs/validation-loop)'s
+  outcome + decision log.
 
 So whatever you generate, the chain runs from a real comment all the way to the line on your
 landing page — see [why you can trust the output](/docs/how-it-works).
