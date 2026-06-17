@@ -43,8 +43,9 @@ Pillars run on a finished demand report and trace every claim back to a real
 Reddit quote by permalink:
 
 - **/position-wedge** — a grounded Dunford positioning wedge + price hypothesis.
-- **/competitor-map** — direct, adjacent, and status-quo rivals, each with an
-  exploitable gap backed by a cited complaint.
+- **/market-landscape** — the full "what exists today": direct, adjacent, and
+  status-quo rivals (each gap backed by a cited complaint, each tagged with the
+  clusters it competes for) plus a scan of real shipped products with traction.
 - **/surface-and-ux** — what surface to build (sdk / web / mobile / cli / ...) and
   a 3-5 screen UX skeleton, each decision traced to a customer voice.
 - **/generate-site** — a small marketing site whose every claim-bearing line is a

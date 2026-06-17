@@ -1461,53 +1461,11 @@ def _print_competitor_map(cmap: object) -> None:
     competitors = getattr(cmap, "competitors", [])
     rows = [sq, *competitors] if sq is not None else list(competitors)
     for c in rows:
-        console.print(f"  [bold]{c.name}[/bold] ({c.kind}) — {c.one_liner}")
+        tags = getattr(c, "addresses_clusters", [])
+        tag_str = f" [dim](clusters {', '.join(map(str, tags))})[/dim]" if tags else ""
+        console.print(f"  [bold]{c.name}[/bold] ({c.kind}) — {c.one_liner}{tag_str}")
         for g in c.gaps:
             console.print(f"    [red]gap[/red] [{g.severity}]: {g.claim}")
-
-
-@research_app.command("competitor-map", rich_help_panel="Pillars & build")
-def research_competitor_map(
-    report_id: Annotated[
-        str | None,
-        typer.Argument(help="Report id or prefix; defaults to your latest run."),
-    ] = None,
-    out: Annotated[
-        Path | None, typer.Option("--out", "-o", help="Write the competitor map JSON here.")
-    ] = None,
-) -> None:
-    """Map the competitive landscape for a stored report (grounded names, cited gaps)."""
-    from metalworks.research import run_competitor_map
-    from metalworks.research.arctic import ArcticReader
-    from metalworks.research.deps import ResearchDeps
-
-    chat = _resolve_chat_or_exit()
-    store = config.default_store()
-    report_id = _resolve_report_id(store, report_id)
-    report = store.get_report(report_id)
-    if report is None:
-        err_console.print(
-            f"[red]No report {report_id!r} in the local store.[/red] "
-            "Run `metalworks research run` first, or check the id."
-        )
-        raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
-    deps = ResearchDeps(
-        chat=chat,
-        embeddings=_resolve_embeddings_or_exit(),
-        corpus=store,
-        reader=reader,
-        search=config.resolve_search(),
-    )
-    console.print(f"[bold]Mapping competitors[/bold] for report {report_id}...")
-    try:
-        cmap = run_competitor_map(deps, report)
-    finally:
-        reader.close()
-    if out is not None:
-        out.write_text(cmap.model_dump_json(indent=2), encoding="utf-8")
-        console.print(f"[green]Wrote competitor map[/green] {out}")
-    _print_competitor_map(cmap)
 
 
 def _print_landscape(landscape: object) -> None:
@@ -1652,14 +1610,15 @@ def _print_assessment(a: object) -> None:
         console.print(f"  [bold]pivot →[/bold] {pt.kind} {pt.target_id}: {pt.why}")
     forks = getattr(a, "fork_verdicts", [])
     if forks:
-        console.print("  [bold]per fork:[/bold]")
+        console.print("  [bold]per fork:[/bold] [dim](saturation advisory; gate is global)[/dim]")
         colors = {"go": "green", "pivot": "yellow", "no_go": "red"}
         for f in forks:
             fc = colors.get(str(f.decision), "white")
             verdict = str(f.decision).upper().replace("_", "-")
             console.print(
                 f"    [{fc}]{verdict:<5}[/{fc}] {f.kind:<7} {f.label} "
-                f"[dim]({f.demand_strength}, {f.confidence:.0%} conf)[/dim]"
+                f"[dim](demand {f.demand_strength}, saturation {f.landscape_saturation}, "
+                f"{f.confidence:.0%} conf)[/dim]"
             )
     if getattr(a, "partial", False):
         console.print(f"  [yellow]partial:[/yellow] {getattr(a, 'caveat', '')}")

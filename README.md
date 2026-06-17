@@ -119,7 +119,7 @@ Two verticals sit on top of those protocols:
   `DemandReport` of real, permalinked Reddit quotes. Entry point:
   `run_research(deps, brief=...)`. Seven functions build on a finished report,
   each linking its output back to that report's real quotes: positioning
-  (`build_positioning_brief`), competitors (`run_competitor_map`), surface + UX
+  (`build_positioning_brief`), the landscape (`run_landscape`), surface + UX
   (`decide_surface` / `build_ux_skeleton`), marketing site
   (`build_marketing_site`), launch assets (`build_launch_assets` /
   `plan_channels`), a content/SEO plan (`content_plan_from_report`), and a build
@@ -133,7 +133,7 @@ Four form factors share that contract:
 1. **Library** — `from metalworks import Metalworks`, or the functions and
    protocols underneath.
 2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report
-   commands (`metalworks research position|competitor-map|surface|site|launch|content-plan`,
+   commands (`metalworks research position|landscape|surface|site|launch|content-plan`,
    `metalworks build init`),
    `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio

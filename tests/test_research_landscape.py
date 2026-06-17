@@ -228,43 +228,6 @@ def test_every_gap_ref_resolves_against_report() -> None:
         assert gap.evidence.evidence_id in evidence_ids
 
 
-# ── MCP tool ─────────────────────────────────────────────────────────────────
-
-
-def test_mcp_competitor_map_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    from metalworks import config
-    from metalworks.mcp import tools
-
-    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
-    res = tools.competitor_map_from_report("nope")
-    assert res["error"]["error_code"] == "not_found"
-
-
-def test_mcp_competitor_map_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    from metalworks import config
-    from metalworks.mcp import tools
-    from metalworks.research import arctic
-
-    complaint = "it is gritty and pills under makeup"
-    q = _quote(complaint, "https://r/1")
-    report = _report(clusters=[_cluster(1, quotes=[q], distinct_authors=25)])
-    store = MemoryStores()
-    store.save_report(report)
-    cand = _CompetitorCand(name="The Ordinary", kind="direct", one_liner="cheap")
-    chat = _chat(competitors=[cand], harvest=_Harvest(strengths=["cheap"], gaps=[complaint]))
-    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
-    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: chat)
-    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
-    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
-    monkeypatch.setattr(arctic, "ArcticReader", lambda *a, **k: _NullReader())
-    res = tools.competitor_map_from_report(report.report_id)
-    assert "competitor_map" in res
-    cm = res["competitor_map"]
-    assert cm["report_id"] == "rpt-1"
-    assert cm["status_quo_alternative"]["kind"] == "status_quo"
-    assert cm["competitors"][0]["gaps"][0]["evidence"]["evidence_id"] == q.id
-
-
 # ── landscape (thick): competitor map + existing-solutions scan ───────────────
 
 
@@ -338,3 +301,77 @@ def test_landscape_no_clusters_scans_nothing_but_does_not_fail() -> None:
     )
     assert ls.existing_solutions == []  # nothing to ground against
     assert "Existing-solutions scan unavailable" not in (ls.caveat or "")  # not a failure
+
+
+# ── corpus-mining + cluster-tagged competitors ───────────────────────────────
+
+
+def test_corpus_mining_adds_cluster_tagged_competitor() -> None:
+    """A product NAMED in a cluster's quotes surfaces as a competitor tagged to that cluster,
+    even when the web enumeration finds nothing."""
+    from metalworks.research.landscape import _CorpusMention, _CorpusMentions
+
+    complaint = "vitamin C serums sting and oxidize fast"
+    q = _quote(complaint, "https://r/1")
+    report = _report(clusters=[_cluster(1, quotes=[q], distinct_authors=30)])
+    chat = FakeChatModel()
+    chat.script(_CompetitorList, _CompetitorList(competitors=[]))  # web finds nothing
+    chat.script(_Harvest, _Harvest(strengths=["cheap"], gaps=[complaint]))
+    chat.script(
+        _CorpusMentions,
+        _CorpusMentions(
+            mentions=[
+                _CorpusMention(
+                    name="The Ordinary", kind="direct", one_liner="cheap actives", cluster_rank=1
+                )
+            ]
+        ),
+    )
+    cmap = run_competitor_map(_deps(chat), report)
+    comp = next(c for c in cmap.competitors if c.name == "The Ordinary")
+    assert 1 in comp.addresses_clusters  # tagged to the cluster it was named in
+
+
+def test_web_and_corpus_competitor_dedupe_unions_clusters() -> None:
+    """The same rival from web + corpus dedupes to one, keeps the web kind, unions cluster tags."""
+    from metalworks.research.landscape import _CorpusMention, _CorpusMentions
+
+    q = _quote("it pills under makeup", "https://r/2")
+    report = _report(clusters=[_cluster(2, quotes=[q], distinct_authors=20)])
+    chat = FakeChatModel()
+    chat.script(
+        _CompetitorList,
+        _CompetitorList(
+            competitors=[_CompetitorCand(name="The Ordinary", kind="direct", one_liner="cheap")]
+        ),
+    )
+    chat.script(_Harvest, _Harvest(gaps=[]))
+    chat.script(
+        _CorpusMentions,
+        _CorpusMentions(
+            mentions=[_CorpusMention(name="the  ordinary!", kind="adjacent", cluster_rank=2)]
+        ),
+    )
+    cmap = run_competitor_map(_deps(chat), report)
+    named = [c for c in cmap.competitors if c.name == "The Ordinary"]
+    assert len(named) == 1  # web + corpus deduped to one
+    assert named[0].kind == "direct"  # web kind wins
+    assert 2 in named[0].addresses_clusters  # corpus mention cluster unioned in
+
+
+def test_corpus_mine_drops_hallucinated_cluster() -> None:
+    """A mention pointing at a cluster rank that doesn't exist is dropped."""
+    from metalworks.research.landscape import _CorpusMention, _CorpusMentions
+
+    report = _report(
+        clusters=[_cluster(1, quotes=[_quote("x", "https://r/1")], distinct_authors=9)]
+    )
+    chat = FakeChatModel()
+    chat.script(_CompetitorList, _CompetitorList(competitors=[]))
+    chat.script(_Harvest, _Harvest(gaps=[]))
+    chat.script(
+        _CorpusMentions,
+        _CorpusMentions(mentions=[_CorpusMention(name="Ghost", kind="direct", cluster_rank=99)]),
+    )
+    cmap = run_competitor_map(_deps(chat), report)
+    assert all(c.name != "Ghost" for c in cmap.competitors)

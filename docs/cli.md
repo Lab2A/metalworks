@@ -43,7 +43,7 @@ Inspect and set the chat/fast/embedding models.
 ## research
 
 Plan and run demand-research reports, then derive everything else from them. The
-report-grounded commands (`position`, `competitor-map`, `surface`, `site`, `launch`,
+report-grounded commands (`position`, `landscape`, `surface`, `site`, `launch`,
 `content-plan`, `landscape`, `assess`, `refresh`, `versions`) take a **report id** —
 but it's **optional**: omit it to use your latest run, or pass a unique **prefix**
 instead of the full id. No more copy/pasting UUIDs between steps. (`research --help`
@@ -58,7 +58,6 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research versions REPORT_ID` | List a report's versions, oldest → newest. | zero-key |
 | `metalworks research diff REPORT_A REPORT_B` | Show the diff between two stored report versions. | chat key |
 | `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
-| `metalworks research competitor-map REPORT_ID` | Map the competitive landscape for a stored report — grounded names, cited gaps. | chat key |
 | `metalworks research surface REPORT_ID` | Recommend a product surface + UX skeleton for a stored report (grounded). | chat key |
 | `metalworks research site REPORT_ID` | Build a grounded marketing site (verbatim, cited copy) from a stored report. | chat key |
 | `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
@@ -84,7 +83,7 @@ Options:
 - `research list` — `--limit INT` (max runs to show, default 20).
 - `research refresh` / `versions` — optional `REPORT_ID` (id or prefix, any version of the report; defaults to latest); refresh updates from the lineage head and takes `--out, -o PATH`.
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
-- `research position` / `competitor-map` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
+- `research position` / `landscape` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
 - `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON.
 
 ## corpus

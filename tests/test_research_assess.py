@@ -270,3 +270,66 @@ def test_mcp_assess_not_found(monkeypatch: Any) -> None:
     monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
     res = tools.assess_from_report("nope")
     assert res["error"]["error_code"] == "not_found"
+
+
+# ── advisory per-fork saturation ──────────────────────────────────────────────
+
+
+def _tagged_landscape(comp_clusters: list[list[int]]) -> Landscape:
+    comps = [
+        Competitor(
+            competitor_index=i,
+            name=f"c{i}",
+            kind="direct",
+            one_liner="x",
+            gaps=[],
+            addresses_clusters=cl,
+        )
+        for i, cl in enumerate(comp_clusters, start=1)
+    ]
+    cm = CompetitorMap(
+        map_id="cm:rpt-1",
+        report_id="rpt-1",
+        competitors=comps,
+        status_quo_alternative=_status_quo(),
+        generated_at=_CLOCK,
+    )
+    return Landscape(
+        landscape_id="ls:rpt-1", report_id="rpt-1", competitor_map=cm, generated_at=_CLOCK
+    )
+
+
+def _wedge_on(label: str, breadth: int, clusters: list[int]) -> CandidateWedge:
+    return CandidateWedge(
+        label=label,
+        pain=label,
+        scope="minimal",
+        breadth_count=breadth,
+        distinct_author_count=breadth,
+        cluster_ranks=clusters,
+        evidence=[EvidenceRef(kind="cluster", cluster_rank=clusters[0])],
+    )
+
+
+def test_per_fork_saturation_diverges_by_cluster() -> None:
+    # Two wedges on different clusters; ALL supply tags cluster 1 → wedge-1 crowded, wedge-2 open.
+    report = _report(
+        200,
+        wedges=[_wedge_on("indie", 100, [1]), _wedge_on("enterprise", 100, [2])],
+    )
+    land = _tagged_landscape([[1]] * 6)  # 6 rivals, all on cluster 1
+    a = run_assessment(_deps(), report, land)
+    by = {f.label: f for f in a.fork_verdicts}
+    assert by["indie"].landscape_saturation == SignalStrength.HIGH  # 6 rivals hit its cluster
+    assert by["enterprise"].landscape_saturation == SignalStrength.LOW  # none hit cluster 2
+    # the gate stays GLOBAL (advisory): report-level saturation is the space-level number.
+    assert a.gap.landscape_saturation == SignalStrength.HIGH
+
+
+def test_untagged_landscape_falls_back_to_global_per_fork() -> None:
+    # No competitor carries cluster tags → per-fork can't distinguish → each fork shows global.
+    report = _report(200, wedges=[_wedge_on("a", 100, [1]), _wedge_on("b", 100, [2])])
+    land = _tagged_landscape([[], [], []])  # 3 rivals, none tagged
+    a = run_assessment(_deps(), report, land)
+    glob = a.gap.landscape_saturation
+    assert all(f.landscape_saturation == glob for f in a.fork_verdicts)

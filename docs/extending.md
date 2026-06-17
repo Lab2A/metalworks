@@ -67,9 +67,9 @@ public functions you can wire into your own flow.
   drafting-only launch copy (never posts) + a human-executed channel plan.
 - `content_plan_from_report(report)` — a deterministic, zero-key content/SEO plan.
 
-All seven of these are also on the `Metalworks` facade —
-`mw.positioning(research)`, `mw.competitors(...)`, `mw.surface(...)` /
-`mw.ux(...)`, `mw.site(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
+These are also on the `Metalworks` facade —
+`mw.positioning(research)`, `mw.landscape(...)` (the competitive map + existing solutions),
+`mw.surface(...)` / `mw.ux(...)`, `mw.site(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
 `mw.launch(...)` / `mw.channel_plan(...)`, `mw.content_plan(...)` — which thread
 the one resolved `ResearchDeps` for you. See the [walkthrough](/docs/walkthrough).
 

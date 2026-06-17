@@ -48,8 +48,7 @@ source of truth for its tier.
 | --- | --- | --- |
 | `research_plan_brief` | Walk the D1-D8 planner with default answers → an assembled `ResearchBrief` (chat key). | `prompt`, `store_path` |
 | `positioning_from_report` | Derive grounded positioning from a stored report — one LLM call, synchronous (chat key). | `report_id`, `store_path` |
-| `competitor_map_from_report` | Map the competitive landscape — grounded names, cited gaps, synchronous (chat + embedding keys). | `report_id`, `store_path` |
-| `landscape_from_report` | The thick "what exists today" — the competitor map **plus** an empirical existing-solutions scan, synchronous (chat + embedding keys). | `report_id`, `store_path` |
+| `landscape_from_report` | The full "what exists today" — direct/adjacent/status-quo rivals (each gap cited, each tagged with the clusters it competes for) **plus** an empirical existing-solutions scan, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ideate_from_idea` | Idea-first: sharpen a raw idea into a testable hypothesis + a brief (chat key). | `idea`, `store_path` |
 | `ideate_from_report` | Evidence-first: surface a stored report's forks as grounded idea sketches (chat key). | `report_id`, `store_path` |
 | `assess_from_report` | The **GO / PIVOT / NO-GO** verdict — runs the landscape, then the deterministic demand × landscape gap, synchronous (chat + embedding keys). | `report_id`, `store_path` |
@@ -67,7 +66,7 @@ source of truth for its tier.
 | `reddit_post_comment` | **Security boundary** — post a reply to a public thread (see below). | `url`, `text`, `confirm_token`, `username` |
 
 <Note>
-The report-derived tools (`positioning_from_report`, `competitor_map_from_report`,
+The report-derived tools (`positioning_from_report`,
 `landscape_from_report`, `assess_from_report`, `ideate_from_report`, `surface_recommend`,
 `ux_skeleton_build`, `site_render`, `launch_assets_build`, `build_spec`) are **synchronous** —
 run them after a stored report exists. `validate_from_idea` is the exception: like the pipeline

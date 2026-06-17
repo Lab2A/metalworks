@@ -67,6 +67,11 @@ class Competitor(BaseModel):
     one_liner: str = Field(description="What it is, in one line.")
     strengths: list[StrengthClaim] = Field(default_factory=list[StrengthClaim])
     gaps: list[GapClaim] = Field(default_factory=list[GapClaim])
+    addresses_clusters: list[int] = Field(
+        default_factory=list[int],
+        description="Demand-cluster ranks this competitor speaks to (gap-matched + mentioned). "
+        "Powers per-fork saturation — which wedge/segment this rival actually competes for.",
+    )
 
 
 class CompetitorMap(BaseModel):

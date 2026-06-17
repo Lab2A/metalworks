@@ -139,23 +139,17 @@ output traces back to the same evidence.
 
 ```python
 def positioning(self, research: Research | DemandReport) -> PositioningBrief: ...
-def competitors(self, research: Research | DemandReport) -> CompetitorMap: ...
 ```
 
-`positioning` returns a Dunford-style wedge + price hypothesis. `competitors` returns
-direct/adjacent/status-quo rivals, each gap backed by a real complaint. Both set `partial=True`
-with a `caveat` when there's no defensible wedge / the named set couldn't be grounded.
+`positioning` returns a Dunford-style wedge + price hypothesis, with `partial=True` + a `caveat`
+when there's no defensible wedge. (The competitive map lives inside `landscape()` below — there's
+one "what exists today" door now, not two.)
 
 ```python
 pos = mw.positioning(research)
 print(pos.positioning_statement)
 if pos.wedge:                      # None when no white-space cluster qualifies
     print(pos.wedge.unique_attribute)
-
-comp = mw.competitors(research)
-for rival in comp.competitors:
-    for gap in rival.gaps:
-        print(rival.name, "misses:", gap.claim)   # each gap has a resolvable EvidenceRef
 ```
 
 ### The validation loop
@@ -174,8 +168,9 @@ def validate(self, idea: str, *, max_iterations: int = 4) -> ValidationResult: .
 - `ideate` (idea-first) sharpens a raw idea into a testable hypothesis + a `ResearchBrief`;
   `ideate_from_evidence` (evidence-first) surfaces a report's forks — candidate wedges, else top
   clusters — as grounded `IdeaSketch`es to pick from.
-- `landscape` is the thick "what exists today": it wraps `competitors()` (the `CompetitorMap`) and
-  adds an empirical existing-solutions scan (real shipped products, matched to demand clusters).
+- `landscape` is the full "what exists today": the nested `competitor_map` (direct/adjacent/status-quo
+  rivals, each gap cited and each tagged with the clusters it competes for) plus an empirical
+  existing-solutions scan (real shipped products, matched to demand clusters).
 - `assess` is the heart: a **deterministic** GO / PIVOT / NO-GO gap over demand × landscape (the LLM
   only writes the rationale). PIVOT carries a `pivot_target` — a real fork id to aim at. A partial
   landscape never yields a hard GO.

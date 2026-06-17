@@ -24,7 +24,6 @@ if TYPE_CHECKING:
         Assessment,
         BuildSpec,
         ChannelPlan,
-        CompetitorMap,
         ContentPlan,
         DemandReport,
         DiscoveryContext,
@@ -360,16 +359,11 @@ class Metalworks:
 
         return build_positioning_brief(self.deps, _demand(research))
 
-    def competitors(self, research: Research | DemandReport) -> CompetitorMap:
-        """Pillar A — direct / adjacent / status-quo rivals, each gap cited."""
-        from metalworks.research import run_competitor_map
-
-        return run_competitor_map(self.deps, _demand(research))
-
     def landscape(self, research: Research | DemandReport) -> Landscape:
-        """Pillar A (thick) — the competitor map PLUS an empirical existing-solutions
-        scan (real shipped products, with traction, matched to demand clusters).
-        This is the 'what exists today' surface ``assess()`` consumes."""
+        """Pillar A — the full 'what exists today': direct / adjacent / status-quo rivals
+        (each gap cited, each tagged with the demand clusters it competes for) PLUS an
+        empirical existing-solutions scan (real shipped products, with traction). This is
+        the 'what exists today' surface ``assess()`` consumes."""
         from metalworks.research import run_landscape
 
         return run_landscape(self.deps, _demand(research))

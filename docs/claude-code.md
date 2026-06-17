@@ -51,7 +51,6 @@ Each command runs one step of the [end-to-end workflow](/docs/walkthrough). Star
 
 - **`/demand-report <idea>`** — is there real demand? Runs the pipeline (`research_plan_brief` → `research_start` → poll `research_status` → `research_result`), or a zero-key Arctic-corpus path if no key is set. Returns a go/no-go plus ranked demand clusters with distinct-author counts and verbatim, permalinked quotes. Research only — never posts.
 - **`/position-wedge`** — turns the report into a Dunford wedge (competitive alternative, unique attribute, value, beachhead, category) + a price band. Calls `positioning_from_report`. Every slot resolves to a real quote; if nothing defensible survives, it says so rather than inventing one.
-- **`/competitor-map`** — direct / adjacent / status-quo rivals, each gap backed by a cited complaint, severity derived from distinct-author counts. Calls `competitor_map_from_report`. Leads with the "do nothing" alternative.
 
 ### Validation loop
 
