@@ -1,13 +1,9 @@
-"""Built-in startup-shape catalog — self-registers on import.
+"""Store base stack — manage records for a workflow.
 
-The first proof slice: the **Store** base stack and one product shape on it,
-**submission-portal**. Store is chosen first because it is the most common output
-and consolidates the Clique-side record-keeping archetypes; submission-portal has
-a known-good built example (Clique's TaxLock) to validate the spec against.
-
-Adding a shape is one ``register_shape`` call here (or in any module that imports
-and registers) — the fan-out of the full base x module catalog lands the same way,
-without editing a shared inline list.
+The first base stack, and the most common output. Consolidates the Clique-side
+record-keeping archetypes (tracker, submission-portal, lookup-verify, estimator).
+``submission-portal`` is the first product shape on it; it has a known-good built
+example (Clique's TaxLock) to validate the spec against.
 """
 
 from __future__ import annotations
@@ -15,8 +11,6 @@ from __future__ import annotations
 from metalworks.contract.research import SignalStrength
 from metalworks.contract.shape import BaseStack, MatchSignature, ProductShape
 from metalworks.shapes import register_base_stack, register_shape
-
-# ── Base stacks ──────────────────────────────────────────────────────────────
 
 STORE = BaseStack(
     id="store",
@@ -31,8 +25,6 @@ STORE = BaseStack(
     default_modules=[],
     scaffold_target="starter:store-saas",
 )
-
-# ── Product shapes (base + modules + skin) ───────────────────────────────────
 
 SUBMISSION_PORTAL = ProductShape(
     name="submission-portal",
@@ -53,10 +45,5 @@ SUBMISSION_PORTAL = ProductShape(
     ),
 )
 
-
-def _register() -> None:
-    register_base_stack(STORE)
-    register_shape(SUBMISSION_PORTAL)
-
-
-_register()
+register_base_stack(STORE)
+register_shape(SUBMISSION_PORTAL)
