@@ -26,9 +26,12 @@ import metalworks
 from metalworks import config
 
 if TYPE_CHECKING:
+    from metalworks.billing import BillingProvider
     from metalworks.contract import DemandReport
     from metalworks.contract.assess import Decision
+    from metalworks.contract.build import PricingTier
     from metalworks.contract.ideate import IdeaSketch
+    from metalworks.deploy import DeployProvider
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.research.deps import ResearchDeps
@@ -212,6 +215,19 @@ def doctor(
             console.print("  [dim]no connected accounts[/dim] (run: metalworks reddit auth login)")
     except Exception as exc:
         console.print(f"  [yellow]could not read store: {exc}[/yellow]")
+
+    console.print("\n[bold]Deploy & billing[/bold]")
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY")
+    if stripe_key:
+        mode = "live" if stripe_key.startswith("sk_live_") else "test"
+        color = "red" if mode == "live" else "green"
+        console.print(f"  stripe  [green]key set[/green] ([{color}]{mode}[/{color}] mode)")
+    else:
+        console.print("  stripe  [dim]no key[/dim] (set STRIPE_SECRET_KEY; sk_test_ to dry-run)")
+    if os.environ.get("VERCEL_TOKEN"):
+        console.print("  vercel  [green]token set[/green] (deploy ready)")
+    else:
+        console.print("  vercel  [dim]no token[/dim] (set VERCEL_TOKEN to deploy)")
 
     console.print("\n[bold]Hints[/bold]")
     hints = _doctor_hints()
@@ -2238,6 +2254,280 @@ def build_init(
     )
 
 
+# ── deploy + billing ─────────────────────────────────────────────────────────
+
+billing_app = typer.Typer(
+    help="Turn a report's cited pricing tiers into a Stripe product + pay link.",
+    no_args_is_help=True,
+)
+
+
+def _resolve_deploy_or_exit() -> DeployProvider:
+    """Resolve the deploy provider, or exit cleanly with the env-var guidance."""
+    from metalworks.errors import MetalworksError
+
+    try:
+        return config.resolve_deploy()
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+
+def _resolve_billing_or_exit() -> BillingProvider:
+    """Resolve the billing provider, or exit cleanly with the extra/key guidance."""
+    from metalworks.errors import MetalworksError
+
+    try:
+        return config.resolve_billing()
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+
+def _site_files_for_deploy(report: str | None, site: Path | None) -> tuple[dict[str, str], str]:
+    """Resolve the file map to deploy and a default project name.
+
+    With ``--site`` the explicit ``index.html`` is deployed verbatim (offline). With
+    no site, the latest (or named) report's ``MarketingSite`` is rendered on the
+    fly — the same grounded artifact ``research site`` produces.
+    """
+    if site is not None:
+        if not site.exists():
+            err_console.print(f"[red]No such file: {site}[/red]")
+            raise typer.Exit(code=1)
+        return {"index.html": site.read_text(encoding="utf-8")}, site.stem or "metalworks-site"
+
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report)
+    report_obj = store.get_report(report_id)
+    if report_obj is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    chat = _resolve_chat_or_exit()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Rendering site[/bold] for report {report_id}...")
+    try:
+        positioning = build_positioning_brief(deps, report_obj)
+        marketing_site = build_marketing_site(deps, report_obj, positioning)
+    finally:
+        reader.close()
+    return {"index.html": render_site_html(marketing_site, report_obj)}, report_id
+
+
+@app.command()
+def deploy(
+    report: Annotated[
+        str | None,
+        typer.Argument(help="Report id/prefix; defaults to your latest run. Ignored with --site."),
+    ] = None,
+    site: Annotated[
+        Path | None,
+        typer.Option("--site", help="Deploy this explicit index.html (skips rendering)."),
+    ] = None,
+    prod: Annotated[
+        bool, typer.Option("--prod", help="Promote to production (the gated, irreversible step).")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", help="Confirm a production promote (required with --prod).")
+    ] = False,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Vercel project name (defaults to the report/site slug)."),
+    ] = None,
+) -> None:
+    """Render the latest report's marketing site to Vercel and print the live URL.
+
+    Preview by default. ``--prod`` promotes to production — the irreversible step —
+    and refuses without ``--yes``, the same way ``reddit post`` gates a real post.
+    """
+    from metalworks.errors import MetalworksError
+
+    target = "production" if prod else "preview"
+    if prod and not yes:
+        console.print(
+            "[yellow]Production promote is gated.[/yellow] "
+            "Re-run with [bold]--prod --yes[/bold] to go live."
+        )
+        return
+
+    files, default_name = _site_files_for_deploy(report, site)
+    provider = _resolve_deploy_or_exit()
+    project = name or default_name
+    try:
+        deployment = provider.deploy(name=project, files=files, target=target)
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]Deployed[/green] ([bold]{target}[/bold]): {deployment.url}")
+    if deployment.inspector_url:
+        console.print(f"  [dim]inspect: {deployment.inspector_url}[/dim]")
+
+
+def _load_build_spec_for_billing(report: str | None):
+    """Resolve pricing tiers: a BuildSpec JSON path, or a report → derived spec.
+
+    A ``*.json`` path is tried as a :class:`BuildSpec` first (the offline path), then
+    as a :class:`DemandReport` to spec via the LLM. Otherwise the id/prefix/latest
+    report is resolved and specced — the same derivation ``build init`` uses.
+    """
+    from pydantic import ValidationError
+
+    from metalworks.contract import BuildSpec, DemandReport
+
+    if report:
+        candidate = Path(report)
+        if candidate.exists() and candidate.suffix == ".json":
+            text = candidate.read_text(encoding="utf-8")
+            try:
+                return BuildSpec.model_validate_json(text)
+            except ValidationError:
+                report_obj = DemandReport.model_validate_json(text)
+                return _spec_from_report(report_obj)
+    report_obj = _load_report_for_build(report)
+    return _spec_from_report(report_obj)
+
+
+def _spec_from_report(report_obj: DemandReport):
+    """Derive a BuildSpec from a report via the LLM (chat + embedding keys)."""
+    from metalworks.build import build_spec_from_report
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+    from metalworks.research.synthesis import build_positioning_brief
+
+    chat = _resolve_chat_or_exit()
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_resolve_embeddings_or_exit(),
+        corpus=config.default_store(),
+        reader=reader,
+    )
+    console.print(f"[bold]Speccing pricing[/bold] for report {report_obj.report_id}...")
+    try:
+        positioning = build_positioning_brief(deps, report_obj)
+        return build_spec_from_report(deps, report_obj, positioning, "web", stack="empty")
+    finally:
+        reader.close()
+
+
+def _pick_pricing_tier(tiers: list[PricingTier], tier_name: str | None) -> PricingTier:
+    """Pick the tier to charge for: a named one, else the first priced, else exit."""
+    if not tiers:
+        err_console.print(
+            "[red]This report has no pricing tiers.[/red] "
+            "Run `metalworks build init` first, or pass a BuildSpec JSON with tiers."
+        )
+        raise typer.Exit(code=1)
+    if tier_name:
+        match = next((t for t in tiers if t.name.lower() == tier_name.lower()), None)
+        if match is None:
+            names = ", ".join(t.name for t in tiers)
+            err_console.print(f"[red]No tier named {tier_name!r}.[/red] Available: {names}.")
+            raise typer.Exit(code=1)
+        return match
+    priced = next((t for t in tiers if t.price is not None), None)
+    return priced if priced is not None else tiers[0]
+
+
+@billing_app.command("create")
+def billing_create(
+    report: Annotated[
+        str | None,
+        typer.Argument(help="Report id/prefix, report.json, or BuildSpec JSON; default latest."),
+    ] = None,
+    tier_name: Annotated[
+        str | None, typer.Option("--tier", help="Which tier to create (default: first priced).")
+    ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", help="Product name (defaults to the report slug).")
+    ] = None,
+    live: Annotated[
+        bool, typer.Option("--live", help="Create REAL charges (needs a live key + --yes).")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", help="Confirm live charges (required with --live).")
+    ] = False,
+    out: Annotated[
+        Path | None, typer.Option("--json", help="Write the BillingProduct JSON here.")
+    ] = None,
+) -> None:
+    """Cited tiers → a Stripe product + recurring price + payment link (test mode by default).
+
+    Test mode is the default. ``--live`` creates real charges and is double-gated:
+    it refuses without ``--yes``, and the adapter refuses a live key unless ``--live``
+    is set — "live → paid" never happens by accident.
+    """
+    from metalworks.errors import MetalworksError
+
+    if live and not yes:
+        console.print(
+            "[yellow]Live billing is gated.[/yellow] "
+            "Re-run with [bold]--live --yes[/bold] to create real charges."
+        )
+        return
+
+    spec = _load_build_spec_for_billing(report)
+    tier = _pick_pricing_tier(spec.pricing_tiers, tier_name)
+    provider = _resolve_billing_or_exit()
+    product_name = name or spec.report_id
+    try:
+        product = provider.create_product(name=product_name, tier=tier, mode_live=live)
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+    mode_color = "red" if product.mode == "live" else "green"
+    badge = f"[{mode_color}]{product.mode}[/{mode_color}]"
+    console.print(f"[bold]{tier.name}[/bold] -> Stripe product ({badge} mode)")
+    console.print(f"  product: {product.product_id}")
+    if product.partial:
+        console.print(f"  [yellow]partial:[/yellow] {product.caveat}")
+    else:
+        console.print(f"  price:   {product.price_id} ({product.amount} {product.currency}/mo)")
+        console.print(f"  [green]pay:[/green]     {product.payment_link_url}")
+    if out is not None:
+        out.write_text(product.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote[/green] {out}")
+
+
+@billing_app.command("status")
+def billing_status() -> None:
+    """Report Stripe/Vercel readiness from the environment. Never prints a secret."""
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY")
+    console.print("[bold]Stripe[/bold]")
+    if stripe_key:
+        mode = "live" if stripe_key.startswith("sk_live_") else "test"
+        color = "red" if mode == "live" else "green"
+        console.print(f"  key   [green]set[/green] — [{color}]{mode}[/{color}] mode")
+    else:
+        console.print("  key   [dim]unset[/dim] (set STRIPE_SECRET_KEY; sk_test_ to dry-run)")
+    installed = _module_available("stripe")
+    extra = "[green]installed[/green]" if installed else "[dim]not installed[/dim]"
+    console.print(f"  sdk   {extra}")
+
+    console.print("[bold]Vercel[/bold]")
+    if os.environ.get("VERCEL_TOKEN"):
+        console.print("  token [green]set[/green] (deploy ready; no SDK needed)")
+    else:
+        console.print("  token [dim]unset[/dim] (set VERCEL_TOKEN to deploy)")
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
@@ -2490,6 +2780,7 @@ _EXTRA_PROBES: tuple[tuple[str, str], ...] = (
     ("arctic", "duckdb"),
     ("exa", "exa_py"),
     ("tavily", "tavily"),
+    ("stripe", "stripe"),
     ("mcp", "mcp"),
 )
 
@@ -2514,6 +2805,8 @@ _SECRET_KEYS = frozenset(
         "REDDIT_CLIENT_SECRET",
         "METALWORKS_FERNET_KEY",
         "METALWORKS_MCP_TOKEN",
+        "STRIPE_SECRET_KEY",
+        "VERCEL_TOKEN",
     }
 )
 
@@ -2682,6 +2975,7 @@ reddit_app.add_typer(auth_app, name="auth")
 
 app.add_typer(research_app, name="research")
 app.add_typer(build_app, name="build")
+app.add_typer(billing_app, name="billing")
 app.add_typer(reddit_app, name="reddit")
 app.add_typer(arctic_app, name="arctic")
 app.add_typer(discovery_app, name="discovery")

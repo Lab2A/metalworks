@@ -29,6 +29,8 @@ from metalworks.errors import MissingKeyError
 from metalworks.project import Project
 
 if TYPE_CHECKING:
+    from metalworks.billing import BillingProvider
+    from metalworks.deploy import DeployProvider
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.research.sources import ItemSource
@@ -501,6 +503,32 @@ def resolve_search() -> SearchProvider | None:
 
         return FirecrawlSearch()
     return None
+
+
+def resolve_billing() -> BillingProvider:
+    """Resolve a :class:`~metalworks.billing.BillingProvider` (Stripe) from the env.
+
+    Reads ``STRIPE_SECRET_KEY`` inside the adapter; raises
+    :class:`~metalworks.errors.MissingExtraError` when the ``[stripe]`` extra is
+    absent and :class:`~metalworks.errors.MissingKeyError` when the key is unset.
+    The adapter (and its SDK) is imported lazily.
+    """
+    from metalworks.billing.adapters.stripe import StripeBilling
+
+    return StripeBilling()
+
+
+def resolve_deploy() -> DeployProvider:
+    """Resolve a :class:`~metalworks.deploy.DeployProvider` (Vercel) from the env.
+
+    Reads ``VERCEL_TOKEN`` (plus optional ``VERCEL_TEAM_ID`` / ``VERCEL_PROJECT``)
+    inside the adapter; raises :class:`~metalworks.errors.MissingKeyError` when the
+    token is unset. No SDK or extra is needed — the adapter calls the REST API over
+    the core ``httpx`` dependency.
+    """
+    from metalworks.deploy.adapters.vercel import VercelDeploy
+
+    return VercelDeploy()
 
 
 # ── Store resolution ────────────────────────────────────────────────────────
