@@ -51,7 +51,7 @@ LandscapeFn = Callable[["ResearchDeps", DemandReport], Landscape]
 AssessFn = Callable[["ResearchDeps", DemandReport, Landscape], Assessment]
 
 
-def _default_research(deps: ResearchDeps, sketch: IdeaSketch) -> DemandReport:
+def default_research(deps: ResearchDeps, sketch: IdeaSketch) -> DemandReport:
     from metalworks.research.pipeline import run_research
 
     brief = sketch.brief
@@ -80,7 +80,7 @@ def validate(
 ) -> ValidationResult:
     """Run the discovery loop from ``idea``. Returns where it landed + the decision log."""
     do_ideate = ideate_fn or ideate_from_idea
-    do_research = research_fn or _default_research
+    do_research = research_fn or default_research
     do_landscape = landscape_fn or run_landscape
     do_assess = assess_fn or run_assessment
     choose = decide or _auto

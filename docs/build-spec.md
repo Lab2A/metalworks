@@ -52,8 +52,8 @@ metalworks build init <report-id> --dest ./build --surface web --base next-shipf
 ## What you give it / what you get back
 
 **You give it:** a finished `Research` bundle (the report on `.demand`), your positioning, and a
-target surface. The `report` argument to the CLI is a stored report id (`metalworks research
-list`) or a path to a `report.json`.
+target surface. The `report` argument to the CLI is a stored report id or prefix (`metalworks
+research list`), a path to a `report.json`, or — omitted entirely — your latest run.
 
 **You get back:** a `BuildSpec` — three parts, each line tied to a real quote:
 
