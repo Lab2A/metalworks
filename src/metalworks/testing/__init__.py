@@ -32,6 +32,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
+from metalworks.billing.fake import FakeBillingProvider, FakeSubscriptionStore
 from metalworks.contract import (
     CorpusComment,
     CorpusRecord,
@@ -43,6 +44,7 @@ from metalworks.contract import (
     RunSummary,
     TargetSubreddit,
 )
+from metalworks.deploy.fake import FakeDeploy
 from metalworks.embeddings import FakeEmbedding, IndexIdentity
 from metalworks.errors import EmbeddingModelMismatch
 from metalworks.llm.fake import FakeChatModel
@@ -289,8 +291,11 @@ def check_all_repos(backend: AllRepos, *, corpus_rows: int = 1500) -> None:
 
 __all__ = [
     "AllRepos",
+    "FakeBillingProvider",
     "FakeChatModel",
+    "FakeDeploy",
     "FakeEmbedding",
+    "FakeSubscriptionStore",
     "check_account_repo",
     "check_all_repos",
     "check_brief_repo",
