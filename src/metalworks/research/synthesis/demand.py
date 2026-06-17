@@ -49,9 +49,10 @@ class AssessPolicy(BaseModel):
     min_prevalence: float = Field(
         default=0.05, description="A fork reaching <5% of the crowd is not a real slice."
     )
-    # Self-calibrating band cuts — percentiles of the PEER-fork distribution.
+    # Self-calibrating band cuts — midrank percentiles of the PEER-fork distribution.
     # 0.66 so a 3-fork run reads cleanly as one HIGH / one MEDIUM / one LOW
-    # (top-of-3 percentile is 2/3 ≈ 0.667).
+    # (distinct top-of-3 midrank is 5/6 ≈ 0.83) AND a tied pair at the top both
+    # clear it (a top tie of two scores 2/3 ≈ 0.667).
     high_percentile: float = 0.66
     medium_percentile: float = 0.33
     # Degenerate <2-fork fallback ONLY (surfaced + overridable; no longer hidden).
@@ -77,10 +78,21 @@ def prevalence(distinct_authors: int, total_distinct_authors: int) -> float:
 
 
 def percentile_rank(value: int, population: list[int]) -> float:
-    """Fraction of peers strictly below ``value`` — the fork's standing among its peers, [0, 1]."""
+    """Midrank percentile of ``value`` among its peers — fraction below plus half
+    the ties, in [0, 1].
+
+    Counting half the ties keeps equal peers symmetric. With a plain
+    strictly-below count, a tie at the top is demoted: two equally-broad forks in
+    ``[50, 50, 10]`` each score 1/3 and miss the HIGH cut, so the report reads
+    "Moderate demand" while a distinct ``[60, 30, 10]`` of the same shape reads
+    "Strong". Midrank scores that tied pair 2/3, so the strongest forks set the
+    band regardless of ties. Empty population → 0.0.
+    """
     if not population:
         return 0.0
-    return sum(1 for x in population if x < value) / len(population)
+    below = sum(1 for x in population if x < value)
+    ties = sum(1 for x in population if x == value)
+    return (below + 0.5 * ties) / len(population)
 
 
 def rank(band: SignalStrength) -> int:
