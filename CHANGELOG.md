@@ -6,6 +6,52 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [0.0.4] - 2026-06-17
+
+Sharper decisions and a friendlier front door. The verdict stops collapsing the
+report's forks, the CLI gets a guided session, and the competitive landscape becomes
+one segment-aware surface. Still pre-1.0; anything outside `metalworks.contract` and the
+MCP tool contracts may change — including the removed competitor-map surface below.
+
+### Added
+
+- **Per-fork verdicts.** `assess()` now scores each candidate wedge AND segment and
+  synthesizes the three-lane top-line; `Assessment.fork_verdicts` carries the
+  un-collapsed answer ("GO on the sleep wedge, NO-GO on the broad market"), each with
+  its own demand band and a `confidence` (distance from a band edge). New `ForkVerdict`
+  contract.
+- **Relative, self-calibrating demand.** Demand strength is now a fork's prevalence
+  (its share of the pulled crowd) and its standing among the report's other forks, not a
+  hardcoded author-count cutoff — so the bands self-calibrate to each run. `GapAnalysis`
+  gains `demand_prevalence` / `demand_percentile` / `confidence` / `reference`.
+- **Guided CLI session.** Bare `metalworks` (or `metalworks start`) walks one idea end to
+  end — setup → idea → demand → landscape → assess with the GO/PIVOT/NO-GO call in your
+  hands each round — then offers positioning / site / scaffold after a GO.
+- **Corpus-mined competitors + cluster tags.** `landscape()` now discovers rivals from a
+  live web search AND the corpus (products people name in their complaints), and tags each
+  `Competitor` with the demand clusters it competes for (`addresses_clusters`). Each
+  `ForkVerdict` carries an **advisory** per-fork `landscape_saturation` (which wedge the
+  supply competes for — shown, not yet gated).
+
+### Changed
+
+- **Report ids are optional everywhere.** Every report-grounded command (`landscape`,
+  `assess`, `position`, `surface`, `site`, `launch`, `content-plan`, `refresh`,
+  `versions`, `build init`) takes an id/prefix or defaults to your latest run — no more
+  copy/pasting UUIDs. `research --help` groups the verbs into Core / Pillars / History.
+- **`research validate` is interactive by default** (you make each GO/PIVOT/NO-GO call;
+  `--auto` for headless), and both it and the guided session persist their final report.
+- `derive_verdict` is a pure formatter — the demand-strength bands live in one place
+  (`synthesis.demand`), so `report.verdict` and the assess decision can't disagree.
+
+### Removed
+
+- **The lean competitor-map surface.** `Metalworks.competitors()`, the
+  `metalworks research competitor-map` CLI command, the MCP `competitor_map_from_report`
+  tool, and the `/competitor-map` skill are gone — folded into `landscape()` (which still
+  exposes the map as a nested `competitor_map`). Use `landscape()` /
+  `metalworks research landscape` / `landscape_from_report` / `/market-landscape`.
+
 ## [0.0.3] - 2026-06-16
 
 Research becomes a **validation loop**: ideate → demand + landscape → assess
