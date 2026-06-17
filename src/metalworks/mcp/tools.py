@@ -578,6 +578,95 @@ def build_spec(
 
 
 @guard
+def deploy_marketing_site(
+    report_id: str,
+    target: str = "preview",
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys + VERCEL_TOKEN). Render a stored report's
+    marketing site and deploy it to Vercel, returning the live URL.
+
+    ``target="preview"`` is the safe default. ``target="production"`` is the
+    gated, irreversible promote: it requires the operator opt-in
+    ``METALWORKS_ALLOW_DEPLOY=1`` (the same posture as ``reddit_post_comment``'s
+    ``METALWORKS_ALLOW_POSTING``), so a host model cannot push to production by
+    itself."""
+    from metalworks import config
+    from metalworks.research import build_marketing_site, render_site_html
+    from metalworks.research.synthesis import build_positioning_brief
+
+    if target not in ("preview", "production"):
+        return {
+            "error": {
+                "error_code": "invalid_argument",
+                "message": f"Unknown deploy target {target!r}.",
+                "fix": "Pass target='preview' (default) or 'production'.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    if target == "production" and os.environ.get("METALWORKS_ALLOW_DEPLOY") != "1":
+        raise MissingKeyError(
+            "METALWORKS_ALLOW_DEPLOY=1", provider="production deploy (disabled by default)"
+        )
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+    files = {"index.html": render_site_html(site, report)}
+    deployment = config.resolve_deploy().deploy(name=report.report_id, files=files, target=target)
+    return {"deployment": deployment.model_dump(mode="json")}
+
+
+@guard
+def billing_create_product(
+    report_id: str,
+    live: bool = False,
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat + embedding keys + STRIPE_SECRET_KEY). Derive a stored report's
+    BuildSpec, take its first priced tier, and create a real Stripe product +
+    recurring price + payment link — a working pay URL — carrying the tier's
+    evidence through.
+
+    Test mode is the default. ``live=True`` creates REAL charges and is gated by
+    the operator opt-in ``METALWORKS_ALLOW_BILLING=1``; the Stripe adapter
+    additionally refuses a live key unless ``live`` is set — "live -> paid" never
+    happens by accident."""
+    from metalworks import config
+    from metalworks.build import build_spec_from_report
+    from metalworks.research.synthesis import build_positioning_brief
+
+    if live and os.environ.get("METALWORKS_ALLOW_BILLING") != "1":
+        raise MissingKeyError(
+            "METALWORKS_ALLOW_BILLING=1", provider="live billing (disabled by default)"
+        )
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    spec = build_spec_from_report(
+        deps, report, build_positioning_brief(deps, report), "web", stack="empty"
+    )
+    if not spec.pricing_tiers:
+        return {
+            "error": {
+                "error_code": "no_pricing_tiers",
+                "message": "The derived BuildSpec has no pricing tiers to bill.",
+                "fix": "Run research that surfaces price evidence, or set a tier manually.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    tier = next((t for t in spec.pricing_tiers if t.price is not None), spec.pricing_tiers[0])
+    product = config.resolve_billing().create_product(
+        name=report.report_id, tier=tier, mode_live=live
+    )
+    return {"billing_product": product.model_dump(mode="json")}
+
+
+@guard
 def research_start(
     brief: dict[str, Any],
     *,
@@ -816,8 +905,10 @@ def _do_post(*, url: str, text: str, username: str | None) -> ToolResult:
 __all__ = [
     "arctic_list_months",
     "arctic_pull_threads",
+    "billing_create_product",
     "compliance_lint",
     "corpus_stats",
+    "deploy_marketing_site",
     "discovery_run",
     "generate_reply",
     "guard",
