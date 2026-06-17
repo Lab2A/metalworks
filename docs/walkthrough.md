@@ -51,15 +51,15 @@ inventing an opportunity. Everything below runs on this `report`.
 
 ```text Claude Code
 /position-wedge
-/competitor-map
+/market-landscape
 ```
 
 ```python Python
 positioning = mw.positioning(research)
 print(positioning.positioning_statement)   # who it's for, and why it's different
 
-competitors = mw.competitors(research)
-for rival in competitors.competitors:
+land = mw.landscape(research)
+for rival in land.competitor_map.competitors:
     for gap in rival.gaps:                  # an opening, backed by a real complaint
         print(rival.name, "misses:", gap.claim)
 ```

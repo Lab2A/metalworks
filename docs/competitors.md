@@ -1,19 +1,21 @@
 ---
-title: "Competitors"
-description: "Map the competitors you have to beat from your demand report — each with what it does well and a real, cited gap you can exploit."
+title: "Landscape"
+description: "Map everything that exists today from your demand report — direct/adjacent/status-quo rivals (each gap cited) plus real shipped products, each tagged with the demand clusters it competes for."
 ---
 
-**Map the rivals to beat — each gap backed by a real complaint.**
+**Map what exists today — rivals + real products, each gap backed by a real complaint.**
 
-With a [demand report](/docs/demand-research) in hand, one call maps the products people use
-today: what each does well, and the gap you can exploit. Every gap is backed by an actual
-complaint someone posted, so the whole map traces back to real quotes you can open.
+With a [demand report](/docs/demand-research) in hand, one call maps the full supply side: the
+products people use today, what each does well, the gap you can exploit, and — for the shipped
+ones — their traction. Every gap traces back to an actual complaint someone posted, and every
+competitor is **tagged with the demand clusters it competes for**, so you can see which of your
+[wedges/segments](/docs/data-model) a rival actually threatens.
 
 <CodeGroup>
 
 ```text Claude Code
 /demand-report an affordable, jitter-free focus supplement for developers
-/competitor-map
+/market-landscape
 ```
 
 ```python Python
@@ -22,53 +24,61 @@ from metalworks import Metalworks
 mw = Metalworks()
 research = mw.research("an affordable, jitter-free focus supplement for developers")
 
-comp = mw.competitors(research)
-for rival in comp.competitors:
-    print(rival.kind, rival.name)       # direct, adjacent, or "do nothing"
+land = mw.landscape(research)
+for rival in land.competitor_map.competitors:
+    print(rival.kind, rival.name, "→ clusters", rival.addresses_clusters)
     for gap in rival.gaps:              # each gap is backed by a real complaint
         print("   misses:", gap.claim, f"[{gap.severity}]")
+for product in land.existing_solutions:  # real shipped products, with traction
+    print(product.name, product.traction, "→ clusters", product.addresses_clusters)
 ```
 
 ```bash CLI
-metalworks research competitor-map <report-id>
+metalworks research landscape <report-id>
 ```
 
 </CodeGroup>
 
-You get back a `CompetitorMap`: the real products people use today, each with what it
-does well and a **gap you can exploit** — and that gap is always backed by an actual
-complaint someone posted. It also always includes the "do nothing" option, because
-the cost of people sticking with their current habit is the real thing any new product
-has to beat.
+You get back a `Landscape`: the nested `competitor_map` (the real products people use today — each
+with what it does well, a **gap you can exploit**, and the **clusters it addresses**) plus
+`existing_solutions` (real shipped products from Product Hunt / the web, with traction, matched to
+your demand clusters). It always includes the "do nothing" status-quo option, because the cost of
+people sticking with their current habit is the real thing any new product has to beat.
 
-## What you give it / what you get back
+> Competitor names come from **two grounded sources**: a live web search AND the corpus itself
+> (tools people literally name in their complaints). A name you can't ground in either is dropped —
+> no hallucinated rivals.
+
+## What you get back
 
 | Field | What it is |
 | --- | --- |
-| `comp.competitors[].name` / `.kind` | The rival and its type: `direct`, `adjacent`, or `status_quo` (do nothing). |
-| `comp.competitors[].strengths` | What that competitor does well. |
-| `comp.competitors[].gaps[].claim` | A gap you can exploit — phrased as what the rival misses. |
-| `comp.competitors[].gaps[].severity` | How big the gap is, set from how many people complained about it (not a model's opinion). |
+| `land.competitor_map.competitors[].name` / `.kind` | The rival and its type: `direct`, `adjacent`, or `status_quo` (do nothing). |
+| `…competitors[].addresses_clusters` | The demand-cluster ranks this rival competes for — which wedge/segment it threatens. |
+| `…competitors[].strengths` | What that competitor does well. |
+| `…competitors[].gaps[].claim` / `.severity` | A gap to exploit (what it misses); severity set from how many people complained, not a model's opinion. |
+| `land.existing_solutions[]` | Real shipped products: `name`, `url`, `tagline`, `traction`, `addresses_clusters`. |
 
-metalworks only lists rivals it can actually find evidence for — if a name can't be
-grounded in a real source, it's dropped, so you won't get hallucinated competitors.
-And it only keeps a gap when a real complaint backs it up: every gap links to one
-verbatim quote or a grounded web source. A gap nobody actually voiced gets dropped.
+metalworks only lists rivals it can ground — a name with no web result and no corpus mention is
+dropped — and only keeps a gap when a real complaint backs it: every gap links to one verbatim quote
+or a grounded web source. A gap nobody voiced gets dropped.
+
+## Per-fork saturation (advisory)
+
+Because every competitor and product is cluster-tagged, [`assess`](/docs/validation-loop) can show
+**how crowded each fork is on its own**: your indie-DX wedge might face Supabase/Neon while your
+enterprise wedge faces RDS/Aurora. Each `ForkVerdict` carries its own `landscape_saturation`, so a
+GO/NO-GO per fork shows whether *that* slice is open or crowded. (This per-fork saturation is
+**advisory** today — the GO/NO-GO gate itself still uses the space-level number; the gate goes
+per-fork in a follow-up once the attribution is proven stable.)
 
 ## When the result is thin
 
-If metalworks can't confidently ground the list of named competitors, it still ships
-the "do nothing" alternative (always grounded in your report's strongest pains) and
-flags the rest with `partial=True` and a caveat telling you the named set is unverified.
-You're never handed a confident-looking map built on invented rivals.
-
-## The fuller picture: landscape
-
-The competitor map is the lean "who are the rivals." For the full **"what exists today"** —
-the competitor map **plus** an empirical scan of real shipped products (Product Hunt launches and
-web), each matched to a demand cluster with its traction — use `landscape()` instead. That's the
-supply side the [validation loop](/docs/validation-loop) weighs against demand to reach a
-GO / PIVOT / NO-GO call.
+If metalworks can't confidently ground the named competitors, it still ships the "do nothing"
+alternative (always grounded in your report's strongest pains) and the existing-solutions scan,
+flagging the rest with `partial=True` and a caveat that the named set is unverified. You're never
+handed a confident-looking map built on invented rivals. The existing-solutions scan needs a Product
+Hunt token; without one, that half is empty and the competitor map still holds.
 
 ## Next
 

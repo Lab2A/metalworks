@@ -62,7 +62,7 @@ metalworks research list          # table of report_id · question · authors ·
 
 # take the report_id from that table:
 metalworks research position   <report_id>
-metalworks research competitor-map <report_id>
+metalworks research landscape  <report_id>
 metalworks research site       <report_id>
 metalworks build init          <report_id> --dest ./my-startup
 ```

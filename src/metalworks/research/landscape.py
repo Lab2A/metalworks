@@ -66,10 +66,24 @@ class _CompetitorCand(BaseModel):
     name: str = Field(description="The competitor or alternative name.")
     kind: Literal["direct", "adjacent"] = Field(description="direct or adjacent.")
     one_liner: str = Field(description="What it is, one line.")
+    # Demand-cluster ranks this candidate was MENTIONED in (corpus-mined cands only;
+    # empty for web-enumerated names, which get their clusters from the gap-match).
+    clusters: list[int] = Field(default_factory=list[int])
 
 
 class _CompetitorList(BaseModel):
     competitors: list[_CompetitorCand] = Field(default_factory=list[_CompetitorCand])
+
+
+class _CorpusMention(BaseModel):
+    name: str = Field(description="A real, named product/tool/service the text names.")
+    kind: Literal["direct", "adjacent"] = "direct"
+    one_liner: str = Field(default="", description="What it is, one line, if discernible.")
+    cluster_rank: int = Field(description="The cluster number this mention appeared in.")
+
+
+class _CorpusMentions(BaseModel):
+    mentions: list[_CorpusMention] = Field(default_factory=list[_CorpusMention])
 
 
 class _Harvest(BaseModel):
@@ -181,6 +195,107 @@ def _enumerate(deps: ResearchDeps, report: DemandReport) -> tuple[list[_Competit
         return out.competitors[:_MAX_COMPETITORS], False
     except Exception:
         return [], False
+
+
+# ── stage 1b: mine the corpus for named competitors (a second enumeration source) ──
+
+_MAX_MENTIONS = 12
+
+
+def _mine_context(report: DemandReport) -> str:
+    """Top clusters with their verbatim quotes, labeled by rank — so a mined name is
+    born tied to the cluster it was named in."""
+    lines: list[str] = []
+    for c in report.ranked_clusters[:8]:
+        lines.append(f"Cluster {c.rank}: {c.claim}")
+        for q in c.quotes[:3]:
+            lines.append(f"  - {q.text}")
+    return "\n".join(lines)
+
+
+def _mine_corpus_competitors(deps: ResearchDeps, report: DemandReport) -> list[_CompetitorCand]:
+    """Extract real product/tool names people NAME in their complaints, each tied to the
+    cluster it appeared in. A second, corpus-grounded enumeration source beside the web pass.
+
+    Uses a DISTINCT output model (``_CorpusMentions``) so the FakeChatModel script (keyed by
+    output type) never collides with the web enumerate call.
+    """
+    if not report.ranked_clusters:
+        return []
+    valid_ranks = {c.rank for c in report.ranked_clusters}
+    system = (
+        "You extract the real, NAMED products / tools / services that people mention in these "
+        "complaints as things they currently use, pay for, or compare against. Only concrete names "
+        "that literally appear in the text — never categories ('a database', 'a CRM'), never names "
+        "you are unsure appear. For each, give the cluster number it was mentioned in."
+    )
+    user = "Complaints, grouped by cluster:\n" + _mine_context(report)
+    try:
+        out = deps.chat.complete_structured(
+            system=system,
+            user=user,
+            output_model=_CorpusMentions,
+            max_tokens=_MAX_TOKENS,
+            temperature=0.1,
+        )
+    except Exception:
+        return []
+    cands: list[_CompetitorCand] = []
+    for m in out.mentions[:_MAX_MENTIONS]:
+        if not m.name.strip() or m.cluster_rank not in valid_ranks:
+            continue  # no name, or a hallucinated cluster number → drop
+        cands.append(
+            _CompetitorCand(
+                name=m.name.strip(),
+                kind=m.kind,
+                one_liner=m.one_liner.strip(),
+                clusters=[m.cluster_rank],
+            )
+        )
+    return cands
+
+
+def _norm_name(name: str) -> str:
+    """Casefold + strip non-alphanumerics for dedupe ('PostgreSQL' == 'Postgres SQL')."""
+    return "".join(ch for ch in name.casefold() if ch.isalnum())
+
+
+def _merge_candidates(
+    web: list[_CompetitorCand], corpus: list[_CompetitorCand]
+) -> list[_CompetitorCand]:
+    """Union web + corpus candidates, deduped by normalized name. A name in both keeps the
+    web ``kind``/``one_liner`` (the grounded surface) and the UNION of cluster tags."""
+    by_key: dict[str, _CompetitorCand] = {}
+    order: list[str] = []
+    for cand in [*web, *corpus]:  # web first → its kind/one_liner wins on collision
+        key = _norm_name(cand.name)
+        if not key:
+            continue
+        if key in by_key:
+            ex = by_key[key]
+            by_key[key] = ex.model_copy(
+                update={
+                    "clusters": sorted(set(ex.clusters) | set(cand.clusters)),
+                    "one_liner": ex.one_liner or cand.one_liner,
+                }
+            )
+        else:
+            by_key[key] = cand
+            order.append(key)
+    return [by_key[k] for k in order][:_MAX_COMPETITORS]
+
+
+def _web_id_to_clusters(report: DemandReport) -> dict[str, list[int]]:
+    """Map each web-finding evidence id → the cluster ranks it's cross-referenced to, so a
+    competitor whose gap matched a WEB finding (not a quote) still gets a cluster tag."""
+    by_index = {w.finding_index: w.id for w in report.web_findings}
+    out: dict[str, list[int]] = {}
+    for cr in report.cross_references:
+        for fi in cr.web_finding_indices:
+            wid = by_index.get(fi)
+            if wid is not None:
+                out.setdefault(wid, []).append(cr.cluster_rank)
+    return out
 
 
 # ── stage 2: harvest strengths + gap claims ──────────────────────────────────
@@ -296,8 +411,11 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
     report's real complaints → assemble, dropping any unevidenced gap. The
     status-quo alternative is always present and verbatim-grounded.
     """
-    cands, grounded = _enumerate(deps, report)
+    web_cands, grounded = _enumerate(deps, report)
+    corpus_cands = _mine_corpus_competitors(deps, report)
+    cands = _merge_candidates(web_cands, corpus_cands)
     evidence_texts, quote_cluster, web_ids = _evidence_index(report)
+    web_clusters = _web_id_to_clusters(report)
 
     competitors: list[Competitor] = []
     for ci, cand in enumerate(cands, start=1):
@@ -305,11 +423,18 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
         gap_texts = [g for g in harvest.gaps if g.strip()][:_MAX_GAPS_PER]
         matched = _match_gaps(deps, gap_texts, evidence_texts, quote_cluster, web_ids)
         gaps: list[GapClaim] = []
+        # addresses_clusters = the clusters this rival competes for: mention clusters (corpus)
+        # plus quote-matched gap clusters plus web-matched gap clusters (via cross_references).
+        cluster_tags: set[int] = set(cand.clusters)
         for gi, text in enumerate(gap_texts):
             if gi not in matched:
                 continue  # no-quote-no-gap
             ref, sev = matched[gi]
             gaps.append(GapClaim(gap_index=len(gaps) + 1, claim=text, severity=sev, evidence=ref))
+            if ref.kind == "quote" and ref.evidence_id in quote_cluster:
+                cluster_tags.add(quote_cluster[ref.evidence_id].rank)
+            elif ref.kind == "web":
+                cluster_tags.update(web_clusters.get(ref.evidence_id or "", []))
         competitors.append(
             Competitor(
                 competitor_index=ci,
@@ -318,6 +443,7 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
                 one_liner=cand.one_liner,
                 strengths=[StrengthClaim(claim=s) for s in harvest.strengths if s.strip()],
                 gaps=gaps,
+                addresses_clusters=sorted(cluster_tags),
             )
         )
 

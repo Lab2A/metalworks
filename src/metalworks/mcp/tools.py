@@ -331,27 +331,6 @@ def positioning_from_report(report_id: str, store_path: str | None = None) -> To
 
 
 @guard
-def competitor_map_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
-    """TIER 2 (chat + embedding keys). Map the competitive landscape for a stored
-    report — grounded competitor enumeration + cited gaps, synchronous. Bounded
-    competitor count keeps it responsive; needs chat + embedding keys."""
-    from metalworks import config
-    from metalworks.research import run_competitor_map
-
-    store = config.default_store(store_path)
-    report = store.get_report(report_id)
-    if report is None:
-        return {
-            "error": {
-                "error_code": "not_found",
-                "message": f"No report with id {report_id!r} in the local store.",
-                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
-                "docs_url": _DOCS_BASE,
-            }
-        }
-    deps = _build_deps(store_path)
-    cmap = run_competitor_map(deps, report)
-    return {"competitor_map": cmap.model_dump(mode="json")}
 
 
 @guard

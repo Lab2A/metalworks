@@ -429,6 +429,8 @@ export interface Competitor {
   one_liner: string;
   strengths?: StrengthClaim[];
   gaps?: GapClaim[];
+  /** Demand-cluster ranks this competitor speaks to (gap-matched + mentioned). Powers per-fork saturation — which wedge/segment this rival actually competes for. */
+  addresses_clusters?: number[];
 }
 
 export interface CompetitorMap {

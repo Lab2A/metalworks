@@ -69,15 +69,54 @@ def _saturation(landscape: Landscape, policy: AssessPolicy) -> SignalStrength:
     return SignalStrength.LOW
 
 
+def _fork_saturation(
+    fork_clusters: set[int],
+    landscape: Landscape,
+    policy: AssessPolicy,
+    fallback: SignalStrength,
+) -> SignalStrength:
+    """ADVISORY saturation for ONE fork — supply (competitors + existing solutions) whose addressed
+    clusters intersect this fork's clusters. Pure ints in, so the scorer never imports landscape
+    types. Falls back to the global value when this fork has no cluster tags, or when nothing in the
+    landscape is tagged at all (can't distinguish forks → don't pretend to). status_quo is the
+    do-nothing baseline, never counted as supply. NOTE: advisory only — it does NOT gate the verdict
+    this release (the GO test stays on global saturation); see the autoplan review (UC-1)."""
+    if not fork_clusters:
+        return fallback
+    cm = landscape.competitor_map
+    comp = [c for c in cm.competitors if set(c.addresses_clusters) & fork_clusters]
+    sols = [s for s in landscape.existing_solutions if set(s.addresses_clusters) & fork_clusters]
+    supply = len(comp) + len(sols)
+    if supply == 0:
+        any_tagged = any(c.addresses_clusters for c in cm.competitors) or any(
+            s.addresses_clusters for s in landscape.existing_solutions
+        )
+        # tagged landscape, none hits this fork → genuinely open; untagged → can't tell, fall back.
+        return SignalStrength.LOW if any_tagged else fallback
+    openings = any(g.severity == SignalStrength.HIGH for c in comp for g in c.gaps)
+    if supply >= policy.saturated_supply and not openings:
+        return SignalStrength.HIGH
+    if supply >= policy.some_supply:
+        return SignalStrength.MEDIUM
+    return SignalStrength.LOW
+
+
+def _segment_clusters(seg: object) -> set[int]:
+    return {e.cluster_rank for e in getattr(seg, "evidence", []) if e.cluster_rank}
+
+
 def _score_forks(
-    report: DemandReport, saturation: SignalStrength, partial: bool, policy: AssessPolicy
-) -> tuple[list[ForkVerdict], dict[str, str]]:
+    report: DemandReport, landscape: Landscape, partial: bool, policy: AssessPolicy
+) -> tuple[list[ForkVerdict], dict[str, str], SignalStrength]:
     """A GO/NO-GO verdict per candidate wedge AND segment, with relative demand.
 
-    A fork GOes iff its (relative, self-calibrating) demand clears MEDIUM and the
-    space is open (and grounding isn't partial). Returns the verdicts plus each
-    fork's self-calibration note (keyed by fork id) for the headline reference.
+    A fork GOes iff its (relative, self-calibrating) demand clears MEDIUM and the space is open
+    (global saturation LOW, and grounding isn't partial). Each fork ALSO carries its own
+    ``landscape_saturation`` — the **advisory** per-fork value (which wedge the supply competes
+    for); shown, not gated on, this release. Returns the verdicts, the self-calibration notes (keyed
+    by fork id), and the global saturation the gate uses.
     """
+    global_sat = _saturation(landscape, policy)
     forks: list[ForkVerdict] = []
     refs: dict[str, str] = {}
     wedge_breadths = [w.breadth_count for w in report.candidate_wedges]
@@ -89,7 +128,7 @@ def _score_forks(
             wedge_breadths,
             policy=policy,
         )
-        go = demand.meets_medium(band) and saturation == SignalStrength.LOW and not partial
+        go = demand.meets_medium(band) and global_sat == SignalStrength.LOW and not partial
         forks.append(
             ForkVerdict(
                 kind="wedge",
@@ -97,7 +136,9 @@ def _score_forks(
                 label=w.label,
                 decision=Decision.GO if go else Decision.NO_GO,
                 demand_strength=band,
-                landscape_saturation=saturation,
+                landscape_saturation=_fork_saturation(
+                    set(w.cluster_ranks), landscape, policy, global_sat
+                ),
                 demand_prevalence=prev,
                 demand_percentile=pct,
                 confidence=conf,
@@ -114,7 +155,7 @@ def _score_forks(
             seg_authors,
             policy=policy,
         )
-        go = demand.meets_medium(band) and saturation == SignalStrength.LOW and not partial
+        go = demand.meets_medium(band) and global_sat == SignalStrength.LOW and not partial
         forks.append(
             ForkVerdict(
                 kind="segment",
@@ -122,7 +163,9 @@ def _score_forks(
                 label=s.name,
                 decision=Decision.GO if go else Decision.NO_GO,
                 demand_strength=band,
-                landscape_saturation=saturation,
+                landscape_saturation=_fork_saturation(
+                    _segment_clusters(s), landscape, policy, global_sat
+                ),
                 demand_prevalence=prev,
                 demand_percentile=pct,
                 confidence=conf,
@@ -130,14 +173,17 @@ def _score_forks(
             )
         )
         refs[s.id] = ref
-    return forks, refs
+    return forks, refs, global_sat
 
 
 def _decide(report: DemandReport, landscape: Landscape, policy: AssessPolicy) -> _Verdict:
-    """The pure verdict: score every fork, then synthesize the three-lane report decision."""
-    saturation = _saturation(landscape, policy)
+    """The pure verdict: score every fork, then synthesize the three-lane report decision.
+
+    The GO/NO-GO gate + the report-level ``gap.landscape_saturation`` use the GLOBAL saturation;
+    each fork's own ``landscape_saturation`` is advisory (per-fork), shown but not gated (UC-1).
+    """
     partial = landscape.partial
-    forks, refs = _score_forks(report, saturation, partial, policy)
+    forks, refs, saturation = _score_forks(report, landscape, partial, policy)
     # The fork the loop already narrowed to (a PIVOT round) — never pivot back to it.
     active_id = report.chosen_wedge_id or report.chosen_segment_id
 
