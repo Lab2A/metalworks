@@ -47,26 +47,27 @@ err_console = Console(stderr=True)
 def main_callback(ctx: typer.Context) -> None:
     """Marketing research and Reddit engagement toolkit.
 
-    Run with no command for a guided session (idea → demand → landscape → verdict),
-    or call any sub-command directly (`metalworks --help`).
+    Run with no command for an interactive menu (validate an idea, configure models /
+    sources, run diagnostics, browse runs), or call any sub-command directly
+    (`metalworks --help`). `metalworks start` jumps straight to validating an idea.
     """
     if ctx.invoked_subcommand is None:
-        _guided_session()
+        _main_menu()
 
 
 # Sub-apps registered at the bottom of the module.
 research_app = typer.Typer(help="Plan and run demand-research reports.", no_args_is_help=True)
 reddit_app = typer.Typer(help="Search Reddit, fetch intel, post (gated).", no_args_is_help=True)
 arctic_app = typer.Typer(help="Read the Arctic Shift historical corpus.", no_args_is_help=True)
-config_app = typer.Typer(help="Read and write non-secret config.", no_args_is_help=True)
+config_app = typer.Typer(help="Read and write non-secret config.", no_args_is_help=False)
 models_app = typer.Typer(
     help="Inspect and set the chat/fast/embedding model and provider reachability.",
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 mcp_app = typer.Typer(help="Run the metalworks MCP server.", no_args_is_help=True)
 sources_app = typer.Typer(
     help="List, enable, and disable the data sources research ingests from.",
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 corpus_app = typer.Typer(
     help="Ingest sources into, and inspect, the local corpus store.",
@@ -563,6 +564,171 @@ def _guided_session() -> None:
         console.print(
             "\n[dim]Not a GO this round — refine the idea and run `metalworks` again.[/dim]"
         )
+
+
+# ── interactive menus (the whole CLI, not just setup) ────────────────────────
+
+
+def _menu(title: str, options: list[str], *, default_last: bool = True) -> int:
+    """Print a numbered menu and return the 0-based choice. Blank/invalid input picks
+    the last option (Back/Quit) when ``default_last``, else the first."""
+    console.print(f"\n[bold]{title}[/bold]")
+    for i, label in enumerate(options, start=1):
+        console.print(f"  [bold]{i}[/bold]) {label}")
+    fallback = len(options) - 1 if default_last else 0
+    choice = str(typer.prompt("  Pick", default=str(fallback + 1))).strip()
+    if choice.isdigit() and 1 <= int(choice) <= len(options):
+        return int(choice) - 1
+    return fallback
+
+
+def _models_menu() -> None:
+    """Interactive model config — reachable with no project or idea."""
+    import contextlib
+
+    while True:
+        models_list()
+        idx = _menu("Models", ["Set chat model", "Set fast model", "Warm embeddings", "Back"])
+        if idx == 0:
+            ref = str(typer.prompt("  Chat model ref (e.g. openai/gpt-5)", default="")).strip()
+            if ref:
+                _set_model_setting("model", ref)
+        elif idx == 1:
+            ref = str(typer.prompt("  Fast model ref (e.g. openai/gpt-5-mini)", default="")).strip()
+            if ref:
+                _set_model_setting("fast_model", ref)
+        elif idx == 2:
+            with contextlib.suppress(typer.Exit):
+                models_warm()
+        else:
+            return
+
+
+def _sources_menu() -> None:
+    """Interactive data-source toggling — reachable with no project or idea."""
+    import contextlib
+
+    while True:
+        sources_list()
+        enabled = set(config.enabled_source_ids())
+        ids = sorted({*_discover_sources(), *enabled})
+        options = [f"{'[green]on[/green] ' if s in enabled else 'off'} {s}" for s in ids] + ["Back"]
+        idx = _menu("Toggle a source", options)
+        if idx >= len(ids):
+            return
+        sid = ids[idx]
+        with contextlib.suppress(typer.Exit):
+            _edit_enabled(sid, enable=sid not in enabled)
+
+
+def _config_menu() -> None:
+    """Interactive non-secret config — reachable with no project or idea."""
+    import contextlib
+
+    while True:
+        config_list()
+        idx = _menu("Config", ["Set a value", "Back"])
+        if idx != 0:
+            return
+        key = str(typer.prompt("  Key (e.g. provider, model, store)", default="")).strip()
+        if not key:
+            continue
+        value = str(typer.prompt(f"  Value for {key}", default="")).strip()
+        if value:
+            with contextlib.suppress(typer.Exit):
+                config_set(key, value)
+
+
+def _runs_menu() -> None:
+    """Browse stored runs and act on one — no idea entry required."""
+    import contextlib
+
+    store = config.default_store()
+    runs = store.list_runs(limit=20)
+    if not runs:
+        console.print(
+            "\n[dim]No runs yet — validate an idea or run `metalworks research run`.[/dim]"
+        )
+        return
+    labels: list[str] = []
+    for r in runs:
+        meta = f"{r.report_id[:8]}, {r.total_distinct_authors or 0} authors"
+        labels.append(f"{(r.query or '')[:48]} [dim]({meta})[/dim]")
+    labels.append("Back")
+    idx = _menu("Past runs — pick one", labels)
+    if idx >= len(runs):
+        return
+    rid = runs[idx].report_id
+    actions: list[tuple[str, Any]] = [
+        ("Assess (GO / PIVOT / NO-GO)", lambda: research_assess(report_id=rid)),
+        ("Landscape", lambda: research_landscape(report_id=rid)),
+        ("Positioning", lambda: research_position(report_id=rid)),
+        ("Marketing site", lambda: research_site(report_id=rid)),
+        ("Scaffold build harness", lambda: build_init(report=rid)),
+        ("Back", None),
+    ]
+    a = _menu(f"Run {rid[:8]} — what next?", [label for label, _ in actions])
+    fn = actions[a][1]
+    if fn is not None:
+        with contextlib.suppress(typer.Exit):
+            fn()
+
+
+def _main_menu() -> None:
+    """The top-level interactive menu behind bare ``metalworks`` — validate is just one
+    choice. Config / models / sources / doctor are reachable with no project or idea."""
+    import contextlib
+
+    console.print("[bold]metalworks[/bold] — what do you want to do?")
+    console.print("[dim]type 'metalworks --help' for the full command list.[/dim]")
+    options = [
+        "Validate an idea (demand → landscape → verdict)",
+        "Configure models",
+        "Configure data sources",
+        "View / edit config",
+        "Check setup (doctor)",
+        "Run onboarding (setup)",
+        "Browse past runs",
+        "Quit",
+    ]
+    handlers: list[Any] = [
+        _guided_session,
+        _models_menu,
+        _sources_menu,
+        _config_menu,
+        lambda: doctor(fix=False),
+        setup,
+        _runs_menu,
+        None,
+    ]
+    while True:
+        idx = _menu("What do you want to do?", options)
+        handler = handlers[idx]
+        if handler is None:
+            return
+        with contextlib.suppress(typer.Exit, KeyboardInterrupt):
+            handler()
+
+
+@models_app.callback(invoke_without_command=True)
+def models_root(ctx: typer.Context) -> None:
+    """Inspect and set models. Run with no sub-command for an interactive menu."""
+    if ctx.invoked_subcommand is None:
+        _models_menu()
+
+
+@sources_app.callback(invoke_without_command=True)
+def sources_root(ctx: typer.Context) -> None:
+    """List and toggle data sources. Run with no sub-command for an interactive menu."""
+    if ctx.invoked_subcommand is None:
+        _sources_menu()
+
+
+@config_app.callback(invoke_without_command=True)
+def config_root(ctx: typer.Context) -> None:
+    """Read and write non-secret config. Run with no sub-command for an interactive menu."""
+    if ctx.invoked_subcommand is None:
+        _config_menu()
 
 
 # ── config sub-app ──────────────────────────────────────────────────────────

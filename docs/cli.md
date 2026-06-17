@@ -17,7 +17,8 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 
 | Command | Description | Keys |
 | --- | --- | --- |
-| `metalworks` / `metalworks start` | **Guided session** — the easiest way in. Walks one idea end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / site / scaffold once it earns a GO. | chat key |
+| `metalworks` | **Interactive menu** — the easiest way in. Pick what to do: validate an idea, configure models / data sources, view-or-edit config, run diagnostics (`doctor`), onboard (`setup`), or browse past runs. Everything is reachable with no project and no idea. | zero-key to open |
+| `metalworks start` | Jump straight to **validating an idea** end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / site / scaffold once it earns a GO. | chat key |
 | `metalworks setup` | Interactive onboarding: detect provider keys, pick a model, choose sources, scaffold a project, warm embeddings. `--yes` accepts every default non-interactively. | zero-key |
 | `metalworks version` | Print the installed metalworks version. | zero-key |
 | `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the store path, connected Reddit accounts, and actionable hints. | zero-key |
@@ -25,9 +26,10 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 
 **`metalworks init`** option: `--idea TEXT` — one line on what you're building (seeds the project slug).
 
-> **New to metalworks?** Just run `metalworks` with no arguments — the guided
-> session handles setup and walks you through validating an idea without your
-> having to memorize the command chain below.
+> **New to metalworks?** Just run `metalworks` with no arguments — the interactive
+> menu lets you validate an idea, configure models/sources, or run diagnostics
+> without memorizing the command chain below. `models`, `sources`, and `config` also
+> open their own interactive menu when run with no sub-command.
 
 ## models
 
