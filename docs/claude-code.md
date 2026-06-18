@@ -80,6 +80,7 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 - **`/find-threads <product>`** — live Reddit threads worth a genuine reply (`reddit_search_posts`), ranked by honest fit. Discovery only — it doesn't draft or post.
 - **`/draft-reply <thread>`** — reads the thread and rules (`reddit_get_post_comments`, `reddit_subreddit_rules`), drafts a reply in your voice (`generate_reply`), and runs it through the compliance gate (`compliance_lint`) until it passes. It stops there. Posting happens only on your explicit instruction, and only if the gate is satisfied.
 - **`/subreddit-intel <r/name>`** — a practical brief on a community (rules that bite, tone, what gets removed) before you participate (`reddit_subreddit_info`). Reconnaissance only.
+- **`/discovery <queries>`** — the batch of find-threads + draft-reply: searches Reddit across several queries, drafts one reply per worthwhile thread, and gates each through the compliance check (`discovery_run`). Drafts only — it never posts.
 
 ## The posting gate
 
