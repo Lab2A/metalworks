@@ -49,6 +49,10 @@ from metalworks.contract.launch import (
     ClaimCitation,
     LaunchAsset,
 )
+from metalworks.contract.logo import (
+    LogoOption,
+    LogoSet,
+)
 from metalworks.contract.marketing import (
     CitationStrategy,
     ContentPage,
@@ -193,6 +197,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "ChannelStep",
     "ClaimCitation",
     "LaunchAsset",
+    # Logo stage — authored brand logo options for a report.
+    "LogoOption",
+    "LogoSet",
     # Content/SEO stage (Pillar G) — the deterministic content plan + citation strategy.
     "CitationStrategy",
     "ContentPage",

@@ -6,6 +6,20 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [Unreleased]
+
+### Added
+
+- **Logo generation.** `metalworks research logo <report>` generates five diverse,
+  company-grade logo options for a stored report and opens a picker to choose from.
+  The model authors each SVG directly under a fixed house design system
+  (`research.logo.TASTE`), one per design angle — symbol, logotype, negative-space,
+  reference, expressive. This is the one place metalworks lets the LLM draw geometry,
+  because a logo is a designed artifact, not a grounded claim. Diversity is the lever:
+  five independent passes, a human picks (a critique/refine loop was tried and not
+  worth its cost). New `LogoOption` / `LogoSet` contracts, the `logo_generate` MCP
+  tool, and a `/logo` Claude Code skill — same capability across CLI, MCP, and plugin.
+
 ## [0.0.4] - 2026-06-17
 
 Sharper decisions and a friendlier front door. The verdict stops collapsing the

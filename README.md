@@ -117,13 +117,14 @@ Two verticals sit on top of those protocols:
 
 - **Research** (`metalworks.research`) — turns an idea into a clustered
   `DemandReport` of real, permalinked Reddit quotes. Entry point:
-  `run_research(deps, brief=...)`. Seven functions build on a finished report,
+  `run_research(deps, brief=...)`. Eight functions build on a finished report,
   each linking its output back to that report's real quotes: positioning
   (`build_positioning_brief`), the landscape (`run_landscape`), surface + UX
   (`decide_surface` / `build_ux_skeleton`), marketing site
-  (`build_marketing_site`), launch assets (`build_launch_assets` /
-  `plan_channels`), a content/SEO plan (`content_plan_from_report`), and a build
-  plan + scaffold (`build_spec_from_report` / `scaffold`).
+  (`build_marketing_site`), five authored logo options (`build_logo_set`), launch
+  assets (`build_launch_assets` / `plan_channels`), a content/SEO plan
+  (`content_plan_from_report`), and a build plan + scaffold
+  (`build_spec_from_report` / `scaffold`).
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.
@@ -160,7 +161,7 @@ See [docs/custom-chatmodel.md](https://metalworks.lab2a.ai/docs/custom-chatmodel
 Full docs: **[metalworks.lab2a.ai](https://metalworks.lab2a.ai)**
 
 - [Installation](https://metalworks.lab2a.ai/docs/installation) · [Quickstart](https://metalworks.lab2a.ai/docs/quickstart) · [Build a startup, end to end](https://metalworks.lab2a.ai/docs/walkthrough)
-- Capabilities: [demand research](https://metalworks.lab2a.ai/docs/demand-research) · [positioning & competitors](https://metalworks.lab2a.ai/docs/positioning) · [design & site](https://metalworks.lab2a.ai/docs/design) · [build spec](https://metalworks.lab2a.ai/docs/build-spec) · [launch](https://metalworks.lab2a.ai/docs/launch) · [content & SEO](https://metalworks.lab2a.ai/docs/content-seo) · [Reddit engagement](https://metalworks.lab2a.ai/docs/reddit-engagement)
+- Capabilities: [demand research](https://metalworks.lab2a.ai/docs/demand-research) · [positioning & competitors](https://metalworks.lab2a.ai/docs/positioning) · [design & site](https://metalworks.lab2a.ai/docs/design) · [logo](https://metalworks.lab2a.ai/docs/logo) · [build spec](https://metalworks.lab2a.ai/docs/build-spec) · [launch](https://metalworks.lab2a.ai/docs/launch) · [content & SEO](https://metalworks.lab2a.ai/docs/content-seo) · [Reddit engagement](https://metalworks.lab2a.ai/docs/reddit-engagement)
 - [Why you can trust the output](https://metalworks.lab2a.ai/docs/how-it-works) · [Data model](https://metalworks.lab2a.ai/docs/data-model)
 - Reference: [Python SDK](https://metalworks.lab2a.ai/docs/python-sdk) · [CLI](https://metalworks.lab2a.ai/docs/cli) · [MCP tools](https://metalworks.lab2a.ai/docs/mcp-tools) · [Configuration](https://metalworks.lab2a.ai/docs/configuration) · [Using with AI agents](https://metalworks.lab2a.ai/docs/ai-agents)
 - Extending: [overview](https://metalworks.lab2a.ai/docs/extending) · [protocols](https://metalworks.lab2a.ai/docs/protocols) · [custom model/corpus/store](https://metalworks.lab2a.ai/docs/custom-chatmodel)

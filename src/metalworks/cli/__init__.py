@@ -2019,6 +2019,64 @@ def research_surface(
     _print_surface(rec, skeleton)
 
 
+@research_app.command("logo", rich_help_panel="Pillars & build")
+def research_logo(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Brand name for the wordmark (default: a generated name)."),
+    ] = None,
+    out_dir: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Directory for the SVGs and picker.html."),
+    ] = Path("logos"),
+    open_browser: Annotated[
+        bool, typer.Option("--open/--no-open", help="Open the picker in your browser.")
+    ] = True,
+) -> None:
+    """Generate five diverse, company-grade logo options for a report and open a picker.
+
+    The model authors each SVG under a fixed house design system, one per design
+    angle. Options are offered for you to choose; nothing is auto-selected.
+    """
+    import webbrowser
+
+    from metalworks.research import build_logo_set, render_logo_picker_html
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[bold]Designing logos[/bold] for report {report_id}...")
+    logos = build_logo_set(chat, report, brand_name=name)
+    if not logos.options:
+        err_console.print(f"[red]{logos.caveat or 'No logos produced.'}[/red]")
+        raise typer.Exit(code=1)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    slug = logos.brand_name.lower().replace(" ", "-")
+    for i, opt in enumerate(logos.options, 1):
+        (out_dir / f"{slug}_{i}_{opt.angle}.svg").write_text(opt.svg, encoding="utf-8")
+    picker = out_dir / "picker.html"
+    picker.write_text(render_logo_picker_html(logos), encoding="utf-8")
+    console.print(
+        f"[green]{len(logos.options)} options[/green] for "
+        f"[bold]{logos.brand_name}[/bold] -> {out_dir}/"
+    )
+    for i, opt in enumerate(logos.options, 1):
+        console.print(f"  [bold]{i}.[/bold] {opt.angle}: {opt.concept[:70]}")
+    if logos.partial:
+        console.print(f"  [yellow]partial:[/yellow] {logos.caveat}")
+    console.print(f"[bold]Pick one:[/bold] {picker}")
+    if open_browser:
+        webbrowser.open(picker.resolve().as_uri())
+
+
 @research_app.command("site", rich_help_panel="Pillars & build")
 def research_site(
     report_id: Annotated[

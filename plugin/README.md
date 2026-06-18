@@ -1,8 +1,8 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and eleven skills: the four engagement skills below,
-plus seven grounded pillars that build on a finished demand report.
+the metalworks MCP server and twelve skills: the four engagement skills below,
+plus eight grounded pillars that build on a finished demand report.
 
 ## Install
 
@@ -50,6 +50,8 @@ Reddit quote by permalink:
   a 3-5 screen UX skeleton, each decision traced to a customer voice.
 - **/generate-site** — a small marketing site whose every claim-bearing line is a
   verbatim Reddit quote, footnoted to its permalink.
+- **/logo** — five diverse, company-grade logo options for the brand, each authored
+  as SVG under a fixed house design system. Offered for you to pick, never auto-chosen.
 - **/launch-kit** — drafting-only Product Hunt / Show HN / X-thread assets plus a
   human-executed channel plan. Never posts.
 - **/content-plan** — a deterministic, zero-key content/SEO plan: one page per

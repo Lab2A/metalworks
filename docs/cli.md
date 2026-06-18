@@ -62,6 +62,7 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
 | `metalworks research surface REPORT_ID` | Recommend a product surface + UX skeleton for a stored report (grounded). | chat key |
 | `metalworks research site REPORT_ID` | Build a grounded marketing site (verbatim, cited copy) from a stored report. | chat key |
+| `metalworks research logo REPORT_ID` | Generate five diverse logo options (the model authors each SVG) and open a picker to choose. | chat key |
 | `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
 | `metalworks research content-plan REPORT_ID` | Project a stored report into a deterministic content/SEO plan. **No LLM.** | zero-key |
 

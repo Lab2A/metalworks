@@ -65,6 +65,7 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 
 - **`/surface-and-ux`** — picks the surface to build (web, mobile, CLI, SDK, …) with a cited rubric (`surface_recommend`), then sketches 3–5 screens (`ux_skeleton_build`), each marked validated or hypothesis. Text and structure only — no mockups.
 - **`/generate-site`** — a marketing site whose every load-bearing line is a verbatim real quote, footnoted to its permalink. Calls `site_render`, which returns the `MarketingSite` plus a self-contained `index.html`. A line that can't be exact-matched to a real quote is dropped.
+- **`/logo`** — five diverse, company-grade logo options for the brand (`logo_generate`), one per design angle (symbol, logotype, negative-space, reference, expressive). The model authors each SVG directly under a fixed house design system; the logo is the one artifact metalworks draws rather than grounds in a quote. Options are offered for you to pick, never auto-selected.
 
 ### Build
 

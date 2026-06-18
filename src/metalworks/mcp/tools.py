@@ -498,6 +498,24 @@ def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
 
 
 @guard
+def logo_generate(
+    report_id: str, name: str | None = None, store_path: str | None = None
+) -> ToolResult:
+    """TIER 2 (chat key). Generate five diverse, company-grade logo options for a
+    stored report and return the option set plus a self-contained picker page for
+    a human to choose from. The model authors the SVG directly under a fixed house
+    design system; logos are offered, never auto-selected."""
+    from metalworks import config
+    from metalworks.research import build_logo_set, render_logo_picker_html
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    logos = build_logo_set(config.resolve_chat(), report, brand_name=name)
+    return {"logos": logos.model_dump(mode="json"), "html": render_logo_picker_html(logos)}
+
+
+@guard
 def launch_assets_build(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Draft grounded, channel-native launch assets for a stored
     report — one LLM call per surface. Returns [] on a no-go report. DRAFTING ONLY."""
