@@ -131,6 +131,32 @@ class RedditError(MetalworksError):
         )
 
 
+class BillingError(MetalworksError):
+    """A billing-provider call failed in a way that isn't a missing key/extra."""
+
+    error_code = "billing_error"
+
+    def __init__(self, message: str, *, status: int | None = None):
+        self.status = status
+        super().__init__(
+            message,
+            fix="Check the Stripe key's mode (test vs live), the price amount, and the dashboard.",
+        )
+
+
+class DeployError(MetalworksError):
+    """A deploy-provider call failed in a way that isn't a missing token."""
+
+    error_code = "deploy_error"
+
+    def __init__(self, message: str, *, status: int | None = None):
+        self.status = status
+        super().__init__(
+            message,
+            fix="Check the VERCEL_TOKEN, the project/team id, and the artifact you are deploying.",
+        )
+
+
 class EmbeddingModelMismatch(MetalworksError):
     """A persisted vector index was built with a different embedding model."""
 

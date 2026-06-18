@@ -59,9 +59,13 @@ tavily = ["tavily-python>=0.5"]
 # endpoint over the core httpx dep (their SDK search surfaces are still in beta).
 parallel = ["parallel-web>=1.1"]
 firecrawl = ["firecrawl-py>=4.0"]
+# Billing/Stripe: the package gates the extra; the adapter reads STRIPE_SECRET_KEY
+# from the env. Deploy/Vercel needs no SDK — it calls the REST API over the core
+# httpx dep, gated by VERCEL_TOKEN, so it works on a bare install.
+stripe = ["stripe>=11"]
 mcp = ["mcp[cli]>=1.2"]
 all = [
-  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,mcp]",
+  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,stripe,mcp]",
 ]
 dev = [
   "pytest>=8",

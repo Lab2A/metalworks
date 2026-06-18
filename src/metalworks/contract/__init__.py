@@ -16,6 +16,12 @@ from metalworks.contract.assess import (
     GapAnalysis,
     PivotTarget,
 )
+from metalworks.contract.billing import (
+    BillingMode,
+    BillingProduct,
+    Subscription,
+    SubscriptionStatus,
+)
 from metalworks.contract.build import (
     BuildPersona,
     BuildSpec,
@@ -26,6 +32,10 @@ from metalworks.contract.bundle import Research
 from metalworks.contract.corpus import (
     CorpusComment,
     CorpusRecord,
+)
+from metalworks.contract.deploy import (
+    Deployment,
+    DeployTarget,
 )
 from metalworks.contract.evidence import (
     EvidenceRecord,
@@ -203,6 +213,13 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "BuildSpec",
     "FeatureSpec",
     "PricingTier",
+    # Deploy + billing — take the artifact live and the cited tiers to paid.
+    "BillingMode",
+    "BillingProduct",
+    "Deployment",
+    "DeployTarget",
+    "Subscription",
+    "SubscriptionStatus",
     # Validate loop — the discovery loop's result + decision log.
     "DecisionLogEntry",
     "ValidationResult",

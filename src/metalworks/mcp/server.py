@@ -157,6 +157,20 @@ async def build_spec(
     return tools.build_spec(report_id, surface, stack, store_path)
 
 
+async def deploy_marketing_site(
+    report_id: str, target: str = "preview", store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Render a report's site and deploy to Vercel; production is opt-in gated."""
+    return tools.deploy_marketing_site(report_id, target, store_path)
+
+
+async def billing_create_product(
+    report_id: str, live: bool = False, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Cited tier -> Stripe product + pay link; live charges are opt-in gated."""
+    return tools.billing_create_product(report_id, live, store_path)
+
+
 async def research_start(
     brief: dict[str, Any], months: int | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -228,6 +242,8 @@ _TOOL_WRAPPERS = (
     channel_plan_build,
     content_plan_from_report,
     build_spec,
+    deploy_marketing_site,
+    billing_create_product,
     research_start,
     research_status,
     research_result,
