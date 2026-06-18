@@ -231,12 +231,13 @@ def test_pivot_targets_the_strongest_fork_across_kinds() -> None:
 
 
 def test_confidence_is_low_on_a_band_edge() -> None:
-    # Three forks: the middle sits exactly on the MEDIUM percentile cut → near-zero confidence.
-    report = _report(60, wedges=[_wedge("hi", 30), _wedge("mid", 20), _wedge("lo", 10)])
+    # A tied pair at the top lands at midrank 2/3 ≈ 0.667 — right on the HIGH cut
+    # (0.66) — so its confidence is near zero even though the band itself is HIGH.
+    report = _report(60, wedges=[_wedge("tieA", 30), _wedge("tieB", 30), _wedge("lo", 10)])
     a = run_assessment(_deps(), report, _landscape(competitors=1))
-    mid = next(f for f in a.fork_verdicts if f.label == "mid")
-    assert mid.demand_percentile == 1 / 3  # exactly the medium cut
-    assert mid.confidence < 0.1
+    tie = next(f for f in a.fork_verdicts if f.label == "tieA")
+    assert tie.demand_percentile == 2 / 3  # sits on the 0.66 high cut
+    assert tie.confidence < 0.1
 
 
 def test_old_assessment_payload_validates() -> None:

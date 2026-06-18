@@ -21,9 +21,18 @@ def test_prevalence_is_a_clamped_fraction() -> None:
 
 def test_percentile_rank_self_calibrates() -> None:
     pop = [10, 20, 30]
-    assert demand.percentile_rank(30, pop) == 2 / 3  # top of three
-    assert demand.percentile_rank(10, pop) == 0.0  # bottom
+    # Midrank: fraction below + half the ties (each value is its own single tie).
+    assert demand.percentile_rank(30, pop) == 5 / 6  # top of three (2 below + 0.5)/3
+    assert demand.percentile_rank(10, pop) == 1 / 6  # bottom (0 below + 0.5)/3
     assert demand.percentile_rank(5, []) == 0.0
+
+
+def test_percentile_rank_keeps_a_top_tie_symmetric() -> None:
+    # A tie at the top must not be demoted: both 50s score 2/3 (1 below + half of
+    # the two ties), clearing the 0.66 HIGH cut, rather than 1/3 under a plain
+    # strictly-below count.
+    assert demand.percentile_rank(50, [50, 50, 10]) == 2 / 3
+    assert demand.percentile_rank(10, [50, 50, 10]) == 1 / 6
 
 
 def test_relative_path_uses_peers_not_absolute_count() -> None:
@@ -34,7 +43,7 @@ def test_relative_path_uses_peers_not_absolute_count() -> None:
     small, *_ = demand.strength(10, 10, 100, peers)
     assert big == SignalStrength.HIGH
     assert small == SignalStrength.LOW
-    assert prev == 0.40 and pct == 2 / 3
+    assert prev == 0.40 and pct == 5 / 6  # midrank: (2 below + 0.5)/3
     assert "forks" in ref  # self-calibration note mentions the peer set
 
 
@@ -68,3 +77,10 @@ def test_report_label_is_the_strongest_fork() -> None:
     label = demand.report_demand_label([40, 20, 10], [], 100)
     assert label == "Strong demand"
     assert demand.report_demand_label([], [], 5) == "Thin signal"  # no forks → absolute fallback
+
+
+def test_report_label_is_not_demoted_by_a_top_tie() -> None:
+    # Two equally-broad wedges dominating a third is Strong demand, same as the
+    # distinct shape — a tie at the top must not silently drop it to Moderate.
+    assert demand.report_demand_label([50, 50, 10], [], 200) == "Strong demand"
+    assert demand.report_demand_label([60, 30, 10], [], 200) == "Strong demand"
