@@ -1,8 +1,8 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and eleven skills: the four engagement skills below,
-plus seven grounded pillars that build on a finished demand report.
+the metalworks MCP server and sixteen skills across four groups: validate an
+idea, engage on Reddit, build on a finished demand report, and take it live.
 
 ## Install
 
@@ -31,21 +31,35 @@ plus seven grounded pillars that build on a finished demand report.
 
 ## Skills
 
+**Validate an idea** — the loop from a raw idea to an honest build/don't-build
+call:
+
 - **/demand-report `<idea>`** — a demand report from real Reddit conversations.
   Runs with no API key (sampled corpus + synthesis) or the full clustered
   pipeline when an LLM key is set.
+- **/ideate** — frame an idea worth testing: sharpen a raw pitch into one
+  testable hypothesis, or surface an existing report's forks as grounded wedges
+  to pick from. Frames the idea; it doesn't decide.
+- **/market-landscape** — the full "what exists today": direct, adjacent, and
+  status-quo rivals (each gap backed by a cited complaint, each tagged with the
+  clusters it competes for) plus a scan of real shipped products with traction.
+- **/go-no-go** — an honest GO / PIVOT / NO-GO verdict for a finished report: the
+  gap between real demand and what people can already do. Computed from the
+  evidence, argued with quotes; the human makes the final call.
+- **/validate `<idea>`** — run the whole loop end to end (ideate → demand →
+  landscape → assess → loop), human-gated at each step, until a GO or out of road.
+
+**Engage on Reddit** — find and join real conversations:
+
 - **/find-threads `<product>`** — find live threads worth a genuine reply.
 - **/draft-reply `<thread-url>`** — draft an authentic reply and run it through
   the compliance gate. Drafting is free; posting requires explicit confirmation.
 - **/subreddit-intel `<r/name>`** — a community brief before you participate.
 
-Pillars run on a finished demand report and trace every claim back to a real
-Reddit quote by permalink:
+**Build on a finished report** — every claim traces back to a real Reddit quote
+by permalink:
 
 - **/position-wedge** — a grounded Dunford positioning wedge + price hypothesis.
-- **/market-landscape** — the full "what exists today": direct, adjacent, and
-  status-quo rivals (each gap backed by a cited complaint, each tagged with the
-  clusters it competes for) plus a scan of real shipped products with traction.
 - **/surface-and-ux** — what surface to build (sdk / web / mobile / cli / ...) and
   a 3-5 screen UX skeleton, each decision traced to a customer voice.
 - **/generate-site** — a small marketing site whose every claim-bearing line is a
@@ -58,6 +72,13 @@ Reddit quote by permalink:
   features each mapped to a real demand cluster, plus a scaffolded repo with a
   cite-or-die rule and a frozen quote table. metalworks specs it; you build it.
 
+**Take it live** — report → live → paid, with the irreversible step human-gated:
+
+- **/deploy-site** — deploy the report's grounded marketing site to Vercel and
+  get a live URL. Preview by default; production needs explicit confirmation.
+- **/billing** — turn the report's cited pricing tiers into a real Stripe product,
+  price, and payment link. Test mode by default; live charges are double-gated.
+
 ## Keys (optional)
 
 The data tools (search, subreddit intel, corpus pulls, compliance lint) need no
@@ -68,6 +89,11 @@ keys. The pipeline tools read a provider key from your environment:
 - `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` and `METALWORKS_ALLOW_POSTING=1`
   for the posting path. Posting always runs the compliance gate first and
   always requires your explicit confirmation.
+- `VERCEL_TOKEN` for `/deploy-site`, and `METALWORKS_ALLOW_DEPLOY=1` to allow a
+  production promote. `STRIPE_SECRET_KEY` (with the `[stripe]` extra) for
+  `/billing`, and `METALWORKS_ALLOW_BILLING=1` to allow live charges. Both
+  default to the safe side — a preview URL, a test-mode product — and never go
+  irreversible without your explicit confirmation. No secret is ever printed.
 
 ## Usage policy
 

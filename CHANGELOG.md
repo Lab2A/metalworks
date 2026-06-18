@@ -20,7 +20,9 @@ contracts may change in any release.
   `Deployment` / `BillingProduct` / `Subscription` contracts, a Vercel adapter
   (REST over the core `httpx` dep, gated by `VERCEL_TOKEN`), a Stripe adapter
   (behind the new `[stripe]` extra), and `deploy_marketing_site` /
-  `billing_create_product` MCP tools.
+  `billing_create_product` MCP tools. The Claude Code plugin gets matching
+  `/deploy-site` and `/billing` skills, so the capability is reachable from all
+  three surfaces (CLI, MCP, plugin) the same way every other one is.
 - **A paywall you can import.** The subscription gate
   (`require_active_subscription`) and the Stripe webhook mapper
   (`subscription_event_to_record`) are pure, framework-agnostic functions a

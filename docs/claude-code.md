@@ -1,6 +1,6 @@
 ---
 title: "Claude Code plugin"
-description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 31 tools and a hard posting gate."
+description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies, deploy the site and bill for it — backed by an MCP server with 32 tools and a hard posting gate."
 ---
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
@@ -9,7 +9,7 @@ report the library produces — every claim linked to a real quote you can open 
 then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls
-one or more of its 31 tools. The commands chain through a stored demand report, exactly like the
+one or more of its 32 tools. The commands chain through a stored demand report, exactly like the
 [CLI](/docs/cli) — see [Projects & memory](/docs/projects) for how that state persists.
 
 ## Install
@@ -39,8 +39,9 @@ present wins). A few tools also need an embeddings key.
 | --- | --- | --- |
 | **Zero-key** | nothing | Reddit search & comments, subreddit info/rules, Arctic corpus pull, corpus stats, run/report listing, compliance lint, channel plan, content plan |
 | **Chat key** | a provider key | demand research, positioning, launch assets, reply drafting, discovery |
-| **Chat + embeddings** | provider + embeddings | competitor map, surface, UX skeleton, marketing site, build spec |
-| **Gated** | env opt-in (below) | posting a Reddit reply |
+| **Chat + embeddings** | provider + embeddings | competitor map, surface, UX skeleton, marketing site, build spec, deploy site, billing |
+| **Provider token** | a service token | deploy needs `VERCEL_TOKEN`; billing needs the `[stripe]` extra + `STRIPE_SECRET_KEY` |
+| **Gated** | env opt-in (below) | posting a Reddit reply, a production deploy, live charges |
 
 ## The commands
 
@@ -69,6 +70,13 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 ### Build
 
 - **`/build-spec`** — a feature spec mapped to real demand (`build_spec`), then a scaffolded repo: `CLAUDE.md` with a cite-or-die rule, `docs/SPEC.md`, a frozen `docs/EVIDENCE.md` quote table, a `PostToolUse` lint hook, and `.mcp.json` wiring back to metalworks. metalworks specs and scaffolds; your agent builds. Ungrounded features are dropped before scaffolding.
+
+### Go live
+
+Report → live → paid. Both default to the safe side, and the irreversible step is human-gated the same way posting is. See [Deploy & bill](/docs/deploy-billing).
+
+- **`/deploy-site`** — render the report's grounded marketing site and deploy it to Vercel for a live URL (`deploy_marketing_site`). Preview by default; a production promote needs `METALWORKS_ALLOW_DEPLOY=1` and your explicit confirmation. Needs `VERCEL_TOKEN`.
+- **`/billing`** — turn the report's already-cited pricing tiers into a real Stripe product, recurring price, and payment link — a working pay URL (`billing_create_product`). Test mode by default; going live is double-gated (`METALWORKS_ALLOW_BILLING=1` plus a live key) so real charges never happen by accident. A tier the report never priced returns a partial result, never a guess. Needs the `[stripe]` extra + `STRIPE_SECRET_KEY`.
 
 ### Launch
 

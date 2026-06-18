@@ -128,6 +128,43 @@ Scaffold an evidence-grounded build harness from a report (see the
 - `--surface TEXT` — target surface: `web` | `mobile` | `cli` | `api` | `sdk` | `browser_extension` | `desktop` (default `web`).
 - `--base TEXT` — stack hint recorded in the spec, e.g. `next-shipfast` (default `empty`).
 
+## deploy
+
+Render a report's grounded marketing site and deploy it to Vercel (see
+[Deploy & bill](/docs/deploy-billing)). Needs `VERCEL_TOKEN`; no SDK or extra.
+
+| Command | Description | Keys |
+| --- | --- | --- |
+| `metalworks deploy [REPORT]` | Render the latest (or named) report's marketing site and deploy it to Vercel, printing the live URL. Preview by default. | chat + embeddings + `VERCEL_TOKEN` |
+
+Options:
+
+- `REPORT` — report id/prefix; defaults to your latest run (ignored with `--site`).
+- `--site PATH` — deploy an explicit `index.html` verbatim instead of rendering (offline).
+- `--name TEXT` — Vercel project name (defaults to the report/site slug).
+- `--prod` — promote to production, the irreversible step. Refuses without `--yes`.
+- `--yes` — confirm a production promote.
+
+## billing
+
+Turn a report's already-cited pricing tiers into a real Stripe product, recurring
+price, and payment link (see [Deploy & bill](/docs/deploy-billing)). Needs the
+`[stripe]` extra and `STRIPE_SECRET_KEY`.
+
+| Command | Description | Keys |
+| --- | --- | --- |
+| `metalworks billing create [REPORT]` | Cited tier → Stripe product + recurring price + payment link. Test mode by default. | chat + embeddings + `STRIPE_SECRET_KEY` (`[stripe]`) |
+| `metalworks billing status` | Report Stripe/Vercel readiness from the environment. Never prints a secret. | zero-key |
+
+Options for `billing create`:
+
+- `REPORT` — report id/prefix, a `report.json`, or a BuildSpec JSON; defaults to your latest run.
+- `--tier TEXT` — which tier to create (default: first priced).
+- `--name TEXT` — product name (defaults to the report slug).
+- `--json PATH` — write the `BillingProduct` JSON here.
+- `--live` — create REAL charges. Needs a live (`sk_live_…`) key and `--yes`.
+- `--yes` — confirm live charges.
+
 ## reddit
 
 Search Reddit, fetch intel, and post (gated). The `[reddit]` extra is required;
