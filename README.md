@@ -12,11 +12,10 @@ A Python library (also a CLI, an MCP server, and a Claude Code plugin). MIT
 licensed and built to be embedded — every layer (LLM, search, embeddings,
 storage, data source) is a swappable protocol.
 
-> **Status: pre-release (0.0.1).** APIs are unstable below 1.0. The stable
+> **Status: pre-release (0.0.4).** APIs are unstable below 1.0. The stable
 > surface is the `Metalworks` facade, the `metalworks.contract` Pydantic models,
-> and the MCP tool contracts. Everything else may change in any 0.x release. Some
-> surfaces below are marked **planned for 0.1** where they are not wired yet;
-> this README is honest about what runs today.
+> and the MCP tool contracts — everything else may change in any 0.x release.
+> Everything described in this README runs today.
 
 Read the [USAGE_POLICY](https://github.com/Lab2A/metalworks/blob/main/USAGE_POLICY.md) before you use the Reddit side. Short
 version: authentic, disclosed engagement only. No fake personas, no vote
@@ -164,6 +163,40 @@ Full docs: **[metalworks.lab2a.ai](https://metalworks.lab2a.ai)**
 - [Why you can trust the output](https://metalworks.lab2a.ai/docs/how-it-works) · [Data model](https://metalworks.lab2a.ai/docs/data-model)
 - Reference: [Python SDK](https://metalworks.lab2a.ai/docs/python-sdk) · [CLI](https://metalworks.lab2a.ai/docs/cli) · [MCP tools](https://metalworks.lab2a.ai/docs/mcp-tools) · [Configuration](https://metalworks.lab2a.ai/docs/configuration) · [Using with AI agents](https://metalworks.lab2a.ai/docs/ai-agents)
 - Extending: [overview](https://metalworks.lab2a.ai/docs/extending) · [protocols](https://metalworks.lab2a.ai/docs/protocols) · [custom model/corpus/store](https://metalworks.lab2a.ai/docs/custom-chatmodel)
+
+## Contributing & development
+
+Collaborators welcome. metalworks is **contract-first**: one set of Pydantic models
+(`metalworks.contract`) is the stable spine, and every surface speaks it — so a capability lands on
+the **Python facade, the CLI, the MCP server, and the Claude Code plugin together**, never just one.
+The [architecture page](https://metalworks.lab2a.ai/docs/architecture) is the mental model;
+[CONTRIBUTING.md](https://github.com/Lab2A/metalworks/blob/main/CONTRIBUTING.md) is the operational
+guide.
+
+```bash
+git clone https://github.com/Lab2A/metalworks && cd metalworks
+uv venv && uv pip install -e ".[all,dev]"
+# the gate — everything must pass before a PR:
+uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -q
+```
+
+Where things live:
+
+| Path | What |
+| --- | --- |
+| `src/metalworks/contract/` | the Pydantic models every surface speaks — the stable spine |
+| `src/metalworks/research/`, `reddit/` | the two cores: demand research + Reddit engagement |
+| `src/metalworks/client.py` | the `Metalworks` facade — **surface 1** |
+| `src/metalworks/cli/` | the `metalworks` CLI — **surface 2** |
+| `src/metalworks/mcp/` | the MCP tool bodies + server — **surface 3** |
+| `plugin/skills/` | the Claude Code plugin skills — **surface 4** |
+| `scripts/gen_ts_types.py` | regenerates `ts/contract.ts` + JSON schema snapshots from the contract |
+| `tests/` | offline by default (`pytest-socket`; fakes for the LLM / embeddings / stores) |
+
+**The golden rule:** a change to a primitive moves all four surfaces, the contract registry
+(`gen_ts_types` + `contract/__init__`), and the docs — together. Run **`/pr-ready`** (the Claude Code
+skill in `.claude/skills/`) before opening a PR: it runs the gate, the contract-drift check CI
+*doesn't*, and walks the parity / docs / CHANGELOG checklist.
 
 ## Project
 
