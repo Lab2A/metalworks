@@ -47,6 +47,7 @@ if TYPE_CHECKING:
         UxSkeleton,
         ValidationResult,
     )
+    from metalworks.contract.shape import ShapeMatch
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
@@ -479,6 +480,32 @@ class Metalworks:
         from metalworks.research import build_launch_assets
 
         return build_launch_assets(self.deps, _demand(research), positioning)
+
+    def match_shapes(
+        self,
+        research: Research | DemandReport,
+        *,
+        embedder: EmbeddingProvider | None = None,
+        surface: SurfaceRecommendation | None = None,
+        build_spec: BuildSpec | None = None,
+        min_score: float = 0.5,
+    ) -> list[ShapeMatch]:
+        """Rank reusable startup shapes against the demand — the base stack + modules a
+        coding agent builds from. Read-only over the report and verdict-reactive over the
+        assessment (NO_GO yields no match; PIVOT scores the pivot fork). Embedding-scored
+        when ``embedder`` is given, deterministic keyword fallback otherwise. Accepts a bare
+        ``DemandReport`` (wrapped into a ``Research`` with no verdict) or a full bundle."""
+        from metalworks.contract.bundle import Research as _ResearchBundle
+        from metalworks.shapes.matcher import ShapeMatcher
+
+        bundle = (
+            research
+            if isinstance(research, _ResearchBundle)
+            else _ResearchBundle(demand=research)
+        )
+        return ShapeMatcher(embedder=embedder).match(
+            bundle, surface=surface, build_spec=build_spec, min_score=min_score
+        )
 
     def channel_plan(
         self, research: Research | DemandReport, surfaces: list[str] | None = None
