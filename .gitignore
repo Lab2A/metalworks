@@ -26,3 +26,6 @@ dist/
 
 # Gate / scratch run artifacts (local evidence, not committed)
 .gate/
+
+# Local Claude Code worktrees (the pr-ready dev skill under .claude/skills/ IS committed)
+.claude/worktrees/
