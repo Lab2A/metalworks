@@ -6,6 +6,32 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [0.0.5] - 2026-06-18
+
+The CLI gets a real front door. Still pre-1.0; anything outside `metalworks.contract` and the MCP
+tool contracts may change.
+
+### Added
+
+- **Top-level interactive menu.** Running bare `metalworks` now opens a menu — validate an idea,
+  configure models, configure data sources, view/edit config, run diagnostics (`doctor`), onboard
+  (`setup`), or browse past runs — all reachable with **no project and no idea**. `metalworks start`
+  keeps the direct idea flow.
+- **`models` / `sources` / `config` open their own interactive menu** when run with no sub-command
+  (set a model, toggle a source, set a config value); their flag-based subcommands still work for
+  scripting.
+
+### Changed
+
+- Bare `metalworks` no longer jumps straight into the idea wizard, so configuration is no longer
+  gated behind making a project and entering an idea.
+
+### Docs
+
+- New **Architecture** page (the contract-first / four-surface / no-cite-no-claim philosophy), a
+  README "Develop" section, an expanded `CONTRIBUTING.md` (surface parity + contract-registry
+  lockstep + release mechanics), and a `/pr-ready` Claude Code skill for contributors.
+
 ## [0.0.4] - 2026-06-17
 
 Sharper decisions and a friendlier front door. The verdict stops collapsing the
