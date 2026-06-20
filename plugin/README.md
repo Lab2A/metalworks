@@ -1,7 +1,7 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and eleven skills: the four engagement skills below,
+the metalworks MCP server and twelve skills: the five engagement skills below,
 plus seven grounded pillars that build on a finished demand report.
 
 ## Install
@@ -38,6 +38,8 @@ plus seven grounded pillars that build on a finished demand report.
 - **/draft-reply `<thread-url>`** — draft an authentic reply and run it through
   the compliance gate. Drafting is free; posting requires explicit confirmation.
 - **/subreddit-intel `<r/name>`** — a community brief before you participate.
+- **/discovery `<queries>`** — batch find-threads + draft-reply across several
+  queries: drafts a gated reply per worthwhile thread. Never posts.
 
 Pillars run on a finished demand report and trace every claim back to a real
 Reddit quote by permalink:
