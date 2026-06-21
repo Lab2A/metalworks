@@ -137,6 +137,14 @@ def _doctor_hints() -> list[str]:
                 'No embedding key and fastembed not installed → pip install "metalworks[research]" '
                 "(or set GOOGLE_API_KEY / OPENAI_API_KEY)."
             )
+    if _module_available("playwright"):
+        from metalworks.render import chromium_present
+
+        if not chromium_present():
+            hints.append(
+                "Browser extra installed but Chromium is missing → metalworks browser install "
+                "(or set FIRECRAWL_API_KEY to render without a local browser)."
+            )
     return hints
 
 
@@ -152,6 +160,23 @@ def _embeddings_are_local() -> bool:
         return isinstance(config.resolve_embeddings(), FastEmbedEmbedding)
     except Exception:
         return False
+
+
+def _renderer_status() -> tuple[str, str]:
+    """Which renderer tier the next render/teardown would use — without launching one.
+
+    Returns ``(tier, human_detail)``. The tier the design pillar reports as its
+    ``grounding_tier`` when it runs: ``playwright`` (full teardown + style audits),
+    ``firecrawl`` (hosted, screenshot-only), or ``none`` (design falls back to the
+    model's own knowledge — no real competitor teardown).
+    """
+    from metalworks.render import chromium_present
+
+    if _module_available("playwright") and chromium_present():
+        return ("playwright", "Playwright (owned Chromium) → full teardown + style audits")
+    if os.environ.get("FIRECRAWL_API_KEY"):
+        return ("firecrawl", "Firecrawl (hosted) → screenshot-only, no style audits")
+    return ("none", "no renderer → design runs from model knowledge (no competitor teardown)")
 
 
 @app.command()
@@ -198,6 +223,13 @@ def doctor(
     store_path = config.setting("store") or str(Path.home() / ".metalworks" / "store.db")
     console.print("\n[bold]Store[/bold]")
     console.print(f"  path  {store_path}")
+
+    console.print("\n[bold]Renderer[/bold]")
+    tier, detail = _renderer_status()
+    color = {"playwright": "green", "firecrawl": "yellow", "none": "dim"}[tier]
+    console.print(f"  [{color}]{detail}[/{color}]")
+    if tier == "playwright":
+        console.print("  [dim]verify: metalworks render https://example.com -o /tmp/shot.png[/dim]")
 
     console.print("\n[bold]Reddit auth[/bold]")
     try:
@@ -264,6 +296,87 @@ def _doctor_fix(hints: list[str]) -> None:
 
     if not acted:
         console.print("  [green]nothing to repair.[/green]")
+
+
+@app.command()
+def render(
+    url: Annotated[str, typer.Argument(help="Page URL to render (http(s):// or file://).")],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Write the screenshot PNG to this path."),
+    ] = Path("screenshot.png"),
+) -> None:
+    """Render a URL to a screenshot — a quick check that the browser renderer works.
+
+    Uses the resolved renderer (Playwright when installed, else Firecrawl when
+    ``FIRECRAWL_API_KEY`` is set). This is a debug / verification command for the
+    rendering infrastructure, not a pillar — the design pillar consumes the same
+    renderer internally.
+    """
+    from metalworks.errors import MetalworksError
+
+    renderer = config.resolve_renderer()
+    if renderer is None:
+        err_console.print("[red]No renderer available.[/red]")
+        err_console.print(
+            "[dim]Install the browser (metalworks browser install) or set FIRECRAWL_API_KEY.[/dim]"
+        )
+        raise typer.Exit(code=1)
+    try:
+        page = renderer.render(url)
+    except MetalworksError as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+    out.write_bytes(page.screenshot)
+    console.print(
+        f"[green]Rendered[/green] {page.final_url} via [bold]{renderer.renderer_id}[/bold] "
+        f"→ {out} ({len(page.screenshot)} bytes)"
+    )
+
+
+browser_app = typer.Typer(
+    help="Manage the owned headless browser (Chromium) used for rendering.",
+    no_args_is_help=True,
+)
+
+
+@browser_app.command("install")
+def browser_install(
+    with_deps: Annotated[
+        bool,
+        typer.Option(
+            "--with-deps",
+            help="Also install the OS system libraries Chromium needs (Linux; may need sudo).",
+        ),
+    ] = False,
+) -> None:
+    """Download Chromium for the browser renderer — the post-install step for the browser extra.
+
+    Runs ``python -m playwright install chromium`` in this interpreter (so it
+    works regardless of how the ``playwright`` script is on PATH). ``--with-deps``
+    also installs the Linux system libraries Chromium needs to launch, which fixes
+    the most common "installed but won't launch" failure on servers and CI.
+    """
+    import subprocess
+    import sys
+
+    if not _module_available("playwright"):
+        err_console.print("[red]The browser extra is not installed.[/red]")
+        err_console.print('pip install "metalworks[browser]"', style="dim", markup=False)
+        raise typer.Exit(code=1)
+    cmd = [sys.executable, "-m", "playwright", "install"]
+    if with_deps:
+        cmd.append("--with-deps")
+    cmd.append("chromium")
+    console.print(f"[bold]Installing Chromium[/bold] [dim]({' '.join(cmd)})[/dim]")
+    # Fixed argv, no shell, no user-controlled input — just the playwright installer.
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        err_console.print("[red]Chromium install failed.[/red] See the output above.")
+        raise typer.Exit(code=result.returncode)
+    console.print("[green]Ready.[/green] The browser renderer can now launch Chromium.")
 
 
 @app.command()
@@ -2490,6 +2603,7 @@ _EXTRA_PROBES: tuple[tuple[str, str], ...] = (
     ("arctic", "duckdb"),
     ("exa", "exa_py"),
     ("tavily", "tavily"),
+    ("browser", "playwright"),
     ("mcp", "mcp"),
 )
 
@@ -2689,6 +2803,7 @@ app.add_typer(config_app, name="config")
 app.add_typer(models_app, name="models")
 app.add_typer(sources_app, name="sources")
 app.add_typer(corpus_app, name="corpus")
+app.add_typer(browser_app, name="browser")
 app.add_typer(mcp_app, name="mcp")
 
 

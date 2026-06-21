@@ -59,9 +59,13 @@ tavily = ["tavily-python>=0.5"]
 # endpoint over the core httpx dep (their SDK search surfaces are still in beta).
 parallel = ["parallel-web>=1.1"]
 firecrawl = ["firecrawl-py>=4.0"]
+# Owned headless browser for page rendering / design teardowns. Chromium is a
+# separate post-install step: `metalworks browser install` (or `python -m
+# playwright install chromium`). Bare `import metalworks` never imports it.
+browser = ["playwright>=1.40,<2"]
 mcp = ["mcp[cli]>=1.2"]
 all = [
-  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,mcp]",
+  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,browser,mcp]",
 ]
 dev = [
   "pytest>=8",
@@ -98,9 +102,12 @@ pythonVersion = "3.11"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Offline by default: block sockets AND deselect tests that need real network
-# (run them explicitly with `-m network --enable-socket`).
-addopts = "--disable-socket -m 'not network'"
+# Offline by default: block sockets AND deselect tests that need real network or
+# a real browser. Run those explicitly:
+#   network: `-m network --force-enable-socket`
+#   browser: `-m browser --force-enable-socket`  (after `metalworks browser install`)
+addopts = "--disable-socket -m 'not network and not browser'"
 markers = [
   "network: test needs real network/sockets (deselected by default; see addopts)",
+  "browser: test needs a real headless browser (Chromium via playwright; deselected by default)",
 ]

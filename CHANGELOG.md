@@ -6,6 +6,26 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it
 reaches 1.0. Below 1.0, anything outside `metalworks.contract` and the MCP tool
 contracts may change in any release.
 
+## [Unreleased]
+
+### Added
+
+- **Page-rendering infrastructure (`metalworks.render`).** A new `PageRenderer` protocol — a
+  screenshot plus computed-style extraction over a real page — with an owned-Chromium **Playwright**
+  adapter (the new `metalworks[browser]` extra), a hosted **Firecrawl** adapter (screenshot-only,
+  reuses `[firecrawl]`), and a `FakeRenderer` for offline tests. Resolved via
+  `config.resolve_renderer()` (Playwright → Firecrawl → none) and surfaced in `doctor`. It is
+  infrastructure like `SearchProvider`/`EmbeddingProvider` — the first consumer is the upcoming
+  design pillar, and it is reusable for landscape / deploy checks. Bare `import metalworks` still
+  imports no browser. The protocol exposes no caller-supplied JavaScript by design.
+- **`metalworks browser install [--with-deps]`** — downloads Chromium for the browser renderer (the
+  post-install step for `[browser]`); `--with-deps` also installs the Linux system libraries Chromium
+  needs to launch.
+- **`metalworks render <url> -o shot.png`** — a debug command to verify the renderer is working.
+- `doctor` now reports the `browser` extra and the active **renderer tier** (Playwright / Firecrawl /
+  none) without launching Chromium, plus `BrowserNotInstalledError` / `BrowserLaunchError` /
+  `StyleAuditUnsupported` with copy-pasteable fixes.
+
 ## [0.0.5] - 2026-06-18
 
 The CLI gets a real front door. Still pre-1.0; anything outside `metalworks.contract` and the MCP

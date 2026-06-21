@@ -31,6 +31,7 @@ from metalworks.project import Project
 if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.render import PageRenderer
     from metalworks.research.sources import ItemSource
     from metalworks.search import SearchProvider
     from metalworks.stores import MemoryStores, SqliteStores
@@ -503,6 +504,36 @@ def resolve_search() -> SearchProvider | None:
     return None
 
 
+def resolve_renderer() -> PageRenderer | None:
+    """Resolve a :class:`~metalworks.render.PageRenderer`, or ``None``.
+
+    Precedence: an installed owned browser (``metalworks[browser]`` + a Chromium
+    binary) → Playwright (full capability, including style audits); else
+    ``FIRECRAWL_API_KEY`` → Firecrawl (hosted, screenshot-only); else ``None``.
+    Like :func:`resolve_search`, this never raises — a pillar with no renderer
+    degrades to text research, which is the intended graceful fallback. The
+    Chromium check is the cheap, launch-free probe so this stays fast.
+    """
+    from metalworks.errors import BrowserNotInstalledError, MissingExtraError
+    from metalworks.render import chromium_present
+
+    if chromium_present():
+        try:
+            from metalworks.render.adapters.playwright import PlaywrightRenderer
+
+            return PlaywrightRenderer()
+        except (MissingExtraError, BrowserNotInstalledError):
+            pass  # extra absent or binary vanished between probe and construct
+    if os.environ.get("FIRECRAWL_API_KEY"):
+        try:
+            from metalworks.render.adapters.firecrawl import FirecrawlRenderer
+
+            return FirecrawlRenderer()
+        except (MissingExtraError, MissingKeyError):
+            return None
+    return None
+
+
 # ── Store resolution ────────────────────────────────────────────────────────
 
 
@@ -565,6 +596,7 @@ __all__ = [
     "resolve_chat_chain",
     "resolve_embeddings",
     "resolve_models",
+    "resolve_renderer",
     "resolve_search",
     "resolve_sources",
     "save_config",
