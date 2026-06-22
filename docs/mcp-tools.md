@@ -56,6 +56,7 @@ source of truth for its tier.
 | `surface_recommend` | Recommend a product surface — grounded rubric + trade-offs, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ux_skeleton_build` | Build a UX skeleton for a stored report on the given surface, synchronous (chat + embeddings). | `report_id`, `surface`, `store_path` |
 | `site_render` | Build a grounded marketing site + a self-contained `index.html` (chat + embeddings). | `report_id`, `store_path` |
+| `design_from_report` | Author a grounded-but-directional design system (+ preview HTML) — SAFE/RISK choices read from a real competitor teardown where available; records the `grounding_tier` (chat key). | `report_id`, `name`, `store_path` |
 | `launch_assets_build` | Draft grounded, channel-native launch assets — one LLM call per surface; `[]` on a no-go report. Drafting only (chat key). | `report_id`, `store_path` |
 | `build_spec` | Derive an evidence-grounded `BuildSpec` — each feature maps to a real demand cluster with quotes; un-grounded features dropped. Returns the spec; does **not** write files (that is the `metalworks build init` CLI) (chat + embedding keys). | `report_id`, `surface` (`web`), `stack` (`empty`), `store_path` |
 | `research_start` | Start the pipeline as a background job and return a `run_id` immediately (chat + embedding keys). | `brief`, `months`, `store_path` |

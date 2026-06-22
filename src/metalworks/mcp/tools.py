@@ -498,6 +498,35 @@ def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
 
 
 @guard
+def design_from_report(
+    report_id: str, name: str | None = None, store_path: str | None = None
+) -> ToolResult:
+    """TIER 2 (chat key). Author a grounded design system for a stored report:
+    builds the landscape, reads the competition at the richest tier available
+    (a real browser teardown > web text > model knowledge), and returns the
+    DesignSystem plus a self-contained preview HTML. The result's grounding_tier
+    records how grounded the look actually is."""
+    from metalworks.contract.bundle import Research
+    from metalworks.research import build_design_system, render_design_preview_html, run_landscape
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    deps = _build_deps(store_path)
+    try:
+        landscape = run_landscape(deps, report)
+    except Exception:  # landscape is best-effort; design degrades honestly without it
+        landscape = None
+    system = build_design_system(
+        deps, Research(demand=report, landscape=landscape), brand_name=name
+    )
+    return {
+        "design_system": system.model_dump(mode="json"),
+        "preview_html": render_design_preview_html(system),
+    }
+
+
+@guard
 def launch_assets_build(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Draft grounded, channel-native launch assets for a stored
     report — one LLM call per surface. Returns [] on a no-go report. DRAFTING ONLY."""

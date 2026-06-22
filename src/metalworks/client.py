@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         ChannelPlan,
         ContentPlan,
         DemandReport,
+        DesignSystem,
         DiscoveryContext,
         IdeaSketch,
         IdeationResult,
@@ -443,6 +444,32 @@ class Metalworks:
         from metalworks.research import render_site_html
 
         return render_site_html(site, _demand(research) if research is not None else None)
+
+    def design(
+        self,
+        research: Research | DemandReport,
+        *,
+        brand_name: str | None = None,
+        max_teardown: int = 3,
+    ) -> DesignSystem:
+        """Visual-design pillar — a grounded-but-directional :class:`DesignSystem`.
+
+        Reads the competition at the richest tier available (a real renderer
+        teardown when a ``Research`` bundle carries a landscape and a browser is
+        installed > web text > model knowledge) and records the ``grounding_tier``
+        so the look is never overstated. ``max_teardown`` caps the live teardown
+        (``0`` for the full sweep)."""
+        from metalworks.research import build_design_system
+
+        return build_design_system(
+            self.deps, research, brand_name=brand_name, max_teardown=max_teardown
+        )
+
+    def render_design_preview(self, system: DesignSystem) -> str:
+        """Render a :class:`DesignSystem` to a self-contained preview HTML page."""
+        from metalworks.research import render_design_preview_html
+
+        return render_design_preview_html(system)
 
     def build_spec(
         self,

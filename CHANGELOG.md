@@ -25,6 +25,14 @@ contracts may change in any release.
 - `doctor` now reports the `browser` extra and the active **renderer tier** (Playwright / Firecrawl /
   none) without launching Chromium, plus `BrowserNotInstalledError` / `BrowserLaunchError` /
   `StyleAuditUnsupported` with copy-pasteable fixes.
+- **Visual-design pillar (`/design`).** Turn a finished report into a grounded-but-directional
+  `DesignSystem` — an aesthetic direction, a SAFE/RISK choice per design dimension, directional
+  landscape signals, and a `DESIGN.md` source of truth + a preview page. It reads the competition at
+  the richest tier available — a real browser teardown of competitor sites (Playwright screenshots +
+  computed styles) > web text > the model's own knowledge — and records the `grounding_tier` so the
+  look is never overstated. Grounding is **directional, not cited** (the landscape informs the bet, it
+  doesn't cite it); the honesty signal is the SAFE/RISK stance + the tier. On all four surfaces:
+  `mw.design()`, `metalworks design`, the `design_from_report` MCP tool, and the `/design` skill.
 
 ## [0.0.5] - 2026-06-18
 
