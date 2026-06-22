@@ -1,15 +1,16 @@
 ---
 title: "Demand research"
-description: "Give metalworks one sentence about your idea. It reads real conversations — Reddit, Hacker News, the web — and tells you whether people actually want it: a go/no-go verdict plus the real needs people voiced, each backed by a quote you can click."
+description: "Give metalworks one sentence about your idea. It reads real conversations — Reddit, Hacker News, the web — and tells you whether people actually want it: a read on how strong the demand is plus the real needs people voiced, each backed by a quote you can click."
 ---
 
 **Find out whether people actually want your idea — backed by real conversations, not a guess.**
 
 Give metalworks one sentence about what you want to build. It reads real
 conversations across your [sources](/docs/sources) — Reddit, Hacker News, the web,
-your own data — and hands back a go/no-go verdict plus the specific needs people
-voiced, each one backed by a real quote you can open and read. This is the report
-every other step runs on, so do it first.
+your own data — and hands back a read on how strong the demand is, plus the specific
+needs people voiced, each one backed by a real quote you can open and read. (The
+explicit GO / PIVOT / NO-GO call is [`assess`'s job](/docs/validation-loop), not this
+report's.) This is the report every other step runs on, so do it first.
 
 ## Run it
 
@@ -126,5 +127,5 @@ plan on signal that isn't there.
 You have the report. Decide whether it's worth building with the
 [validation loop](/docs/validation-loop) (GO / PIVOT / NO-GO), or turn it into what you need to launch:
 → [Validation loop](/docs/validation-loop) · [Positioning](/docs/positioning) ·
-[Competitors](/docs/competitors) · [Surface & screens](/docs/design) ·
+[Competitors](/docs/competitors) · [Build spec](/docs/build-spec) ·
 [the full walkthrough](/docs/walkthrough)

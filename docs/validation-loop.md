@@ -45,8 +45,8 @@ mw = Metalworks()
 result = mw.validate("a jitter-free focus supplement for developers")
 
 print(result.outcome)          # "go" | "no_go" | "exhausted"
-for round in result.decision_log:
-    print(round.iteration, round.decision, "→", round.idea)
+for step in result.decision_log:
+    print(step.iteration, step.decision, "→", step.idea)
 ```
 
 ```bash CLI

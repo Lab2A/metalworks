@@ -3,8 +3,8 @@ title: "Projects & memory"
 description: "How metalworks remembers your work: the .metalworks/ project directory, what persists, and how every command chains off one demand report instead of re-running research."
 ---
 
-metalworks saves your work. Run research once, and every later step — positioning, the site,
-the build spec, launch copy — reads from that same saved report instead of re-running research.
+metalworks saves your work. Run research once, and every later step — positioning, the design
+system, the build spec, launch copy — reads from that same saved report instead of re-running research.
 It all lives in a `.metalworks/` folder in your project, created the same way `git init`
 creates `.git`.
 
@@ -36,7 +36,7 @@ your-startup/
     ├─ config.toml           # non-secret provider/model settings             [commit]
     ├─ corpus.db             # your saved research data (posts, comments)       [gitignored]
     ├─ runs/<report_id>/research.{md,json}                                    [commit]
-    └─ artifacts/            # later-stage outputs (positioning, site, …)     [commit]
+    └─ artifacts/            # later-stage outputs (positioning, design, …)   [commit]
 ```
 
 | File | Holds | Committed? |
@@ -46,7 +46,7 @@ your-startup/
 | `corpus.db` | Your [saved research data](/docs/corpus) — the posts and comments you've read. Kept out of git so your raw data stays private. | No |
 | `runs/<report_id>/research.json` | The full `Research` bundle for one run — saved and safe to commit. | Yes |
 | `runs/<report_id>/research.md` | A human-readable summary of the same run. | Yes |
-| `artifacts/<kind>.json` | The latest output of each later stage (positioning, marketing site, content plan, …). | Yes |
+| `artifacts/<kind>.json` | The latest output of each later stage (positioning, design system, content plan, …). | Yes |
 
 `metalworks init` writes a `.gitignore` inside `.metalworks/` that excludes `corpus.db` for
 you, so committing the directory captures your research and outputs without the bulky,

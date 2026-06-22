@@ -27,8 +27,9 @@ else you generate later reads from this one report.
 
 - **`DemandReport`** — the output of demand research: a one-line `demand_summary` (demand
   strength — the go/no-go is `assess`'s job), the
-  `ranked_clusters` (the real needs people voiced), web `web_findings`, audience and market
-  sizing. If a best-effort stage degraded, `partial` is set with a plain-language `caveat`.
+  `ranked_clusters` (the real needs people voiced), web `web_findings`, and market
+  sizing. (`audience_profile` is **currently always `None`** — demographic inference was cut.)
+  If a best-effort stage degraded, `partial` is set with a plain-language `caveat`.
   `version`, `lineage_id`, and `parent_report_id` track a report's earlier versions when you
   [update it](/docs/corpus).
 - **`InsightCluster`** — one ranked need. Carries a `claim` (the need, in plain words),
@@ -58,7 +59,7 @@ else you generate later reads from this one report.
 ResearchBrief ──▶ run_research ──▶ DemandReport
                                     ├─ ranked_clusters: [InsightCluster ─▶ quotes: [ResolvedCitation]]
                                     ├─ web_findings:    [WebFinding]
-                                    └─ verdict / audience / sizing
+                                    └─ demand_summary / sizing
 ```
 
 The input is a **`ResearchBrief`** — the question, the subreddits to cover, success criteria,
@@ -67,7 +68,7 @@ and a relevance rubric. You rarely build one by hand: pass a question string str
 
 ## Everything points back to the report
 
-Positioning, the marketing site, the build spec, and launch copy are all derived objects.
+Positioning, the design system, the build spec, and launch copy are all derived objects.
 Each one is generated from the report and links its claims back to the same quotes:
 
 - **`PositioningBrief`** — your angle: who it's for and why it's different, built from the

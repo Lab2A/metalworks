@@ -41,6 +41,10 @@ for screen in spec.screens:
 paths = mw.scaffold(spec, research, "./build", base="next-shipfast")
 ```
 
+> **`stack` vs `base`** — same value, two names, by design: the spec **records** the
+> chosen stack as `stack`, and `scaffold` **consumes** it as its `base` template. It's
+> not a typo — pass the same template id to both.
+
 ```bash CLI
 # report-id comes from `metalworks research list`
 # --surface auto (the default) lets the spec pick + explain the surface

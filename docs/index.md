@@ -1,6 +1,6 @@
 ---
 title: "metalworks"
-description: "Go from a startup idea to launch, grounded in what people actually want. Validate demand, get positioning, a marketing site, a build plan, and launch copy — every claim backed by a real quote you can open."
+description: "Go from a startup idea to launch, grounded in what people actually want. Validate demand, get positioning, a design system, a build plan, and launch copy — every claim backed by a real quote you can open."
 ---
 
 **metalworks turns a startup idea into a launch plan, grounded in real demand.**
@@ -8,7 +8,7 @@ description: "Go from a startup idea to launch, grounded in what people actually
 Give it one sentence about what you want to build. It reads real conversations — Reddit,
 Hacker News, the web, or your own data — to tell you whether people actually want it, then
 turns that into the things you need to launch: your positioning, the competitors to beat, a
-marketing site, a build plan for your coding agent, and launch copy. **Every claim links back
+design system, a build plan for your coding agent, and launch copy. **Every claim links back
 to a real quote you can click — nothing is invented.**
 
 It's a Python library you install (also a CLI, an MCP server, and a Claude Code plugin).
@@ -58,9 +58,9 @@ falls into five stages — each step is a single call:
 
 | Stage | What you get |
 | --- | --- |
-| **Research** | [Demand research](/docs/demand-research) — a go/no-go verdict + the real needs people voiced, each backed by quotes. Run the full [validation loop](/docs/validation-loop) — frame an idea, weigh demand against what already exists, get a **GO / PIVOT / NO-GO** call — then your [positioning](/docs/positioning) (who it's for, why it's different) and the [competitors](/docs/competitors) to beat. |
-| **Design** | [Surface & screens](/docs/design) — what to build (web, mobile, CLI?) and the screens to ship. |
-| **Build** | [A build spec](/docs/build-spec) — a feature plan mapped to real demand + a project scaffold your coding agent executes. |
+| **Research** | [Demand research](/docs/demand-research) — a read on how strong the demand is + the real needs people voiced, each backed by quotes. Run the full [validation loop](/docs/validation-loop) — frame an idea, weigh demand against what already exists, get a **GO / PIVOT / NO-GO** call — then your [positioning](/docs/positioning) (who it's for, why it's different) and the [competitors](/docs/competitors) to beat. |
+| **Design** | [A design system](/docs/design-system) — an aesthetic direction and a SAFE/RISK choice per dimension, read from what rivals actually do. |
+| **Build** | [A build spec](/docs/build-spec) — what to build (surface + screens), a feature plan mapped to real demand, and a project scaffold your coding agent executes. |
 | **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
 | **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
 

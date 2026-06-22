@@ -14,7 +14,7 @@ the convention used by OpenRouter, LiteLLM, and most agent runtimes):
 ```python
 from metalworks import Metalworks
 
-Metalworks(model="anthropic/claude-opus-4-6")
+Metalworks(model="anthropic/claude-opus-4-8")
 Metalworks(model="openai:gpt-5")
 Metalworks(model="google/gemini-3-pro")
 ```
@@ -42,7 +42,7 @@ can also pin a default in `~/.config/metalworks/metalworks.toml`:
 
 ```toml
 provider = "anthropic"
-model = "claude-opus-4-6"
+model = "claude-opus-4-8"
 ```
 
 Precedence: explicit `model=` ref > config file > first present key.
@@ -92,7 +92,7 @@ The research and discovery pipelines use a cheap "fast" model for triage and
 filtering and a capable model for synthesis and generation. Set both:
 
 ```python
-Metalworks(model="anthropic/claude-opus-4-6", fast_model="anthropic/claude-haiku-4-5")
+Metalworks(model="anthropic/claude-opus-4-8", fast_model="anthropic/claude-haiku-4-5")
 ```
 
 If you set only `model`, the fast slot falls back to it. Resolve a pair directly

@@ -18,7 +18,7 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 | Command | Description | Keys |
 | --- | --- | --- |
 | `metalworks` | **Interactive menu** — the easiest way in. Pick what to do: validate an idea, configure models / data sources, view-or-edit config, run diagnostics (`doctor`), onboard (`setup`), or browse past runs. Everything is reachable with no project and no idea. | zero-key to open |
-| `metalworks start` | Jump straight to **validating an idea** end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / site / scaffold once it earns a GO. | chat key |
+| `metalworks start` | Jump straight to **validating an idea** end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / build spec once it earns a GO. | chat key |
 | `metalworks setup` | Interactive onboarding: detect provider keys, pick a model, choose sources, scaffold a project, warm embeddings. `--yes` accepts every default non-interactively. | zero-key |
 | `metalworks version` | Print the installed metalworks version. | zero-key |
 | `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the store path, connected Reddit accounts, and actionable hints. | zero-key |
@@ -45,8 +45,8 @@ Inspect and set the chat/fast/embedding models.
 ## research
 
 Plan and run demand-research reports, then derive everything else from them. The
-report-grounded commands (`position`, `landscape`, `surface`, `site`, `launch`,
-`content-plan`, `landscape`, `assess`, `refresh`, `versions`) take a **report id** —
+report-grounded commands (`position`, `landscape`, `design`, `launch`,
+`content-plan`, `assess`, `refresh`, `versions`) take a **report id** —
 but it's **optional**: omit it to use your latest run, or pass a unique **prefix**
 instead of the full id. No more copy/pasting UUIDs between steps. (`research --help`
 groups these by *Core flow* / *Pillars & build* / *History*.)
@@ -86,7 +86,7 @@ Options:
 - `research list` — `--limit INT` (max runs to show, default 20).
 - `research refresh` / `versions` — optional `REPORT_ID` (id or prefix, any version of the report; defaults to latest); refresh updates from the lineage head and takes `--out, -o PATH`.
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
-- `research position` / `landscape` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
+- `research position` / `landscape` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
 - `research design` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for `DESIGN.md` + `preview.html`; `--max-teardown N` competitor sites to teardown (`0` = all).
 - `research logo` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for the SVGs + `picker.html`; `--count, -n` how many options (design angles).
 - `research design-review` — `URL` argument; `--report REPORT_ID` to also grade against that report's design system; `--json PATH` for the `DesignReview` JSON.

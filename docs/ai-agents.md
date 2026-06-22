@@ -32,22 +32,16 @@ the `fix` verbatim.
 
 ## MCP tools (the language-agnostic surface)
 
-Run `metalworks mcp serve` (stdio). **31 tools** are registered. The full table — every
-tool, whether it needs a key, its purpose, and params — is the [MCP tools
-reference](/docs/mcp-tools). The split by key requirement:
+Run `metalworks mcp serve` (stdio). **30 tools** are registered. The full table — every
+tool, its tier, whether it needs a key, its purpose, and params — is the canonical [MCP tools
+reference](/docs/mcp-tools); read it there rather than re-deriving the list here. In short:
 
-- **Zero-key:** the data + deterministic tools — `compliance_lint`, `reddit_search_posts`,
-  `reddit_get_post_comments`, `reddit_subreddit_info`, `reddit_subreddit_rules`,
-  `arctic_list_months`, `arctic_pull_threads`, `corpus_stats`, `research_list_runs`,
-  `research_get_report`, `channel_plan_build`, `content_plan_from_report`. No provider key
-  needed (`[reddit]`/`[arctic]` extras where noted).
-- **Key-gated:** anything that calls a model — `research_plan_brief`, `research_start` /
-  `research_status` / `research_result`, `generate_reply`, `discovery_run`, and the
-  synchronous report-derived tools (run after a stored report exists):
-  `positioning_from_report`, `landscape_from_report`,
-  `ideate_from_idea`, `ideate_from_report`, `assess_from_report`,
-  `launch_assets_build`, `build_spec`. The validation-loop
-  orchestrator `validate_from_idea` also calls a model and runs a demand pull (slower).
+- **Zero-key** data + deterministic tools (Reddit + Arctic corpus reads, run/report listing,
+  `compliance_lint`, `content_plan_from_report`, ...) need no provider key.
+- **Key-gated** tools call a model: demand research (`research_start` / `research_status` /
+  `research_result`), `research_plan_brief`, the report-derived pillars (`positioning_from_report`,
+  `landscape_from_report`, `assess_from_report`, design, `launch_assets_build`, `build_spec`, ...),
+  `generate_reply`, `discovery_run`, and the `validate_from_idea` orchestrator.
 - **Posting (the security boundary):** `reddit_post_comment` requires a `confirm_token`
   emitted by a `compliance_lint` pass over that exact text **and**
   `METALWORKS_ALLOW_POSTING=1`. There is no override.

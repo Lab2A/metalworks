@@ -44,8 +44,8 @@ for cluster in report.ranked_clusters:
 </CodeGroup>
 
 Every cluster is a real demand theme, and every quote is a verbatim comment you can open —
-nothing is invented. That report is the input to everything else: positioning, a marketing
-site, a build spec, launch copy. See the [end-to-end walkthrough](/docs/walkthrough).
+nothing is invented. That report is the input to everything else: positioning, a design
+system, a build spec, launch copy. See the [end-to-end walkthrough](/docs/walkthrough).
 
 ## 3. Or use the CLI / MCP / plugin
 

@@ -54,30 +54,61 @@ hn-corpus/
     2026-05.parquet
 ```
 
-## Point metalworks at it
+## Read your local slice
+
+To search the slice you just downloaded, point a `HackerNewsArchiveReader` at the
+output directory and wrap it in a `HackerNewsArchiveSource`. The source matches stories
+to your query by keyword and reads each story's full comment thread straight from the
+same Parquet files — so your quotes come from real HN comments with nothing fetched live:
 
 ```python
-from metalworks import Metalworks
 from metalworks.research.sources.hn_archive import (
     HackerNewsArchiveReader,
     HackerNewsArchiveSource,
 )
 
-reader = HackerNewsArchiveReader(data_root="./hn-corpus")
-mw = Metalworks(sources=[HackerNewsArchiveSource(reader=reader)])
-mw.research("a budget mechanical keyboard for programmers")
+source = HackerNewsArchiveSource(reader=HackerNewsArchiveReader(data_root="./hn-corpus"))
+
+window = source.latest_window()
+stories = list(source.pull(query="a budget mechanical keyboard for programmers", window=window))
+for story in stories:
+    print(story.title, story.url)
+
+# comments_for takes a batch of story ids and yields one comment list per id
+for thread in source.comments_for([s.id for s in stories]) or []:
+    for comment in thread:
+        print("  ", comment.text[:80])
 ```
 
-Stories are matched to your question by keyword; each story's full comment thread is read
-straight from the same files, so your quotes come from real HN comments with nothing fetched
-live.
+<Note>
+The HN archive is a corpus connector, not yet a one-line `Metalworks(...)` option.
+`Metalworks` does **not** take a `sources=` constructor argument — passing one raises
+`TypeError`. Wiring a custom source into the full `mw.research(...)` pipeline by config
+(a `[sources]` stream) is planned but not yet plumbed; today you drive the archive through
+the source object above, or via the CLI below.
+</Note>
+
+## From the CLI
+
+The `hackernews_archive` source self-registers under the `--source` flag, so the CLI can
+ingest it into your local corpus store (`metalworks corpus add`) or run a report against it
+(`metalworks research run --source hackernews_archive`):
+
+```bash
+metalworks corpus add --source hackernews_archive --query "mechanical keyboards" --months 1
+```
+
+The CLI path reads from the archive's default data root (the public HF mirror), or from a
+Supabase mirror when `HN_ARCHIVE_SOURCE=mirror` is set (below). To search a custom **local**
+`--out` directory like `./hn-corpus`, construct the reader with `data_root=` as shown above —
+the `--source` flag doesn't take a local path yet.
 
 ## Read from a Supabase mirror
 
 For a shared, always-available copy (instead of a local download on each machine),
 you can mirror the months you want into a private Supabase Storage bucket and read
-them over signed URLs — no HF and no local files at query time. Point the source at
-a `HackerNewsArchiveMirrorReader` (needs the `supabase` extra):
+them over signed URLs — no HF and no local files at query time. Use a
+`HackerNewsArchiveMirrorReader` (needs the `supabase` extra):
 
 ```python
 from metalworks.research.sources.hn_archive import (
@@ -87,7 +118,7 @@ from metalworks.research.sources.hn_archive import (
 
 # reads months tracked in a `hackernews_pulls` table + shards under <YYYY>/<MM>/
 reader = HackerNewsArchiveMirrorReader()   # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from env
-mw = Metalworks(sources=[HackerNewsArchiveSource(reader=reader)])
+source = HackerNewsArchiveSource(reader=reader)
 ```
 
 Or set `HN_ARCHIVE_SOURCE=mirror` in the environment and `--source hackernews_archive`

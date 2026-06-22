@@ -9,8 +9,8 @@ The QA counterpart to the [design pillar](/docs/design-system). It opens a
 rendered page in a real browser, reads its **actual computed styles** (the fonts,
 heading scale, and colors the browser resolved), and grades them
 **deterministically** — every finding is a pure function of the page, not an LLM
-opinion. With a report, it also grades the page against that report's design
-system.
+opinion. With a report, it adds one more check: whether the rendered **body font**
+matches the brand's typography choice from that report's design system.
 
 <CodeGroup>
 

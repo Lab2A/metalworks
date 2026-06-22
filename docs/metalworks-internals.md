@@ -19,7 +19,7 @@ description: "A complete internals reference for metalworks — the contract lay
 Give it one sentence about a product idea. It reads **real Reddit conversations** (plus
 optional web research), tells you whether people actually want it, and turns that into the
 things you need to launch: positioning, the competitors to beat, a design system, a logo, a
-marketing site, a build spec, and launch copy. **Every demand claim links back to a real
+build spec, and launch copy. **Every demand claim links back to a real
 comment you can click. Anything it cannot back with a real quote, it drops.**
 
 Two identity rules run through everything:
@@ -47,10 +47,11 @@ the MCP tool contracts; everything else can change in any 0.x release.
   ┌───────────┐   ┌───────────┐   ┌───────────┐   ┌──────────┐   ┌──────────┐
   │ RESEARCH  │──▶│  DESIGN    │──▶│  BUILD    │──▶│  LAUNCH  │──▶│  GROWTH  │
   │ demand    │   │ position/  │   │ BuildSpec │   │ launch   │   │ content/ │
-  │ report    │   │ landscape/ │   │ (+ shape  │   │ assets,  │   │ SEO,     │
-  │ (cited)   │   │ surface/UX │   │  match    │   │ reply    │   │ engage   │
-  │           │   │ + design/  │   │  [planned │   │          │   │          │
-  │           │   │ logo/site  │   │   #57])   │   │          │   │          │
+  │ report    │   │ landscape/ │   │ (surface+ │   │ assets,  │   │ SEO,     │
+  │ (cited)   │   │ design/    │   │  screens; │   │ reply    │   │ engage   │
+  │           │   │ logo/      │   │  + shape  │   │          │   │          │
+  │           │   │ review     │   │  match    │   │          │   │          │
+  │           │   │            │   │  [#57])   │   │          │   │          │
   └───────────┘   └───────────┘   └───────────┘   └──────────┘   └──────────┘
         │              │               │
         └── each stage emits one FROZEN, TYPED bundle; downstream resolves
@@ -61,8 +62,9 @@ Stage 1 (`Research`) is the durable artifact; the later pillars are exposed as m
 facade and as optional fields on the `Research` bundle. The bundle (`contract/bundle.py`) is
 the stage-1 artifact: `demand` plus optional `competitors`, `positioning`, `landscape`,
 `assessment`, `ideation`. The DESIGN stage is fully shipped (positioning, landscape,
-surface/UX, the visual **design system**, the **logo** mark, the styled marketing **site**,
-and a rendered-page **design review** — §7). Shape-matching in BUILD is **[planned — PR #57]**.
+the visual **design system**, the **logo** mark, and a rendered-page **design review** — §7).
+Surface choice and the UX skeleton (screens) are now part of the BUILD stage's `BuildSpec`,
+not a separate step. Shape-matching in BUILD is **[planned — PR #57]**.
 
 ---
 
@@ -90,8 +92,9 @@ pytest), so contract drift is a manual gate, not a CI one.
   counting, never the raw username), `engagement`.
 - Fork selectors: `segments` / `candidate_wedges` (options the engine *surfaces*, not
   collapses) with `default_*` / `active_*` accessors.
-- `web_findings`, `price_finding`, `audience_profile`, `market_sizing`, `source_map`,
-  `corpus_stats`, `cross_references`, `must_address_resolution`.
+- `web_findings`, `price_finding`, `market_sizing`, `source_map`,
+  `corpus_stats`, `cross_references`, `must_address_resolution`. (`audience_profile` exists on
+  the model but is **currently always `None`** — demographic inference was cut.)
 - `evidence` (computed property) — the flat, de-duplicated `EvidenceRecord` list every
   downstream `EvidenceRef` resolves against.
 
@@ -346,7 +349,7 @@ and the open module-layer questions.
  assess()                 GO / PIVOT / NO_GO        ── NO_GO ─▶ stop
    │ GO
    ▼
- design()                 DesignSystem + logo + a styled, cited marketing site
+ design()                 DesignSystem + logo + a rendered-page design review
    │
    ▼
  build_spec / scaffold    an evidence-grounded build harness for a coding agent
@@ -358,8 +361,8 @@ and the open module-layer questions.
  launch reply             a disclosed, non-salesy Reddit reply to the originating thread
 ```
 
-Shipped today: research → assess → the full design pillar (design system, logo, styled site,
-review) → build spec + scaffold → launch + content. **[planned]**, in open PRs: shape match
+Shipped today: research → assess → the full design pillar (design system, logo,
+review) → build spec + scaffold (surface + screens) → launch + content. **[planned]**, in open PRs: shape match
 (`#57`) and deploy + billing (`#51` — `metalworks deploy` to Vercel and `metalworks billing
 create` to Stripe, new `DeployProvider` / `BillingProvider` protocols mirroring the
 llm/search adapters, irreversible steps gated like Reddit posting).
@@ -400,10 +403,10 @@ src/metalworks/
   config.py            provider auto-resolution (incl. resolve_renderer), non-secret config
   errors.py            MetalworksError, MissingExtraError, MissingKeyError, BrowserNotInstalledError, ...
   contract/            the stable Pydantic API (research, positioning, landscape, surface,
-                       design, logo, build, assess, site, marketing, bundle, evidence, ...)
+                       design, logo, build, assess, bundle, evidence, ...)
   render/              PageRenderer protocol + adapters (playwright/firecrawl) + FakeRenderer
   research/            pipeline.py, deps.py, planner/, exploration/, synthesis/, triangulate/,
-                       sources/ (arctic, hackernews, producthunt, web), site.py, design.py,
+                       sources/ (arctic, hackernews, producthunt, web), design.py,
                        design_review.py, logo.py
   discovery/           run_discovery (engagement opportunities)
   reddit/              oauth, search, subreddit intel, inbox, compliance, posting

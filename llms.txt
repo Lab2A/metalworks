@@ -28,15 +28,15 @@ no key). So Anthropic/OpenRouter/local chat all work standalone.
   research vertical underneath the facade. Quotes are exact-matched to stored
   Reddit comments; web findings carry source URLs from grounding metadata, never
   model prose.
-- Six functions on a finished `DemandReport`, each linking its output back to the
+- Functions on a finished `DemandReport`, each linking its output back to the
   report's real quotes: `build_positioning_brief`, `run_competitor_map`,
-  `build_marketing_site` / `render_site_html`, `build_spec_from_report` / `scaffold`
+  `build_spec_from_report` / `scaffold`
   (a `BuildSpec` — also picks the surface + sketches feature-grounded screens — plus a
   project scaffold for your own coding agent; metalworks writes no product code),
   `build_launch_assets` / `plan_channels`, `content_plan_from_report`
   (deterministic, zero-key). All on the `Metalworks` facade
-  (`mw.positioning/competitors/site/build_spec/scaffold/launch/channel_plan/content_plan`),
-  the CLI `metalworks research position|competitor-map|site|launch|content-plan`
+  (`mw.positioning/competitors/build_spec/scaffold/launch/channel_plan/content_plan`),
+  the CLI `metalworks research position|competitor-map|launch|content-plan`
   + `metalworks build init`, and the matching synchronous MCP tools.
 - `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
   `draft_reply` building blocks.

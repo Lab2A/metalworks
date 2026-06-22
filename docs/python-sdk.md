@@ -121,7 +121,8 @@ Key fields you'll read on `.demand`:
 | `ranked_clusters` | `list[InsightCluster]` | The demand clusters, ranked by `demand_score`. |
 | `total_distinct_authors` | `int` | Distinct people across the corpus (the honest base rate). |
 | `price_finding` | `PriceFinding \| None` | Price band, if the corpus carried price signal. |
-| `segments` / `audience_profile` | … | Inferred audience, when grounded. |
+| `segments` | `list[SegmentChoice]` | The audience forks the report surfaces. |
+| `audience_profile` | `AudienceProfile \| None` | **Currently always `None`** — demographic inference was cut. |
 | `web_findings` | `list[WebFinding]` | External findings, each with a source URL. |
 | `partial` / `caveat` | `bool` / `str \| None` | Set when the signal was too thin to be confident. |
 
