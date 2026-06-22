@@ -78,6 +78,8 @@ from metalworks.contract import (  # noqa: E402
     LandscapeSignal,
     LaunchAsset,
     LintViolation,
+    LogoOption,
+    LogoSet,
     MarketingSite,
     MarketSizing,
     Opportunity,
@@ -183,6 +185,9 @@ MODELS: list[type[BaseModel]] = [
     LandscapeSignal,
     DesignChoice,
     DesignSystem,
+    # logo (the mark submodule)
+    LogoOption,
+    LogoSet,
     # site (Pillar E)
     SiteSection,
     MarketingSite,

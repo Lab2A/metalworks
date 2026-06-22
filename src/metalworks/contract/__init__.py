@@ -57,6 +57,10 @@ from metalworks.contract.launch import (
     ClaimCitation,
     LaunchAsset,
 )
+from metalworks.contract.logo import (
+    LogoOption,
+    LogoSet,
+)
 from metalworks.contract.marketing import (
     CitationStrategy,
     ContentPage,
@@ -200,6 +204,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "DesignSystem",
     "GroundingTier",
     "LandscapeSignal",
+    # Logo (the mark submodule of the design system) — authored SVG options.
+    "LogoOption",
+    "LogoSet",
     # Site stage (Pillar E) — the grounded marketing site + its sections.
     "MarketingSite",
     "SiteSection",

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         InboxItem,
         Landscape,
         LaunchAsset,
+        LogoSet,
         MarketingSite,
         Opportunity,
         Persona,
@@ -470,6 +471,21 @@ class Metalworks:
         from metalworks.research import render_design_preview_html
 
         return render_design_preview_html(system)
+
+    def logo(self, system: DesignSystem, *, n: int = 5) -> LogoSet:
+        """The mark submodule — diverse, company-grade logo options that draw under
+        a :class:`DesignSystem` (its aesthetic, typography, color). The model authors
+        each SVG; an unsafe or empty one is dropped, never faked. Offered, never
+        auto-selected. Get a system from :meth:`design` first."""
+        from metalworks.research import build_logo_set
+
+        return build_logo_set(self.deps.chat, system, n=n)
+
+    def render_logo_picker(self, logos: LogoSet) -> str:
+        """Render a :class:`LogoSet` to a self-contained picker HTML page."""
+        from metalworks.research import render_logo_picker_html
+
+        return render_logo_picker_html(logos)
 
     def build_spec(
         self,
