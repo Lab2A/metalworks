@@ -377,8 +377,9 @@ def test_taste_param_present_on_all_surfaces() -> None:
 
     # facade
     assert "taste" in inspect.signature(Metalworks.design).parameters
-    # CLI
-    result = CliRunner().invoke(app, ["research", "design", "--help"])
+    # CLI — force a wide terminal so Rich doesn't truncate the option table
+    # (CI defaults to 80 cols, which wraps/clips `--taste` out of --help output).
+    result = CliRunner().invoke(app, ["research", "design", "--help"], env={"COLUMNS": "400"})
     assert result.exit_code == 0 and "--taste" in result.output
     # MCP (tool body + async wrapper)
     if importlib.util.find_spec("mcp") is not None:
