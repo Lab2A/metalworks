@@ -167,6 +167,39 @@ def test_duplicate_feature_ids_are_deduped() -> None:
     assert [f.feature_id for f in spec.features] == ["dup"]
 
 
+def test_features_are_ordered_by_grounded_demand_not_draft_order() -> None:
+    # Three demand-ranked clusters; the LLM drafts them OUT of order (3, 1, 2).
+    report = _report(
+        clusters=[
+            _cluster(1, quotes=[_quote("the rank-1 pain", "https://r/x/1", "a1")]),
+            _cluster(2, quotes=[_quote("the rank-2 pain", "https://r/x/2", "a2")]),
+            _cluster(3, quotes=[_quote("the rank-3 pain", "https://r/x/3", "a3")]),
+        ]
+    )
+    chat = _scripted([_draft("third", 3), _draft("first", 1), _draft("second", 2)])
+    spec = build_spec_from_report(_deps(chat), report)
+    # Build order follows validated demand (rank 1 first), not the draft order.
+    assert [f.feature_id for f in spec.features] == ["first", "second", "third"]
+    assert [f.source_cluster_rank for f in spec.features] == [1, 2, 3]
+    # features[0] is the spine — the highest-demand feature, to build first.
+    assert spec.features[0].feature_id == "first"
+
+
+def test_demand_order_caps_keep_the_strongest_features() -> None:
+    # More grounded drafts than the cap; the survivors must be the highest-demand
+    # ones, in order — the cap follows demand, not LLM draft position.
+    report = _report(
+        clusters=[
+            _cluster(r, quotes=[_quote(f"pain {r}", f"https://r/x/{r}", f"a{r}")])
+            for r in range(1, 11)
+        ]
+    )
+    drafts = [_draft(f"f{r}", r) for r in (9, 2, 7, 1, 4, 10, 3, 8, 5, 6)]
+    spec = build_spec_from_report(_deps(_scripted(drafts)), report)
+    ranks = [f.source_cluster_rank for f in spec.features]
+    assert ranks == [1, 2, 3, 4, 5, 6, 7, 8], "kept the top-8 by demand, in order"
+
+
 def test_infra_error_propagates_not_silently_partial() -> None:
     # A 404/auth/network failure must surface as an error, NOT a spec mislabelled
     # "thin demand" — that would launder a broken setup into a fake finding.
@@ -302,6 +335,19 @@ def test_claude_md_leads_with_cite_or_die(tmp_path: Path) -> None:
     claude = (dest / "CLAUDE.md").read_text(encoding="utf-8")
     assert "cite or die" in claude.lower()
     assert "next-shipfast" in claude  # base overrides the stack hint
+
+
+def test_spec_md_renders_a_grounded_build_order_with_the_spine_flagged(tmp_path: Path) -> None:
+    # rank-2 feature drafted first, rank-1 second → SPEC.md must lead with rank-1.
+    report = _report()  # cluster rank 1 (2 quotes) + rank 2 (1 quote)
+    spec = build_spec_from_report(_deps(_scripted([_draft("track", 2), _draft("fade", 1)])), report)
+    scaffold(spec, report, tmp_path, base="empty")
+    spec_md = (tmp_path / "docs/SPEC.md").read_text(encoding="utf-8")
+    assert "build in this order" in spec_md.lower()
+    assert "spine, build first" in spec_md
+    # The rank-1 feature leads (#1) despite being drafted second.
+    assert spec_md.index("`fade`") < spec_md.index("`track`")
+    assert spec_md.index("### 1. ") < spec_md.index("### 2. ")
 
 
 def test_evidence_md_is_the_frozen_verbatim_table(tmp_path: Path) -> None:

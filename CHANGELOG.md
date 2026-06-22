@@ -10,6 +10,14 @@ contracts may change in any release.
 
 ### Added
 
+- **Grounded build order in the build spec.** `BuildSpec.features` now come back ordered by the
+  demand strength of the cluster behind each (the new `FeatureSpec.source_cluster_rank`, 1 =
+  strongest), and the cap keeps the highest-demand features. `features[0]` is the spine — the
+  feature to build first — and `SPEC.md` renders a numbered "build in this order" list with the
+  spine flagged. The sequence is a deterministic read of real demand; no new LLM call. (This is the
+  kept residue of the build-blueprint exploration: a grounded build order earns its keep where a
+  reusable archetype catalog did not.)
+
 - **Page-rendering infrastructure (`metalworks.render`).** A new `PageRenderer` protocol — a
   screenshot plus computed-style extraction over a real page — with an owned-Chromium **Playwright**
   adapter (the new `metalworks[browser]` extra), a hosted **Firecrawl** adapter (screenshot-only,

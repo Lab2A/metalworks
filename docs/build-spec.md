@@ -70,6 +70,10 @@ The grounding rules are what make the spec safe to build from:
   cluster's real quotes as the feature's evidence. A feature with no real cluster behind it is
   **dropped** — the build stays tied to real demand. What survives is only what people actually
   asked for (capped at 8 core features).
+- **Build order is grounded, not arbitrary.** Features come back ordered by the demand strength of
+  the cluster behind them (`source_cluster_rank`, 1 = strongest). `features[0]` is the spine — the
+  feature to build first — and `SPEC.md` renders them as a numbered build order. The sequence is a
+  deterministic read of real demand, not a model's guess at importance.
 - **Personas.** Derived from the report's audience segments, each tied to a real voice.
 - **Pricing.** Tiers are copied straight from the report's price evidence (`Starter` at the low
   end of observed willingness to pay, `Pro` at the high end). No price signal → no tiers.
@@ -101,7 +105,8 @@ Once the project is written, metalworks is done. The hand-off:
    are now in scope).
 2. **Run `/scaffold-startup`.** The agent reads `docs/SPEC.md` (what to build) and
    `docs/EVIDENCE.md` (the proof), picks the stack hint's starter, stands up the surface, and
-   builds the features top to bottom — each one a demand a real user voiced.
+   builds the features in order — top is the spine (strongest demand), each one a demand a real
+   user voiced.
 3. **The lint holds it to the evidence.** As the agent writes user-facing copy, a hook runs
    `cite_or_die.py` on the edited files. A headline that cites an id not in `EVIDENCE.md` fails
    the build; the agent has to find the real supporting quote or drop the claim.
