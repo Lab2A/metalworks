@@ -371,24 +371,15 @@ def test_taste_param_present_on_all_surfaces() -> None:
     import inspect
 
     from metalworks import Metalworks
-    from metalworks.cli import app
+    from metalworks.cli import research_design, research_logo
 
     # facade
     assert "taste" in inspect.signature(Metalworks.design).parameters
-    # CLI — introspect the registered command params, not the rendered --help.
-    # Scraping --help is brittle: Typer caps help at 100 cols and colorizes option
-    # names, so `--taste` is not reliably a contiguous substring across versions/CI.
-    from typing import cast
-
-    import typer
-    from click import Group
-
-    # TyperGroup carries .commands at runtime; cast (no runtime check) keeps pyright
-    # happy without an isinstance guard that this typer/click pairing fails.
-    root = cast(Group, typer.main.get_command(app))
-    research_grp = cast(Group, root.commands["research"])
-    design_cmd = research_grp.commands["design"]
-    assert any(p.name == "taste" for p in design_cmd.params)
+    # CLI — inspect the command callbacks directly (bare-safe: no click import, no
+    # Typer help rendering). `--taste` is the `taste` parameter on each callback;
+    # scraping --help is brittle (Typer caps help at 100 cols and colorizes names).
+    assert "taste" in inspect.signature(research_design).parameters
+    assert "taste" in inspect.signature(research_logo).parameters
     # MCP (tool body + async wrapper)
     if importlib.util.find_spec("mcp") is not None:
         from metalworks.mcp import server, tools
