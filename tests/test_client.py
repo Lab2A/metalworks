@@ -47,6 +47,60 @@ def test_research_without_key_raises_missing_key(
         Metalworks().research("Is there demand for X?", subreddits=["test"])
 
 
+class _FakeReader:
+    """A no-network stand-in for the Arctic reader (offline source construction)."""
+
+
+class _FakeComments:
+    """A no-network stand-in for the comment client."""
+
+
+def test_sources_default_is_single_reddit_arctic(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # With no [sources] config, client.sources() is byte-for-byte the prior
+    # default: exactly one ArcticItemSource (reddit), built from the resolved
+    # reader + comments. (We pass fakes so nothing touches the network.)
+    from metalworks.research.sources.arctic import ArcticItemSource
+
+    monkeypatch.chdir(tmp_path)  # no metalworks.toml in scope → default ["reddit"]
+    _clear_keys(monkeypatch)
+    mw = Metalworks(reader=_FakeReader(), comments=_FakeComments())
+    sources = mw._r.sources()  # noqa: SLF001 - the resolver is the unit under test
+    assert len(sources) == 1
+    assert isinstance(sources[0], ArcticItemSource)
+    assert sources[0].source_id == "reddit"
+
+
+def test_sources_enabling_hn_adds_it_with_its_own_reader(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Enabling hackernews_archive via the [sources].enabled seam now actually adds
+    # HN alongside Reddit — and HN carries its OWN reader, not the Arctic one.
+    pytest.importorskip("duckdb")  # the HN archive reader needs duckdb
+    from metalworks import config
+    from metalworks.research.sources.arctic import ArcticItemSource
+    from metalworks.research.sources.hn_archive import (
+        HackerNewsArchiveReader,
+        HackerNewsArchiveSource,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    _clear_keys(monkeypatch)
+    # Drive the same seam resolve_sources reads (enabled_source_ids), no file I/O.
+    monkeypatch.setattr(config, "enabled_source_ids", lambda: ["reddit", "hackernews_archive"])
+
+    arctic_reader = _FakeReader()
+    mw = Metalworks(reader=arctic_reader, comments=_FakeComments())
+    sources = mw._r.sources()  # noqa: SLF001 - the resolver is the unit under test
+    assert [type(s) for s in sources] == [ArcticItemSource, HackerNewsArchiveSource]
+    # Reddit/Arctic got the client's reader; HN built its own archive reader.
+    assert sources[0]._reader is arctic_reader  # noqa: SLF001 - asserting the split wiring
+    hn_reader = sources[1]._reader  # noqa: SLF001 - asserting the split wiring
+    assert isinstance(hn_reader, HackerNewsArchiveReader)
+    assert not isinstance(hn_reader, _FakeReader)
+
+
 def test_post_refuses_and_audits_blocked_draft(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

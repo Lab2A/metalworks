@@ -191,14 +191,18 @@ class _Resolver:
     def sources(self) -> list[ItemSource]:
         """The configured ItemSource connectors — default Reddit/Arctic.
 
-        Built here as the single place the default source is chosen. For now the
-        default is Reddit/Arctic, derived from the resolved reader + comment
-        client; which-source-is-default stays configurable by a later
-        ``[sources]`` config stream without re-plumbing this seam.
+        Delegates to :func:`~metalworks.config.resolve_sources`, which maps the
+        ordered ``[sources].enabled`` ids (default ``["reddit"]``) through the
+        registry, passing this client's Reddit ``reader`` / ``comments`` so the
+        Arctic connector is wired while keyless / non-Reddit connectors ignore
+        them. With no ``[sources]`` config this returns exactly the prior default
+        — one ``ArcticItemSource`` over the resolved reader + comment client — so
+        enabling another source (e.g. ``hackernews_archive``) now actually *adds*
+        it to what research ingests, rather than being silently inert.
         """
-        from metalworks.research.sources.arctic import ArcticItemSource
+        from metalworks.config import resolve_sources
 
-        return [ArcticItemSource(reader=self.reader(), comments=self.comments())]
+        return resolve_sources(reader=self.reader(), comments=self.comments())
 
     def research_deps(self) -> ResearchDeps:
         from metalworks.research import ResearchDeps

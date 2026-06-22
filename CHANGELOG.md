@@ -149,6 +149,22 @@ contracts may change in any release.
   from the generated `ts/contract.ts`); `Screen` and `SurfaceKind` are kept (the build spec uses them).
   The `docs/design` "Surface & screens" page is folded into `docs/build-spec`.
 
+### Fixed
+
+- **`[sources].enabled` now actually feeds the pipeline.** The config-driven multi-source system was
+  fully built but never plugged in: `_Resolver.sources()` hardcoded a single Reddit/Arctic connector
+  and never called `config.resolve_sources()`, so `metalworks sources enable hackernews_archive`
+  (and the `[sources].enabled` it writes) had **zero** effect on what demand research ingested — every
+  non-Arctic source (`hackernews_archive`, `hackernews`, `web`) was dead for the `Metalworks(...)`
+  facade path. `client.sources()` now delegates to `resolve_sources(reader=…, comments=…)`, so the
+  default (no `[sources]` config) stays byte-for-byte one Reddit/Arctic source, while enabling another
+  source genuinely **adds** it. Also hardened the `hackernews_archive` factory: `resolve_sources`
+  passes the Reddit reader/comments to every factory, and HN's `__init__` would silently swallow a
+  foreign reader (no `TypeError`, so the `_build_source` fallback never fired) — it now drops any
+  non-`HackerNewsArchiveReader` reader and the `comments` kwarg, so HN always reads its **own**
+  archive (the live `hackernews`, `web`, and `producthunt` factories already raised `TypeError` on
+  those kwargs and needed no change).
+
 ## [0.0.5] - 2026-06-18
 
 The CLI gets a real front door. Still pre-1.0; anything outside `metalworks.contract` and the MCP

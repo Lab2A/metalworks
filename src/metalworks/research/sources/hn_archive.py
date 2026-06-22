@@ -583,6 +583,17 @@ class HackerNewsArchiveMirrorReader(HackerNewsArchiveReader):
 
 
 def _factory(**kwargs: Any) -> HackerNewsArchiveSource:
+    # resolve_sources passes the *Reddit* reader + comment client to every
+    # source's factory (the Arctic connector needs them; keyless ones ignore
+    # them via _build_source's TypeError fallback). This source's __init__,
+    # though, accepts ``reader=`` and swallows extras into ``**reader_kwargs`` —
+    # so a foreign Reddit reader would NOT raise and would silently mis-wire HN.
+    # Drop any reader that isn't ours, and always drop ``comments`` (HN reads its
+    # own comment threads from the same archive — it has no CommentSource seam).
+    reader = kwargs.get("reader")
+    if not isinstance(reader, HackerNewsArchiveReader):
+        kwargs.pop("reader", None)
+    kwargs.pop("comments", None)
     # Opt into the Supabase mirror with HN_ARCHIVE_SOURCE=mirror (when no explicit
     # reader is passed) — the HN analogue of ARCTIC_SHIFT_SOURCE=mirror.
     if "reader" not in kwargs and os.environ.get("HN_ARCHIVE_SOURCE", "").lower() == "mirror":

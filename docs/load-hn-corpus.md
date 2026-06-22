@@ -81,27 +81,46 @@ for thread in source.comments_for([s.id for s in stories]) or []:
 ```
 
 <Note>
-The HN archive is a corpus connector, not yet a one-line `Metalworks(...)` option.
-`Metalworks` does **not** take a `sources=` constructor argument — passing one raises
-`TypeError`. Wiring a custom source into the full `mw.research(...)` pipeline by config
-(a `[sources]` stream) is planned but not yet plumbed; today you drive the archive through
-the source object above, or via the CLI below.
+`Metalworks` does **not** take a `sources=` constructor argument. To run the HN archive
+inside the full `mw.research(...)` pipeline, **enable it in config** — the `[sources]`
+stream below is plumbed end to end. The source object above is the direct, no-config way
+to read the archive yourself.
 </Note>
 
-## From the CLI
+## Add it to the research pipeline
+
+Enable the source once and the next research run pulls HN **alongside** Reddit — sources
+are additive, so Reddit stays on unless you remove it:
+
+```bash
+metalworks sources enable hackernews_archive   # appends to [sources].enabled
+metalworks sources list                        # reddit, hackernews_archive
+metalworks research run "a budget mechanical keyboard for programmers"
+```
+
+`sources enable` writes `[sources].enabled` to your cwd `metalworks.toml`, and **both** the
+CLI `research run` and the Python facade (`Metalworks(...).research(...)`) read that same
+set — so an enabled HN archive is ingested either way. Each enabled source keeps its **own**
+reader: Reddit reads Arctic, HN reads the HN archive (the Reddit reader is never wired into
+HN). For a single run without touching config, pass `--source` instead:
+
+```bash
+metalworks research run --source hackernews_archive "..."   # HN only, this run
+```
+
+## From the CLI (corpus ingest)
 
 The `hackernews_archive` source self-registers under the `--source` flag, so the CLI can
-ingest it into your local corpus store (`metalworks corpus add`) or run a report against it
-(`metalworks research run --source hackernews_archive`):
+also ingest it directly into your local corpus store:
 
 ```bash
 metalworks corpus add --source hackernews_archive --query "mechanical keyboards" --months 1
 ```
 
-The CLI path reads from the archive's default data root (the public HF mirror), or from a
-Supabase mirror when `HN_ARCHIVE_SOURCE=mirror` is set (below). To search a custom **local**
-`--out` directory like `./hn-corpus`, construct the reader with `data_root=` as shown above —
-the `--source` flag doesn't take a local path yet.
+These config / `--source` paths read from the archive's default data root (the public HF
+mirror), or from a Supabase mirror when `HN_ARCHIVE_SOURCE=mirror` is set (below). To search
+a custom **local** `--out` directory like `./hn-corpus`, construct the reader with
+`data_root=` as shown above — the `--source` flag doesn't take a local path yet.
 
 ## Read from a Supabase mirror
 
