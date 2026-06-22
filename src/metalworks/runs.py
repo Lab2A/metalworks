@@ -29,8 +29,8 @@ def render_run_markdown(research: Research) -> str:
     has a quote links back to the real source thread."""
     report: DemandReport = research.demand
     lines: list[str] = [f"# Research — {report.query}", ""]
-    if report.verdict:
-        lines += [f"**Verdict:** {report.verdict}", ""]
+    if report.demand_summary:
+        lines += [f"**Demand summary:** {report.demand_summary}", ""]
     lines += [
         f"- Threads analyzed: {report.total_threads}",
         f"- Distinct authors: {report.total_distinct_authors}",

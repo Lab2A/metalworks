@@ -34,7 +34,7 @@ research = mw.research(
 )
 report = research.demand
 
-print(report.verdict)                 # e.g. "Strong demand — 312 distinct voices..."
+print(report.demand_summary)          # e.g. "Strong demand — 312 distinct voices..."
 for c in report.ranked_clusters:
     print(c.distinct_author_count, "people:", c.claim)
 ```

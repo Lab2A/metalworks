@@ -474,10 +474,6 @@
     },
     "MarketSizing": {
       "properties": {
-        "addressable_market": {
-          "title": "Addressable Market",
-          "type": "integer"
-        },
         "penetration": {
           "additionalProperties": {
             "type": "number"
@@ -492,7 +488,6 @@
       },
       "required": [
         "reddit_floor",
-        "addressable_market",
         "penetration"
       ],
       "title": "MarketSizing",
@@ -1222,6 +1217,18 @@
       "title": "Date Range Start",
       "type": "string"
     },
+    "demand_summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Demand Summary"
+    },
     "fork": {
       "$ref": "#/$defs/Fork"
     },
@@ -1345,18 +1352,6 @@
     "total_threads": {
       "title": "Total Threads",
       "type": "integer"
-    },
-    "verdict": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Verdict"
     },
     "version": {
       "default": 1,

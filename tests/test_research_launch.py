@@ -79,7 +79,7 @@ def _cluster(
 def _report(
     *,
     clusters: list[InsightCluster],
-    verdict: str | None = "Strong signal: launch-worthy demand.",
+    demand_summary: str | None = "Strong signal: launch-worthy demand.",
 ) -> DemandReport:
     now = datetime(2026, 2, 1, tzinfo=UTC)
     return DemandReport(
@@ -94,7 +94,7 @@ def _report(
         total_distinct_authors=130,
         ranked_clusters=clusters,
         generated_at=now,
-        verdict=verdict,
+        demand_summary=demand_summary,
     )
 
 
@@ -128,9 +128,9 @@ def _scripted_chat(phrasings: list[_AssetPhrasing]) -> FakeChatModel:
 def test_refuses_on_negative_verdict() -> None:
     report = _report(
         clusters=[_cluster(1, quotes=[_quote("PIE is the worst", "https://r/x/1", "a1")])],
-        verdict="Thin signal: not enough demand to act on.",
+        demand_summary="Thin signal: not enough demand to act on.",
     )
-    # Even with plenty of distinct authors, a negative verdict refuses.
+    # Even with plenty of distinct authors, a negative demand summary refuses.
     report.ranked_clusters[0].distinct_author_count = 9
     assets = build_launch_assets(_deps(_scripted_chat([])), report)
     assert assets == []
@@ -147,13 +147,13 @@ def test_refuses_when_no_cluster_has_two_distinct_authors() -> None:
 
 
 def test_price_caveat_in_verdict_does_not_trip_no_go() -> None:
-    # Real-world dogfood bug: a STRONG-demand verdict that appends a price caveat
+    # Real-world dogfood bug: a STRONG-demand summary that appends a price caveat
     # ("not enough price signal...") must NOT be read as weak demand. The no-go
     # gate judges only the demand segment (before the first ';').
     report = _two_author_report()
-    report.verdict = (
-        "Strong demand — 1313 distinct voices; ~1,313 reachable on Reddit, "
-        "~131,300 addressable; not enough price signal to recommend a price."
+    report.demand_summary = (
+        "Strong demand — 1313 distinct voices; ~1,313 reachable on Reddit; "
+        "not enough price signal to recommend a price."
     )
     # Claims are irrelevant here — this test is purely about the no-go gate.
     phrasing = _phrasing("We built the fade that doesn't sting.", [])

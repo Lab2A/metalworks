@@ -73,7 +73,7 @@ def test_thin_pull_halves_confidence_and_caveats() -> None:
 
 
 def test_report_label_is_the_strongest_fork() -> None:
-    # report-level label = the best fork's band (so report.verdict and assess agree).
+    # report-level label = the best fork's band (so report.demand_summary and assess agree).
     label = demand.report_demand_label([40, 20, 10], [], 100)
     assert label == "Strong demand"
     assert demand.report_demand_label([], [], 5) == "Thin signal"  # no forks → absolute fallback

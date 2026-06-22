@@ -85,7 +85,7 @@ If you're inside a [project](/docs/projects), the run is automatically persisted
 research = mw.research("a jitter-free focus supplement for developers",
                        subreddits=["Nootropics", "Supplements"])
 report = research.demand
-print(report.verdict)                         # one-line go / no-go (str | None)
+print(report.demand_summary)                  # one-line demand-strength summary (str | None)
 for c in report.ranked_clusters:
     print(c.distinct_author_count, "people:", c.claim)
     for q in c.quotes:
@@ -117,7 +117,7 @@ Key fields you'll read on `.demand`:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `verdict` | `str \| None` | The go/no-go summary line. |
+| `demand_summary` | `str \| None` | The one-line demand-strength summary (not the go/no-go — that's `assess`). |
 | `ranked_clusters` | `list[InsightCluster]` | The demand clusters, ranked by `demand_score`. |
 | `total_distinct_authors` | `int` | Distinct people across the corpus (the honest base rate). |
 | `price_finding` | `PriceFinding \| None` | Price band, if the corpus carried price signal. |

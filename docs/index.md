@@ -39,7 +39,7 @@ research = mw.research(
 )
 report = research.demand           # .research() returns a report
 
-print(report.verdict)              # is there real demand? a one-line go / no-go
+print(report.demand_summary)       # how strong is the demand? a one-line summary
 for cluster in report.ranked_clusters:
     print(cluster.distinct_author_count, "people:", cluster.claim)
     for quote in cluster.quotes:   # the real comments behind it — nothing invented

@@ -20,10 +20,7 @@ def derive_verdict(
 ) -> str:
     parts = [f"{strength_label} — {total_distinct_authors} distinct voices"]
     if market is not None:
-        parts.append(
-            f"~{market.reddit_floor:,} reachable on Reddit, "
-            f"~{market.addressable_market:,} addressable"
-        )
+        parts.append(f"~{market.reddit_floor:,} reachable on Reddit")
     if price is not None:
         if price.insufficient_signal:
             parts.append("not enough price signal to recommend a price")

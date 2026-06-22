@@ -34,7 +34,7 @@ research = mw.research(
 )
 report = research.demand
 
-print(report.verdict)                           # the go / no-go summary
+print(report.demand_summary)                    # the demand-strength summary
 for cluster in report.ranked_clusters:
     print(cluster.claim, "—", cluster.distinct_author_count, "people")
     for quote in cluster.quotes:                # the real comments behind it

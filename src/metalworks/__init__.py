@@ -6,7 +6,7 @@ The high-level entry point is :class:`~metalworks.client.Metalworks`::
 
     mw = Metalworks()  # provider inferred from your env key
     research = mw.research("demand for a focus supplement?")
-    print(research.demand.verdict, len(research.evidence))
+    print(research.demand.demand_summary, len(research.evidence))
 
 Every layer underneath is composable and swappable: the LLM / search /
 embedding / storage protocols, the ``run_research`` / ``run_discovery``

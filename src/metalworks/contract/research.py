@@ -405,7 +405,6 @@ class SourceMapEntry(BaseModel):
 
 class MarketSizing(BaseModel):
     reddit_floor: int
-    addressable_market: int
     penetration: dict[str, float]
 
 
@@ -692,8 +691,8 @@ class DemandReport(BaseModel):
     )
     generated_at: datetime
 
-    # ── Verdict / sizing / pricing (all optional) ──
-    verdict: str | None = None
+    # ── Demand summary / sizing / pricing (all optional) ──
+    demand_summary: str | None = None
     slot_plan: SlotPlan | None = None
     audience_profile: AudienceProfile | None = None
     segments: list[SegmentChoice] = Field(default_factory=list[SegmentChoice])

@@ -104,7 +104,7 @@ def _report_with_quote(q: ResolvedCitation) -> DemandReport:
         total_distinct_authors=1,
         ranked_clusters=[cluster],
         generated_at=now,
-        verdict="Go.",
+        demand_summary="Go.",
     )
 
 

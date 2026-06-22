@@ -82,11 +82,11 @@ the HN audience expects a human, and the plan encodes that. Holding a `LaunchAss
 ## When the result is thin
 
 `launch(...)` **refuses — returns `[]`** — when the report says don't launch: a negative demand
-verdict (thin signal / no demand), or no demand cluster with at least 2 distinct people behind
+summary (thin signal / no demand), or no demand cluster with at least 2 distinct people behind
 it. It won't manufacture a launch for an idea the report couldn't validate.
 
 A strong-demand report with a thin *price* signal is still launch-worthy — the refusal reads only
-the demand-strength part of the verdict, so a "not enough price signal" caveat is never mistaken
+the demand-strength part of the summary, so a "not enough price signal" caveat is never mistaken
 for a no-go. If a single channel's model call fails, that channel is skipped; the rest still
 draft.
 

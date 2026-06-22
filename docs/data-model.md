@@ -25,7 +25,8 @@ trace a claim to the real conversation. See [your research data](/docs/corpus).
 `mw.research(...)` returns a `Research` bundle; the report itself is on `.demand`. Everything
 else you generate later reads from this one report.
 
-- **`DemandReport`** — the output of demand research: a one-line `verdict` (go / no-go), the
+- **`DemandReport`** — the output of demand research: a one-line `demand_summary` (demand
+  strength — the go/no-go is `assess`'s job), the
   `ranked_clusters` (the real needs people voiced), web `web_findings`, audience and market
   sizing. If a best-effort stage degraded, `partial` is set with a plain-language `caveat`.
   `version`, `lineage_id`, and `parent_report_id` track a report's earlier versions when you
