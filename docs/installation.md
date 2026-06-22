@@ -37,6 +37,7 @@ Install only what your workflow needs — combine them like `"metalworks[researc
 | `mcp` | Run the MCP server (`metalworks mcp serve`). |
 | `anthropic` / `openai` / `google` | Use that provider's models. Any one is enough (see the note above). |
 | `exa` / `tavily` | Add live web search to ground findings against the web. |
+| `browser` | An owned headless Chromium for competitor teardowns and design review. **One post-install step:** `metalworks browser install` (downloads Chromium). On a server where Chromium is painful, set `FIRECRAWL_API_KEY` to render without a local browser. |
 | `all` | Everything above. |
 
 If you call something without its extra, metalworks tells you exactly what to install
