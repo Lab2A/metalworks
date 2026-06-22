@@ -55,7 +55,7 @@
           },
           {
             "group": "Design",
-            "pages": ["docs/design", "docs/design-system", "docs/marketing-site"]
+            "pages": ["docs/design", "docs/design-system", "docs/logo", "docs/marketing-site"]
           },
           {
             "group": "Build",

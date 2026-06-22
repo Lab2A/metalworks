@@ -66,6 +66,7 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 - **`/surface-and-ux`** — picks the surface to build (web, mobile, CLI, SDK, …) with a cited rubric (`surface_recommend`), then sketches 3–5 screens (`ux_skeleton_build`), each marked validated or hypothesis. Text and structure only — no mockups.
 - **`/generate-site`** — a marketing site whose every load-bearing line is a verbatim real quote, footnoted to its permalink. Calls `site_render`, which returns the `MarketingSite` plus a self-contained `index.html`. A line that can't be exact-matched to a real quote is dropped.
 - **`/design`** — a grounded-but-directional design system: an aesthetic direction + a SAFE/RISK choice per dimension (`design_from_report`), read from a real browser teardown of competitor sites where available. Records its `grounding_tier` (renderer / web / model_knowledge) so the look is never overstated; writes a `DESIGN.md`. Authors a system, not pixels.
+- **`/logo`** — the mark submodule: diverse, company-grade SVG logo options (`logo_generate`), one per design angle, drawn under the brand's design system. Offered, never auto-selected; an unsafe or empty SVG is dropped, never inlined.
 
 ### Build
 
