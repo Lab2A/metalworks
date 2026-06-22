@@ -19,6 +19,7 @@ from metalworks.research.design import (
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
 from metalworks.research.launch import build_launch_assets, plan_channels
+from metalworks.research.logo import build_logo_set, render_logo_picker_html
 from metalworks.research.marketing import content_plan_from_report
 from metalworks.research.pipeline import run_research
 from metalworks.research.site import build_marketing_site, render_site_html
@@ -38,6 +39,7 @@ __all__ = [
     "ResearchDeps",
     "build_design_system",
     "build_launch_assets",
+    "build_logo_set",
     "build_marketing_site",
     "build_positioning_brief",
     "build_ux_skeleton",
@@ -48,6 +50,7 @@ __all__ = [
     "plan_channels",
     "render_design_md",
     "render_design_preview_html",
+    "render_logo_picker_html",
     "render_site_html",
     "run_assessment",
     "run_competitor_map",

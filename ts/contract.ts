@@ -733,6 +733,28 @@ export interface DesignSystem {
   caveat?: string | null;
 }
 
+export interface LogoOption {
+  /** The design angle that produced it, e.g. 'logotype'. */
+  angle: string;
+  /** One line: the idea behind the mark. */
+  concept: string;
+  /** A self-contained, validated SVG lockup (mark + wordmark). */
+  svg: string;
+}
+
+export interface LogoSet {
+  /** The DemandReport / DesignSystem this set was drawn for. */
+  report_id: string;
+  /** The wordmark name the logos were drawn for. */
+  brand_name: string;
+  /** Diverse options, one per design angle. */
+  options?: LogoOption[];
+  /** True when fewer options than requested were produced. */
+  partial?: boolean;
+  /** Why the set is partial / which angles were dropped. */
+  caveat?: string | null;
+}
+
 export interface SiteSection {
   /** Section job on the page: hero/feature/objection/pricing/social_proof/cta. */
   role: string;

@@ -2252,6 +2252,61 @@ def research_design(
     console.print(f"[green]Wrote[/green] {dest}/DESIGN.md + {dest}/preview.html")
 
 
+@research_app.command("logo", rich_help_panel="Pillars & build")
+def research_logo(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", help="Brand name (else the model suggests one).")
+    ] = None,
+    out_dir: Annotated[
+        Path | None,
+        typer.Option("--out", "-o", help="Directory for the SVGs + picker.html (default: cwd)."),
+    ] = None,
+    count: Annotated[
+        int, typer.Option("--count", "-n", help="How many logo options (design angles).")
+    ] = 5,
+) -> None:
+    """Generate diverse logo options for a stored report, drawn under its design system.
+
+    Builds the brand's design system, then authors N diverse marks under it (one per
+    design angle). Writes each SVG + a `picker.html`. Options are offered, never
+    auto-selected; an unsafe or empty SVG is dropped, never faked.
+    """
+    from metalworks.research import build_design_system, build_logo_set, render_logo_picker_html
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Designing logos[/bold] for report {report_id}...")
+    try:
+        system = build_design_system(deps, report, brand_name=name)
+        logos = build_logo_set(chat, system, n=count)
+    finally:
+        reader.close()
+    if logos.partial and logos.caveat:
+        console.print(f"  [yellow]partial:[/yellow] {logos.caveat}")
+    dest = out_dir or Path()
+    dest.mkdir(parents=True, exist_ok=True)
+    for i, opt in enumerate(logos.options, 1):
+        (dest / f"{i}_{opt.angle}.svg").write_text(opt.svg, encoding="utf-8")
+        console.print(f"  [bold]{i}. {opt.angle}[/bold] — {opt.concept}")
+    (dest / "picker.html").write_text(render_logo_picker_html(logos), encoding="utf-8")
+    console.print(f"[green]Wrote[/green] {len(logos.options)} SVGs + {dest}/picker.html")
+
+
 @research_app.command("launch", rich_help_panel="Pillars & build")
 def research_launch(
     report_id: Annotated[

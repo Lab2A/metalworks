@@ -33,6 +33,13 @@ contracts may change in any release.
   look is never overstated. Grounding is **directional, not cited** (the landscape informs the bet, it
   doesn't cite it); the honesty signal is the SAFE/RISK stance + the tier. On all four surfaces:
   `mw.design()`, `metalworks design`, the `design_from_report` MCP tool, and the `/design` skill.
+- **Logo (`/logo`) — the mark submodule of the design pillar.** Diverse, company-grade SVG logo
+  options, one per design angle (symbol / logotype / negative-space / reference / expressive), each
+  drawn **under the brand's `DesignSystem`** (its aesthetic, typography, color) rather than an invented
+  house style. Options are offered, never auto-selected; an angle that returns no valid SVG — or an
+  **unsafe** one (a `<script>` / event handler / `<foreignObject>` in model-authored markup) — is
+  dropped, never inlined. `LogoOption` / `LogoSet` contracts; on all four surfaces: `mw.logo()`,
+  `metalworks research logo`, the `logo_generate` MCP tool, and the `/logo` skill.
 
 ## [0.0.5] - 2026-06-18
 
