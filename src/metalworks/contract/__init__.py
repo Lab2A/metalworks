@@ -37,6 +37,7 @@ from metalworks.contract.design import (
     LandscapeSignal,
     StyleFinding,
 )
+from metalworks.contract.distribution import ClaimCitation
 from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
@@ -53,21 +54,9 @@ from metalworks.contract.landscape import (
     Landscape,
     StrengthClaim,
 )
-from metalworks.contract.launch import (
-    ChannelPlan,
-    ChannelStep,
-    ClaimCitation,
-    LaunchAsset,
-)
 from metalworks.contract.logo import (
     LogoOption,
     LogoSet,
-)
-from metalworks.contract.marketing import (
-    CitationStrategy,
-    ContentPage,
-    ContentPlan,
-    FaqItem,
 )
 from metalworks.contract.positioning import (
     PositioningBrief,
@@ -202,16 +191,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Logo (the mark submodule of the design system) — authored SVG options.
     "LogoOption",
     "LogoSet",
-    # Launch stage (Pillar F) — channel-native cited assets + human-executed plan.
-    "ChannelPlan",
-    "ChannelStep",
+    # Distribution stage — one pillar (pushes + streams), replacing the former
+    # Pillar F (Launch) + Pillar G (Content/SEO). Rebuilt over D1+; carries the
+    # salvaged no-cite-no-claim primitive for now.
     "ClaimCitation",
-    "LaunchAsset",
-    # Content/SEO stage (Pillar G) — the deterministic content plan + citation strategy.
-    "CitationStrategy",
-    "ContentPage",
-    "ContentPlan",
-    "FaqItem",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",

@@ -23,8 +23,6 @@ if TYPE_CHECKING:
     from metalworks.contract import (
         Assessment,
         BuildSpec,
-        ChannelPlan,
-        ContentPlan,
         DemandReport,
         DesignReview,
         DesignSystem,
@@ -33,7 +31,6 @@ if TYPE_CHECKING:
         IdeationResult,
         InboxItem,
         Landscape,
-        LaunchAsset,
         LogoSet,
         Opportunity,
         Persona,
@@ -509,28 +506,6 @@ class Metalworks:
         from metalworks.build import scaffold
 
         return scaffold(spec, _demand(research), dest, base=base)
-
-    def launch(
-        self, research: Research | DemandReport, positioning: PositioningBrief | None = None
-    ) -> list[LaunchAsset]:
-        """Pillar F — channel-native cited launch drafts (drafting only, never posts)."""
-        from metalworks.research import build_launch_assets
-
-        return build_launch_assets(self.deps, _demand(research), positioning)
-
-    def channel_plan(
-        self, research: Research | DemandReport, surfaces: list[str] | None = None
-    ) -> ChannelPlan:
-        """Pillar F — a deterministic, human-executed launch sequence."""
-        from metalworks.research import plan_channels
-
-        return plan_channels(_demand(research), surfaces)
-
-    def content_plan(self, research: Research | DemandReport) -> ContentPlan:
-        """Pillar G — a deterministic, zero-key content/SEO plan."""
-        from metalworks.research import content_plan_from_report
-
-        return content_plan_from_report(_demand(research))
 
     # ── namespaces ──────────────────────────────────────────────────────────
 

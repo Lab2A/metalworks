@@ -40,16 +40,11 @@ from metalworks.contract import (  # noqa: E402
     BuildPersona,
     BuildSpec,
     CandidateWedge,
-    ChannelPlan,
-    ChannelStep,
     CitationRef,
-    CitationStrategy,
     ClaimCitation,
     Competitor,
     CompetitorMap,
     ComplianceVerdict,
-    ContentPage,
-    ContentPlan,
     CorpusStats,
     CrossReference,
     Decision,
@@ -65,7 +60,6 @@ from metalworks.contract import (  # noqa: E402
     EvidenceRef,
     ExistingSolution,
     ExplorationReport,
-    FaqItem,
     FeatureSpec,
     Fork,
     ForkVerdict,
@@ -77,7 +71,6 @@ from metalworks.contract import (  # noqa: E402
     InsightCluster,
     Landscape,
     LandscapeSignal,
-    LaunchAsset,
     LintViolation,
     LogoOption,
     LogoSet,
@@ -185,16 +178,9 @@ MODELS: list[type[BaseModel]] = [
     # logo (the mark submodule)
     LogoOption,
     LogoSet,
-    # launch (Pillar F)
+    # distribution (one pillar; pushes + streams; replaces Pillar F + Pillar G).
+    # Rebuilt over D1+; carries the salvaged no-cite-no-claim primitive for now.
     ClaimCitation,
-    LaunchAsset,
-    ChannelStep,
-    ChannelPlan,
-    # content/SEO (Pillar G)
-    FaqItem,
-    ContentPage,
-    CitationStrategy,
-    ContentPlan,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,
