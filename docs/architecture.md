@@ -48,7 +48,7 @@ loop.
 ## No-cite-no-claim
 
 Every claim resolves to a real quote. A cluster carries verbatim `ResolvedCitation`s; a competitor
-gap or a marketing-site line carries an `EvidenceRef` that resolves against `report.evidence`. If a
+gap or a launch-copy line carries an `EvidenceRef` that resolves against `report.evidence`. If a
 claim can't be backed by a real comment (or a grounded web finding), it is **dropped, not shipped** —
 no hallucinated competitors, no invented quotes, no confident-looking output built on nothing. This
 is the trust property the whole product rests on.

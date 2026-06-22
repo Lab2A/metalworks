@@ -75,5 +75,5 @@ than guessing a number.
 ## Next
 
 You have your angle. Now see who you're up against and decide what to build:
-→ [Competitors](/docs/competitors) · [Surface & screens](/docs/design) ·
+→ [Competitors](/docs/competitors) · [Build spec](/docs/build-spec) ·
 [the full walkthrough](/docs/walkthrough) · [why you can trust the output](/docs/how-it-works)

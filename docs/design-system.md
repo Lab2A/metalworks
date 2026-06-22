@@ -39,7 +39,7 @@ open("preview.html", "w").write(mw.render_design_preview(system))
 ```
 
 ```bash CLI
-metalworks design <report-id> --taste brutalist --out ./brand
+metalworks research design <report-id> --taste brutalist --out ./brand
 ```
 
 </CodeGroup>
@@ -83,7 +83,7 @@ different system.
 
 The choices carry **no** `evidence_refs` by design — design grounding is directional,
 not cited. This pillar authors a **system**, not pixels: hand the `DESIGN.md` to your
-build step or marketing site to apply it.
+build step to apply it.
 
 ## A real teardown needs the browser
 

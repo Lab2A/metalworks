@@ -5,7 +5,7 @@
 Give metalworks one sentence about what you want to build. It reads real Reddit
 conversations to tell you whether people actually want it, then turns that into
 the things you need to launch: your positioning, the competitors to beat, a
-marketing site, a build plan for your coding agent, and launch copy. **Every claim
+design system, a build plan for your coding agent, and launch copy. **Every claim
 links back to a real comment you can click — nothing is invented.**
 
 A Python library (also a CLI, an MCP server, and a Claude Code plugin). MIT
@@ -43,7 +43,7 @@ via Application Default Credentials. See
 ```python
 from metalworks import Metalworks
 
-mw = Metalworks()             # provider inferred; or Metalworks(model="anthropic/claude-opus-4-6")
+mw = Metalworks()             # provider inferred; or Metalworks(model="anthropic/claude-opus-4-8")
 research = mw.research("Is there demand for a focus supplement aimed at developers?",
                        subreddits=["Nootropics", "Supplements"])
 report = research.demand
@@ -117,13 +117,13 @@ Two verticals sit on top of those protocols:
 
 - **Research** (`metalworks.research`) — turns an idea into a clustered
   `DemandReport` of real, permalinked Reddit quotes. Entry point:
-  `run_research(deps, brief=...)`. Six functions build on a finished report,
+  `run_research(deps, brief=...)`. Several functions build on a finished report,
   each linking its output back to that report's real quotes: positioning
-  (`build_positioning_brief`), the landscape (`run_landscape`), marketing site
-  (`build_marketing_site`), launch assets (`build_launch_assets` /
-  `plan_channels`), a content/SEO plan (`content_plan_from_report`), and a build
-  plan + scaffold (`build_spec_from_report` / `scaffold`) — which also picks the
-  surface and sketches feature-grounded screens.
+  (`build_positioning_brief`), the landscape (`run_landscape`), launch assets
+  (`build_launch_assets` / `plan_channels`), a content/SEO plan
+  (`content_plan_from_report`), and a build plan + scaffold
+  (`build_spec_from_report` / `scaffold`) — which also picks the surface and
+  sketches feature-grounded screens.
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.
@@ -133,7 +133,7 @@ Four form factors share that contract:
 1. **Library** — `from metalworks import Metalworks`, or the functions and
    protocols underneath.
 2. **CLI** — `metalworks research|reddit|arctic|discovery run`, the report
-   commands (`metalworks research position|landscape|surface|site|launch|content-plan`,
+   commands (`metalworks research position|landscape|launch|content-plan`,
    `metalworks build init`),
    `metalworks doctor`, `metalworks mcp serve`.
 3. **MCP server** — zero-key data tools plus key-gated pipeline tools, over stdio
@@ -160,7 +160,7 @@ See [docs/custom-chatmodel.md](https://metalworks.lab2a.ai/docs/custom-chatmodel
 Full docs: **[metalworks.lab2a.ai](https://metalworks.lab2a.ai)**
 
 - [Installation](https://metalworks.lab2a.ai/docs/installation) · [Quickstart](https://metalworks.lab2a.ai/docs/quickstart) · [Build a startup, end to end](https://metalworks.lab2a.ai/docs/walkthrough)
-- Capabilities: [demand research](https://metalworks.lab2a.ai/docs/demand-research) · [positioning & competitors](https://metalworks.lab2a.ai/docs/positioning) · [design & site](https://metalworks.lab2a.ai/docs/design) · [build spec](https://metalworks.lab2a.ai/docs/build-spec) · [launch](https://metalworks.lab2a.ai/docs/launch) · [content & SEO](https://metalworks.lab2a.ai/docs/content-seo) · [Reddit engagement](https://metalworks.lab2a.ai/docs/reddit-engagement)
+- Capabilities: [demand research](https://metalworks.lab2a.ai/docs/demand-research) · [positioning & competitors](https://metalworks.lab2a.ai/docs/positioning) · [design system](https://metalworks.lab2a.ai/docs/design-system) · [build spec](https://metalworks.lab2a.ai/docs/build-spec) · [launch](https://metalworks.lab2a.ai/docs/launch) · [content & SEO](https://metalworks.lab2a.ai/docs/content-seo) · [Reddit engagement](https://metalworks.lab2a.ai/docs/reddit-engagement)
 - [Why you can trust the output](https://metalworks.lab2a.ai/docs/how-it-works) · [Data model](https://metalworks.lab2a.ai/docs/data-model)
 - Reference: [Python SDK](https://metalworks.lab2a.ai/docs/python-sdk) · [CLI](https://metalworks.lab2a.ai/docs/cli) · [MCP tools](https://metalworks.lab2a.ai/docs/mcp-tools) · [Configuration](https://metalworks.lab2a.ai/docs/configuration) · [Using with AI agents](https://metalworks.lab2a.ai/docs/ai-agents)
 - Extending: [overview](https://metalworks.lab2a.ai/docs/extending) · [protocols](https://metalworks.lab2a.ai/docs/protocols) · [custom model/corpus/store](https://metalworks.lab2a.ai/docs/custom-chatmodel)

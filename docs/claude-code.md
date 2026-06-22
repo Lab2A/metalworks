@@ -1,6 +1,6 @@
 ---
 title: "Claude Code plugin"
-description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 31 tools and a hard posting gate."
+description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 30 tools and a hard posting gate."
 ---
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
@@ -9,7 +9,7 @@ report the library produces — every claim linked to a real quote you can open 
 then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls
-one or more of its 31 tools. The commands chain through a stored demand report, exactly like the
+one or more of its 30 tools. The commands chain through a stored demand report, exactly like the
 [CLI](/docs/cli) — see [Projects & memory](/docs/projects) for how that state persists.
 
 ## Install
@@ -35,12 +35,12 @@ The data tools run with **no API key**. The research and synthesis tools use wha
 key is in your environment (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` — first
 present wins). A few tools also need an embeddings key.
 
-| Tier | Needs | Tools |
-| --- | --- | --- |
-| **Zero-key** | nothing | Reddit search & comments, subreddit info/rules, Arctic corpus pull, corpus stats, run/report listing, compliance lint, channel plan, content plan |
-| **Chat key** | a provider key | demand research, positioning, launch assets, reply drafting, discovery |
-| **Chat + embeddings** | provider + embeddings | competitor map, surface, UX skeleton, marketing site, build spec |
-| **Gated** | env opt-in (below) | posting a Reddit reply |
+The tools fall into four tiers by what they need: **zero-key** data tools (Reddit + corpus
+reads, compliance lint, content plan), **chat-key** synthesis tools (demand research,
+positioning, launch assets, discovery), **chat + embeddings** tools (competitor map, build
+spec — which now folds in surface + screens), and the **gated** posting tool (a Reddit reply,
+behind an env opt-in). The [MCP tools reference](/docs/mcp-tools) is the canonical list — every
+tool, its tier, and its key requirement, in one table.
 
 ## The commands
 

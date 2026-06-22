@@ -10,7 +10,7 @@ bodies own the error-envelope contract. The authoritative registered set is the
 `metalworks.mcp.tools` begins with `TIER 1` or `TIER 2` — that prefix is the
 source of truth for its tier.
 
-**31 tools** are registered.
+**30 tools** are registered.
 
 ## The tier model
 

@@ -1,5 +1,5 @@
 ---
-title: "Landscape"
+title: "Competitors"
 description: "Map everything that exists today from your demand report — direct/adjacent/status-quo rivals (each gap cited) plus real shipped products, each tagged with the demand clusters it competes for."
 ---
 
@@ -84,5 +84,5 @@ Hunt token; without one, that half is empty and the competitor map still holds.
 
 You know the landscape. Decide whether it's worth building with the
 [validation loop](/docs/validation-loop), or move to what to build:
-→ [Validation loop](/docs/validation-loop) · [Surface & screens](/docs/design) ·
+→ [Validation loop](/docs/validation-loop) · [Build spec](/docs/build-spec) ·
 [why you can trust the output](/docs/how-it-works)
