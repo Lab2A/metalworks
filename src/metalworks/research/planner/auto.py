@@ -82,3 +82,24 @@ def brief_from_question(
             update={"target_subreddits": pick_target_subreddits(deps, brief=brief)}
         )
     return brief
+
+
+def brief_or_question(
+    deps: ResearchDeps,
+    brief: ResearchBrief | None,
+    question: str,
+    *,
+    subreddits: Sequence[str] | None = None,
+    time_window_months: int = 12,
+) -> ResearchBrief:
+    """The one brief-fallback: return ``brief`` when set, else build one from ``question``.
+
+    The single home for the ``brief is None → brief_from_question`` pattern that the
+    ideate, validate, and facade entry points all need, so the fallback (and any
+    future change to it) lives in exactly one place.
+    """
+    if brief is not None:
+        return brief
+    return brief_from_question(
+        deps, question, subreddits=subreddits, time_window_months=time_window_months
+    )

@@ -17,6 +17,7 @@ from metalworks.research.planner import (
     Option,
     assemble_brief,
     brief_from_question,
+    brief_or_question,
     pick_target_subreddits,
     provide_content,
 )
@@ -309,3 +310,32 @@ def test_brief_from_question_invokes_picker_when_subreddits_omitted() -> None:
     assert brief.question == "is there demand for X?"
     assert brief.time_window_months == 12
     assert isinstance(brief.target_subreddits, list)
+
+
+# ── brief_or_question (the one shared brief-fallback) ────────────────────────
+
+
+def test_brief_or_question_returns_existing_brief_unchanged() -> None:
+    # When a brief is supplied, the helper returns it verbatim — no model call,
+    # no fabricated fallback.
+    deps = _deps(FakeChatModel())
+    existing = ResearchBrief(
+        brief_id="b-1",
+        question="pre-built",
+        decision_context="ctx",
+        success_criteria=["c"],
+        must_address=[],
+        target_subreddits=[TargetSubreddit(name="preset", rationale="given")],
+        web_research_directions=[],
+        relevance_rubric="r",
+        time_window_months=3,
+    )
+    out = brief_or_question(deps, existing, "ignored question", subreddits=["unused"])
+    assert out is existing
+
+
+def test_brief_or_question_builds_from_question_when_brief_is_none() -> None:
+    deps = _deps(FakeChatModel())
+    out = brief_or_question(deps, None, "demand for a focus supplement?", subreddits=["Nootropics"])
+    assert out.question == "demand for a focus supplement?"
+    assert [t.name for t in out.target_subreddits] == ["Nootropics"]

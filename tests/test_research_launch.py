@@ -9,7 +9,10 @@ embeddings.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
+
+import pytest
+from pydantic import BaseModel
 
 from metalworks.contract import (
     DemandReport,
@@ -19,6 +22,7 @@ from metalworks.contract import (
     SignalStrength,
 )
 from metalworks.embeddings import FakeEmbedding
+from metalworks.errors import MissingKeyError, StructuredOutputError
 from metalworks.llm import FakeChatModel
 from metalworks.research.deps import ResearchDeps
 from metalworks.research.launch import (
@@ -29,6 +33,8 @@ from metalworks.research.launch import (
     plan_channels,
 )
 from metalworks.stores import MemoryStores
+
+_T = TypeVar("_T", bound=BaseModel)
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -227,16 +233,42 @@ def test_claim_not_in_body_is_dropped() -> None:
     assert assets[0].claim_citations == []
 
 
-def test_llm_failure_on_a_surface_skips_only_that_asset() -> None:
+def test_model_decline_on_a_surface_skips_only_that_asset() -> None:
     report = _two_author_report()
     good = "nothing fades PIE without burning"
     body = f"They told us {good}."
     phrasing = _phrasing(body, [_ClaimDraft(text=f"They told us {good}", supporting_quote=good)])
-    # Only TWO phrasings scripted for THREE surfaces → the third call raises →
-    # that surface is skipped, the batch still returns the first two.
-    chat = _scripted_chat([phrasing, phrasing])
-    assets = build_launch_assets(_deps(chat), report)
+
+    class _DeclinesAfterTwo(FakeChatModel):
+        """Phrases the first two surfaces, then *declines* (StructuredOutputError)
+        on the third — the only honest "skip this surface" case."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.script(_AssetPhrasing, [phrasing, phrasing])
+            self._left = 2
+
+        def complete_structured(self, *, output_model: type[_T], **kw: Any) -> _T:  # type: ignore[override]
+            if output_model is _AssetPhrasing and self._left == 0:
+                raise StructuredOutputError("fake/chat", "declined for this surface")
+            self._left -= 1
+            return super().complete_structured(output_model=output_model, **kw)
+
+    assets = build_launch_assets(_deps(_DeclinesAfterTwo()), report)
     assert len(assets) == len(DEFAULT_SURFACES) - 1
+
+
+def test_launch_infra_error_propagates_not_swallowed() -> None:
+    # #76: an auth/network error while phrasing must RAISE — never be mistaken for
+    # a per-surface decline and silently produce a thinner (or empty) launch kit.
+    report = _two_author_report()
+
+    class _AuthBroken(FakeChatModel):
+        def complete_structured(self, *, output_model: type[_T], **kw: Any) -> _T:  # type: ignore[override]
+            raise MissingKeyError("GOOGLE_API_KEY", provider="gemini")
+
+    with pytest.raises(MissingKeyError):
+        build_launch_assets(_deps(_AuthBroken()), report)
 
 
 # ── channel plan ─────────────────────────────────────────────────────────────

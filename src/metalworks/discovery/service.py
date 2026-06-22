@@ -28,6 +28,7 @@ from metalworks.discovery.prompts import (
     build_filter_prompt,
     build_generate_prompt,
 )
+from metalworks.errors import StructuredOutputError
 from metalworks.reddit import heuristic_check
 
 if TYPE_CHECKING:
@@ -186,7 +187,9 @@ def filter_post(
     A standalone building block: hand it any :class:`~metalworks.llm.ChatModel`
     and your :class:`~metalworks.contract.DiscoveryContext` to decide whether a
     thread is worth engaging, without running the whole loop. ``on_error`` (if
-    given) receives a ``"filter-error:<url>:<exc>"`` string on failure.
+    given) receives a ``"filter-error:<url>:<exc>"`` string when the model
+    declines. Infra errors (auth/network/quota/timeout) propagate so a
+    misconfigured key is a real failure, not a silent "no relevant posts".
     """
     system, user = build_filter_prompt(post=post, context=context)
     try:
@@ -197,7 +200,7 @@ def filter_post(
             max_tokens=300,
             temperature=0.3,
         )
-    except Exception as exc:
+    except StructuredOutputError as exc:
         if on_error is not None:
             on_error(f"filter-error:{post.url}:{exc}")
         return None
@@ -247,7 +250,13 @@ def draft_reply(
 
 
 def _try_generate(model: object, system: str, user: str) -> ReplyGenerationV2 | None:
-    """One generate attempt against a ChatModel. None on any failure."""
+    """One generate attempt against a ChatModel.
+
+    Returns ``None`` only when the model *declines* — produces no schema-valid
+    reply (:class:`StructuredOutputError`), the pro→flash retry's reason for being.
+    Infra errors (auth/network/quota/timeout) propagate so a misconfigured key
+    surfaces as a real failure, not an indistinguishable "model declined".
+    """
     from metalworks.llm import ChatModel
 
     if not isinstance(model, ChatModel):
@@ -260,7 +269,7 @@ def _try_generate(model: object, system: str, user: str) -> ReplyGenerationV2 | 
             max_tokens=1500,
             temperature=0.7,
         )
-    except Exception:
+    except StructuredOutputError:
         return None
 
 

@@ -45,6 +45,7 @@ from metalworks.contract.launch import (
     ClaimCitation,
     LaunchAsset,
 )
+from metalworks.errors import StructuredOutputError
 from metalworks.reddit import heuristic_check
 
 if TYPE_CHECKING:
@@ -244,10 +245,16 @@ def _build_one_asset(
     positioning: PositioningBrief | None,
     surface: str,
 ) -> LaunchAsset | None:
-    """Draft + ground one surface's asset. Returns None on LLM failure (skip)."""
+    """Draft + ground one surface's asset.
+
+    Returns ``None`` only when the model declines for this surface
+    (:class:`StructuredOutputError`) — one surface failing to phrase never sinks
+    the batch. Infra errors (auth/network/quota/timeout) propagate so a
+    misconfigured key is a real failure, not a silently-empty launch kit.
+    """
     try:
         phrasing = _phrase_asset(deps, report, positioning, surface)
-    except Exception:  # best-effort per surface — one failure never sinks the batch
+    except StructuredOutputError:
         return None
     body = phrasing.body
     citations = _ground_claims(report, body, phrasing.claims)

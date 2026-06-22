@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from metalworks.contract import DemandReport, EvidenceRef
 from metalworks.contract.ideate import IdeaSketch, IdeationResult
+from metalworks.errors import StructuredOutputError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -43,7 +44,9 @@ def ideate_from_idea(
 
     One structured call extracts the hypothesis / pain / who-it's-for; a
     ``ResearchBrief`` is built from the idea so demand can run next. Degrades to
-    the raw idea as its own hypothesis if the model call fails.
+    the raw idea as its own hypothesis only when the model *declines* (no
+    schema-valid output); an infra error (auth/network/quota) propagates so the
+    caller sees a real failure rather than a silently-thinned hypothesis.
     """
     system = (
         "You are a startup advisor. Sharpen a raw product idea into ONE testable "
@@ -54,16 +57,20 @@ def ideate_from_idea(
         ex = deps.chat.complete_structured(
             system=system, user=idea_text, output_model=_IdeaExtract, max_tokens=_MAX_TOKENS
         )
-    except Exception:
+    except StructuredOutputError:
+        # Model declined / produced nothing schema-valid → degrade to the raw idea.
+        # Infra errors are NOT caught here: they propagate.
         ex = _IdeaExtract(hypothesis=idea_text)
 
     brief = None
     caveat = None
     try:
-        from metalworks.research.planner import brief_from_question
+        from metalworks.research.planner import brief_or_question
 
-        brief = brief_from_question(deps, idea_text, subreddits=subreddits)
-    except Exception:
+        brief = brief_or_question(deps, None, idea_text, subreddits=subreddits)
+    except StructuredOutputError:
+        # The brief-builder's own model call declined → honest partial. Infra
+        # errors propagate.
         caveat = "Could not build a research brief automatically — pass subreddits or plan one."
 
     return IdeaSketch(
@@ -85,29 +92,34 @@ def ideate_from_report(deps: ResearchDeps, report: DemandReport) -> IdeationResu
     falls back to the top demand clusters. Each sketch carries the fork's own
     evidence — no guessing. A report with no forks yields an empty, ``partial``
     result.
+
+    A thin, order-preserving pass-through: ``candidate_wedges`` already arrives
+    ranked from ``synthesis/wedges`` and ``ranked_clusters`` from the cluster
+    ranker, so this re-projects them as :class:`IdeaSketch`es without re-sorting
+    (one ranking source). It emits no ``hypothesis``: a wedge's grounded
+    ``rationale`` becomes the hypothesis when present, otherwise the field is
+    left empty — never a templated Mad-Lib dressed as analysis.
     """
     _ = deps  # deterministic transform; deps kept for signature symmetry
     sketches: list[IdeaSketch] = []
 
     if report.candidate_wedges:
-        top = sorted(report.candidate_wedges, key=lambda w: w.breadth_count, reverse=True)
-        for w in top[:_MAX_SKETCHES]:
+        for w in report.candidate_wedges[:_MAX_SKETCHES]:
             sketches.append(
                 IdeaSketch(
                     idea=w.label,
-                    hypothesis=w.rationale or f"Build the narrowest thing that kills: {w.pain}",
+                    hypothesis=w.rationale,
                     pain=w.pain,
                     provenance="evidence-first",
                     evidence=list(w.evidence),
                 )
             )
     else:
-        top_clusters = sorted(report.ranked_clusters, key=lambda c: c.demand_score, reverse=True)
-        for c in top_clusters[:_MAX_SKETCHES]:
+        for c in report.ranked_clusters[:_MAX_SKETCHES]:
             sketches.append(
                 IdeaSketch(
                     idea=c.claim,
-                    hypothesis=f"Build for the people who feel: {c.claim}",
+                    hypothesis="",
                     pain=c.claim,
                     provenance="evidence-first",
                     evidence=[EvidenceRef(kind="cluster", cluster_rank=c.rank)],

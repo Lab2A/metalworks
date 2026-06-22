@@ -289,16 +289,17 @@ class Metalworks:
         """
         from metalworks.contract import Research, ResearchBrief
         from metalworks.research import run_research
-        from metalworks.research.planner import brief_from_question
+        from metalworks.research.planner import brief_or_question
 
         deps = self._r.research_deps()
-        if isinstance(question, ResearchBrief):
-            brief = question
-        else:
-            window = time_window_months if time_window_months is not None else 12
-            brief = brief_from_question(
-                deps, question, subreddits=subreddits, time_window_months=window
-            )
+        window = time_window_months if time_window_months is not None else 12
+        brief = brief_or_question(
+            deps,
+            question if isinstance(question, ResearchBrief) else None,
+            question if isinstance(question, str) else "",
+            subreddits=subreddits,
+            time_window_months=window,
+        )
         report = run_research(
             deps, brief=brief, per_sub_limit=per_sub_limit, max_findings=max_findings
         )

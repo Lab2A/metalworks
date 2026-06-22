@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from metalworks.contract import (
     ComplianceVerdict,
     DiscoveryContext,
@@ -11,6 +13,7 @@ from metalworks.contract import (
     RedditPost,
 )
 from metalworks.discovery import DiscoveryDeps, run_discovery
+from metalworks.errors import MissingKeyError, StructuredOutputError
 from metalworks.llm import FakeChatModel
 from metalworks.stores.memory import MemoryStores
 
@@ -259,11 +262,16 @@ def test_pro_to_flash_degradation_retry() -> None:
     from metalworks.discovery import FilterDecision, ReplyGenerationV2
 
     class BrokenGenerate(FakeChatModel):
-        """Raises on the generate call (ReplyGenerationV2), passes filter through."""
+        """Declines on the generate call (ReplyGenerationV2), passes filter through.
+
+        Truncated structured output surfaces as ``StructuredOutputError`` — the
+        "model declined" signal the pro→flash retry exists to recover from. (An
+        infra error here would instead propagate; see the propagation test.)
+        """
 
         def complete_structured(self, *, output_model, **kwargs):  # type: ignore[no-untyped-def, override]
             if output_model is ReplyGenerationV2:
-                raise RuntimeError("pro model truncated mid-string")
+                raise StructuredOutputError("fake/chat", "pro model truncated mid-string")
             return super().complete_structured(output_model=output_model, **kwargs)
 
     chat = BrokenGenerate()
@@ -280,6 +288,45 @@ def test_pro_to_flash_degradation_retry() -> None:
     # Generate failed on pro (chat), succeeded on flash (fast_chat).
     assert len(opps) == 1
     assert opps[0].draft_reply.startswith("loki")
+
+
+def test_generate_infra_error_propagates_not_swallowed() -> None:
+    # #76: a real auth/network/quota error during generate must RAISE — never be
+    # mistaken for "model declined" and silently yield zero opportunities.
+    from metalworks.discovery import FilterDecision, ReplyGenerationV2
+
+    class AuthBroken(FakeChatModel):
+        def complete_structured(self, *, output_model, **kwargs):  # type: ignore[no-untyped-def, override]
+            if output_model is ReplyGenerationV2:
+                raise MissingKeyError("GOOGLE_API_KEY", provider="gemini")
+            return super().complete_structured(output_model=output_model, **kwargs)
+
+    chat = AuthBroken()
+    chat.script(FilterDecision, _keep())
+
+    deps = _deps(search=StubSearch([_post()]), stores=MemoryStores(), chat=chat)
+    with pytest.raises(MissingKeyError):
+        run_discovery(deps, queries=["q"])
+
+
+def test_generate_decline_yields_no_opportunity_distinguishable_from_error() -> None:
+    # The genuine "model declined" case (StructuredOutputError) degrades to no
+    # opportunity — distinguishable from the raised infra error above.
+    from metalworks.discovery import FilterDecision, ReplyGenerationV2
+
+    class Declines(FakeChatModel):
+        def complete_structured(self, *, output_model, **kwargs):  # type: ignore[no-untyped-def, override]
+            if output_model is ReplyGenerationV2:
+                raise StructuredOutputError("fake/chat", "declined")
+            return super().complete_structured(output_model=output_model, **kwargs)
+
+    chat = Declines()
+    chat.script(FilterDecision, _keep())
+    # No fast_chat → the flash retry reuses chat, which also declines → None reply.
+
+    deps = _deps(search=StubSearch([_post()]), stores=MemoryStores(), chat=chat)
+    opps = run_discovery(deps, queries=["q"])
+    assert opps == []  # explicit empty, not a raised error
 
 
 def test_max_opportunities_cap() -> None:
@@ -392,17 +439,32 @@ def test_filter_post_standalone_building_block() -> None:
     assert decision.keep is True
 
 
-def test_filter_post_reports_errors_via_callback() -> None:
+def test_filter_post_reports_decline_via_callback() -> None:
     from metalworks.discovery import filter_post
 
-    class _BoomChat(FakeChatModel):
+    class _DeclineChat(FakeChatModel):
         def complete_structured(self, **kwargs: object) -> object:  # type: ignore[override]
-            raise RuntimeError("boom")
+            raise StructuredOutputError("fake/chat", "declined")
 
     errors: list[str] = []
-    decision = filter_post(_BoomChat(), _post(), DiscoveryContext(), on_error=errors.append)
-    assert decision is None
+    decision = filter_post(_DeclineChat(), _post(), DiscoveryContext(), on_error=errors.append)
+    assert decision is None  # model declined → None, callback notified
     assert errors and errors[0].startswith("filter-error:")
+
+
+def test_filter_post_propagates_infra_error() -> None:
+    # #76: an infra error during filtering RAISES — never silently a "no relevant
+    # posts" via the callback path.
+    from metalworks.discovery import filter_post
+
+    class _AuthBroken(FakeChatModel):
+        def complete_structured(self, **kwargs: object) -> object:  # type: ignore[override]
+            raise MissingKeyError("GOOGLE_API_KEY", provider="gemini")
+
+    errors: list[str] = []
+    with pytest.raises(MissingKeyError):
+        filter_post(_AuthBroken(), _post(), DiscoveryContext(), on_error=errors.append)
+    assert errors == []  # not reported as a benign filter-error
 
 
 def test_draft_reply_standalone_building_block() -> None:
