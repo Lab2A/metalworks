@@ -69,27 +69,11 @@ for rival in land.competitor_map.competitors:
 Your positioning is built from the unmet needs in the report; each competitor gap is a real
 complaint someone posted. → [Positioning](/docs/positioning) · [Competitors](/docs/competitors)
 
-## 3. Decide what to build
+## 3. Turn it into a build plan
 
-<CodeGroup>
-
-```text Claude Code
-/surface-and-ux
-```
-
-```python Python
-surface = mw.surface(research, positioning)      # web? mobile? CLI? — and why
-ux = mw.ux(research, positioning, surface.chosen)  # the 3-5 screens you need
-```
-
-</CodeGroup>
-
-→ [Surface & screens](/docs/design)
-
-## 4. Turn it into a build plan
-
-metalworks writes the **spec**, not the product. It maps the demand to a feature list and
-scaffolds a project your own coding agent (Claude Code, Cursor, etc.) then builds.
+metalworks writes the **spec**, not the product. From the demand it picks the surface to build
+on (web? mobile? CLI? — with a one-line reason), maps the demand to a feature list, sketches the
+screens you need, and scaffolds a project your own coding agent (Claude Code, Cursor, etc.) builds.
 
 <CodeGroup>
 
@@ -98,7 +82,8 @@ scaffolds a project your own coding agent (Claude Code, Cursor, etc.) then build
 ```
 
 ```python Python
-spec = mw.build_spec(research, positioning, surface.chosen)
+spec = mw.build_spec(research, positioning)        # surface="auto" → picks + explains it
+print(spec.surface, "—", spec.surface_rationale)   # web? mobile? CLI? — and why
 for feature in spec.features:
     print(feature.title, "—", feature.rationale)   # each tied to real demand
 
@@ -110,7 +95,7 @@ mw.scaffold(spec, research, "./my-startup")        # writes the build harness
 The scaffold includes a frozen list of the real quotes behind every feature, so whatever
 your agent builds stays true to what people actually asked for. → [Build spec](/docs/build-spec)
 
-## 5. Launch and grow
+## 4. Launch and grow
 
 <CodeGroup>
 

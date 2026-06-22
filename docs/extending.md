@@ -54,20 +54,19 @@ public functions you can wire into your own flow.
   backed by real quotes (`metalworks.research.synthesis`).
 - `run_competitor_map(deps, report)` — direct / adjacent / status-quo rivals,
   each with an exploitable gap backed by a real complaint.
-- `decide_surface(deps, report, positioning)` / `build_ux_skeleton(...)` — a
-  surface recommendation and a 3-5 screen UX skeleton.
-- `build_spec_from_report(deps, report, positioning=None, surface="web")` /
+- `build_spec_from_report(deps, report, positioning=None, surface="auto")` /
   `scaffold(spec, report, dest)` (`metalworks.build`) — a `BuildSpec` (each
-  feature mapped to a real demand cluster) + a project scaffold for your own
-  coding agent. metalworks specs and scaffolds; it writes no product code.
-  See the [Build spec](/docs/build-spec).
+  feature mapped to a real demand cluster; with `surface="auto"` it also picks the
+  surface + a rationale and sketches feature-grounded screens) + a project scaffold
+  for your own coding agent. metalworks specs and scaffolds; it writes no product
+  code. See the [Build spec](/docs/build-spec).
 - `build_launch_assets(deps, report, positioning)` / `plan_channels(report)` —
   drafting-only launch copy (never posts) + a human-executed channel plan.
 - `content_plan_from_report(report)` — a deterministic, zero-key content/SEO plan.
 
 These are also on the `Metalworks` facade —
 `mw.positioning(research)`, `mw.landscape(...)` (the competitive map + existing solutions),
-`mw.surface(...)` / `mw.ux(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
+`mw.design(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
 `mw.launch(...)` / `mw.channel_plan(...)`, `mw.content_plan(...)` — which thread
 the one resolved `ResearchDeps` for you. See the [walkthrough](/docs/walkthrough).
 

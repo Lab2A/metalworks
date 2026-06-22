@@ -117,13 +117,13 @@ Two verticals sit on top of those protocols:
 
 - **Research** (`metalworks.research`) — turns an idea into a clustered
   `DemandReport` of real, permalinked Reddit quotes. Entry point:
-  `run_research(deps, brief=...)`. Seven functions build on a finished report,
+  `run_research(deps, brief=...)`. Six functions build on a finished report,
   each linking its output back to that report's real quotes: positioning
-  (`build_positioning_brief`), the landscape (`run_landscape`), surface + UX
-  (`decide_surface` / `build_ux_skeleton`), marketing site
+  (`build_positioning_brief`), the landscape (`run_landscape`), marketing site
   (`build_marketing_site`), launch assets (`build_launch_assets` /
   `plan_channels`), a content/SEO plan (`content_plan_from_report`), and a build
-  plan + scaffold (`build_spec_from_report` / `scaffold`).
+  plan + scaffold (`build_spec_from_report` / `scaffold`) — which also picks the
+  surface and sketches feature-grounded screens.
 - **Reddit** (`metalworks.reddit`) — OAuth, search, subreddit intel, inbox,
   posting, in-library rate limiting, and a deterministic compliance gate
   (`heuristic_check`) that runs offline on reply and post text.

@@ -14,7 +14,8 @@
     { "source": "/docs/the-arc", "destination": "/docs/walkthrough" },
     { "source": "/docs/guide-demand-research", "destination": "/docs/demand-research" },
     { "source": "/docs/guide-positioning-landscape", "destination": "/docs/positioning" },
-    { "source": "/docs/guide-design", "destination": "/docs/design" },
+    { "source": "/docs/guide-design", "destination": "/docs/design-system" },
+    { "source": "/docs/design", "destination": "/docs/build-spec" },
     { "source": "/docs/guide-build", "destination": "/docs/build-spec" },
     { "source": "/docs/guide-launch-growth", "destination": "/docs/launch" },
     { "source": "/docs/guide-reddit-engagement", "destination": "/docs/reddit-engagement" },
@@ -56,7 +57,6 @@
           {
             "group": "Design",
             "pages": [
-              "docs/design",
               "docs/design-system",
               "docs/logo",
               "docs/design-review"

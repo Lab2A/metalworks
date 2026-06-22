@@ -27,9 +27,9 @@ never overstated.
      their actual fonts/colors. Trust the landscape signals.
    - `web` — no live teardown, but real competitor names/taglines informed it.
    - `model_knowledge` — **no competitor data; the system is category convention,
-     not this brand's actual landscape.** Say so plainly, the way `/surface-and-ux`
-     leads with "low signal — treat as a hypothesis." Tell the user a real teardown
-     needs the browser: `metalworks browser install`.
+     not this brand's actual landscape.** Say so plainly — lead with "low signal —
+     treat as a hypothesis." Tell the user a real teardown needs the browser:
+     `metalworks browser install`.
 
 4. Present the system honestly:
    - the **aesthetic** direction and the **one memorable thing**;

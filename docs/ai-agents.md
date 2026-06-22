@@ -45,8 +45,8 @@ reference](/docs/mcp-tools). The split by key requirement:
   `research_status` / `research_result`, `generate_reply`, `discovery_run`, and the
   synchronous report-derived tools (run after a stored report exists):
   `positioning_from_report`, `landscape_from_report`,
-  `ideate_from_idea`, `ideate_from_report`, `assess_from_report`, `surface_recommend`,
-  `ux_skeleton_build`, `launch_assets_build`, `build_spec`. The validation-loop
+  `ideate_from_idea`, `ideate_from_report`, `assess_from_report`,
+  `launch_assets_build`, `build_spec`. The validation-loop
   orchestrator `validate_from_idea` also calls a model and runs a demand pull (slower).
 - **Posting (the security boundary):** `reddit_post_comment` requires a `confirm_token`
   emitted by a `compliance_lint` pass over that exact text **and**

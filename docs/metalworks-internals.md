@@ -108,11 +108,10 @@ dropped at assembly.
 |---|---|---|
 | `PositioningBrief` | `positioning.py` | Dunford wedge (competitive alt → unique attribute → value → beachhead → category) + price hypothesis; `wedge` is `None` when there's no real white space |
 | `Landscape` / `CompetitorMap` | `landscape.py` | competitors (direct/adjacent/status-quo), gaps, existing solutions |
-| `SurfaceRecommendation` | `surface.py` | `chosen: SurfaceKind` ∈ {sdk, web, mobile, cli, browser_extension, api, desktop} + UX skeleton |
 | `DesignSystem` | `design.py` | aesthetic + SAFE/RISK `DesignChoice` per dimension + directional `LandscapeSignal`s + `grounding_tier` + `DESIGN.md` (§7) |
 | `DesignReview` / `StyleFinding` | `design.py` | a deterministic audit of a rendered page's computed styles vs the system (§7) |
 | `LogoSet` / `LogoOption` | `logo.py` | authored SVG logo options, drawn under the `DesignSystem` (§7) |
-| `BuildSpec` | `build.py` | `features` (each evidence-backed, cite-or-die), `personas`, `pricing_tiers`, `stack` hint |
+| `BuildSpec` | `build.py` | `surface` (∈ {sdk, web, mobile, cli, browser_extension, api, desktop}) + `surface_rationale`, `features` (each evidence-backed, cite-or-die), feature-grounded `screens` (`Screen` from `surface.py`), `personas`, `pricing_tiers`, `stack` hint |
 | `Assessment` / `Decision` | `assess.py` | GO / PIVOT / NO_GO — **deterministic** from demand × landscape; LLM only writes the rationale |
 | `ContentPlan` | `marketing.py` | deterministic SEO/content plan, one page per cluster |
 
@@ -213,7 +212,7 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
 ## 5. Surfaces
 
 - **Library facade** (`client.py`, `Metalworks`): `.research()`, `.positioning()`,
-  `.landscape()`, `.assess()`, `.ideate()`, `.validate()`, `.surface()`, `.ux()`,
+  `.landscape()`, `.assess()`, `.ideate()`, `.validate()`,
   `.design()`, `.render_design_preview()`,
   `.logo()`, `.render_logo_picker()`, `.design_review()`, `.build_spec()`, `.scaffold()`,
   `.launch()`, `.channel_plan()`, `.content_plan()`, plus `.reddit` and `.discovery`
@@ -232,7 +231,7 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
   `mcp/server.py` registers a thin async wrapper per the `_TOOL_WRAPPERS` tuple.
 - **Claude Code plugin** (`plugin/`): skills over the MCP tools — five engagement
   (`/demand-report`, `/find-threads`, `/draft-reply`, `/subreddit-intel`, `/discovery`) plus
-  the grounded pillars (`/position-wedge`, `/market-landscape`, `/surface-and-ux`,
+  the grounded pillars (`/position-wedge`, `/market-landscape`,
   `/design`, `/logo`, `/design-review`, `/launch-kit`, `/content-plan`,
   `/build-spec`, `/go-no-go`, `/ideate`, `/validate`).
 

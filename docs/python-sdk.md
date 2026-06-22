@@ -192,33 +192,30 @@ print(result.outcome, "in", result.iterations, "round(s)")
 ### Design stage
 
 ```python
-def surface(self, research, positioning: PositioningBrief) -> SurfaceRecommendation: ...
-def ux(self, research, positioning: PositioningBrief, surface: SurfaceKind) -> UxSkeleton: ...
+def design(self, research, *, brand_name: str | None = None,
+           max_teardown: int = 3) -> DesignSystem: ...
 ```
 
-`surface` picks `sdk`/`web`/`mobile`/`cli`/… with a cited rubric; `ux` sketches 3–5 screens,
-each flagged validated (evidence-backed) or hypothesis.
-
-```python
-surface = mw.surface(research, pos)
-ux = mw.ux(research, pos, surface.chosen)
-```
+`design` authors a grounded-but-directional `DesignSystem` (an aesthetic direction + a SAFE/RISK
+choice per dimension), read from a real browser teardown of competitor sites where available and
+honest about its grounding tier.
 
 ### Build stage
 
 ```python
-def build_spec(self, research, positioning=None, surface: SurfaceKind = "web",
+def build_spec(self, research, positioning=None, surface: SurfaceKind | Literal["auto"] = "auto",
                *, stack: str = "empty") -> BuildSpec: ...
 def scaffold(self, spec: BuildSpec, research, dest: Path, *, base: str = "empty") -> list[Path]: ...
 ```
 
 `build_spec` maps demand to a feature list (each feature tied to ≥1 real quote; ungrounded ones
-are dropped). `scaffold` writes a cite-or-die build harness under `dest` and returns the paths
-written. **metalworks writes the spec, not the product** — your coding agent builds from the
-scaffold.
+are dropped), picks the surface with a one-line rationale when `surface="auto"` (the default), and
+sketches a feature-grounded screen skeleton. `scaffold` writes a cite-or-die build harness under
+`dest` and returns the paths written. **metalworks writes the spec, not the product** — your coding
+agent builds from the scaffold.
 
 ```python
-spec = mw.build_spec(research, pos, surface.chosen)
+spec = mw.build_spec(research, pos)        # surface="auto" → the spec picks + explains it
 paths = mw.scaffold(spec, research, Path("./my-startup"))
 ```
 

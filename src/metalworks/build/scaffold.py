@@ -67,6 +67,7 @@ def render_evidence_md(spec: BuildSpec, report: DemandReport) -> str:
         [r.evidence_id for f in spec.features for r in f.evidence],
         [r.evidence_id for p in spec.personas for r in p.evidence],
         [r.evidence_id for t in spec.pricing_tiers for r in t.evidence],
+        [r.evidence_id for s in spec.screens for r in s.evidence_refs],
     ):
         for eid in refs:
             if eid not in seen:
@@ -108,6 +109,8 @@ def render_spec_md(spec: BuildSpec, report: DemandReport) -> str:
         f"- **Spec:** `{spec.spec_id}`  ·  **Report:** `{spec.report_id}`",
         f"- **Surface:** {spec.surface}  ·  **Stack hint:** {spec.stack}",
     ]
+    if spec.surface_rationale:
+        lines.append(f"- **Why {spec.surface}:** {_md(spec.surface_rationale)}")
     if spec.partial:
         lines += ["", f"> ⚠️ **Partial spec.** {spec.caveat or 'Grounding was thin.'}"]
     lines += ["", "## Features — build in this order", ""]
@@ -156,17 +159,50 @@ def render_spec_md(spec: BuildSpec, report: DemandReport) -> str:
         lines.append("")
     else:
         lines += ["_No pricing evidence in the report — price this manually, do not guess._", ""]
+    lines += ["## Screens", ""]
+    if spec.screens:
+        lines += [
+            "The UX skeleton, sketched from the grounded features above — each screen names the "
+            "feature(s) it serves. **validated** = a real voice asked for it (via the feature's "
+            "evidence); **hypothesis** = no backing voice yet; **scaffolding** = a shell every "
+            "product needs (auth/settings), not a demand bet.",
+            "",
+        ]
+        for s in spec.screens:
+            if s.scaffolding:
+                tag = "scaffolding"
+            elif s.validated:
+                tag = "validated"
+            else:
+                tag = "hypothesis"
+            serves = ", ".join(f"`{_md(fid)}`" for fid in s.feature_ids) or "—"
+            cites = (
+                ", ".join(_cite_line(idx, r.evidence_id) for r in s.evidence_refs) or "_(uncited)_"
+            )
+            lines += [
+                f"- **{_md(s.name)}** ({tag}) — {_md(s.purpose)} → {_md(s.primary_action)}. "
+                f"Serves: {serves}.  Evidence: {cites}"
+            ]
+        lines.append("")
+    else:
+        lines += ["_No screens sketched (no grounded features to skeleton)._", ""]
     return "\n".join(lines)
 
 
 def render_claude_md(spec: BuildSpec, report: DemandReport) -> str:
     """The downstream agent's top-level rule file — cite-or-die comes first."""
+    surface_line = (
+        f"This is a **{spec.surface}** build — {_md(spec.surface_rationale)}"
+        if spec.surface_rationale
+        else f"This is a **{spec.surface}** build."
+    )
     return "\n".join(
         [
             f"# {report.query} — build harness",
             "",
             "This repo was scaffolded by **metalworks** from a validated Reddit demand",
             f"report (`{report.report_id}`). metalworks researched and specced; YOU build.",
+            surface_line,
             "",
             "## Rule 0 — cite or die",
             "",
@@ -183,7 +219,10 @@ def render_claude_md(spec: BuildSpec, report: DemandReport) -> str:
             f"2. Pick the `{spec.stack}` starter and stand up the {spec.surface} surface.",
             "3. Build the features in `SPEC.md` in the order given — it is the build order,",
             "   strongest validated demand first. Start with #1, the spine the rest hangs off.",
-            "4. Keep `EVIDENCE.md` frozen. To add a feature, go back to metalworks and",
+            "4. Use the `## Screens` skeleton in `SPEC.md` to lay out the UI — each screen maps",
+            "   to real feature ids; build the validated screens first, treat the hypotheses as",
+            "   bets to test, and the scaffolding (auth/settings) as plumbing.",
+            "5. Keep `EVIDENCE.md` frozen. To add a feature, go back to metalworks and",
             "   re-run the research — do not invent demand here.",
             "",
             "The metalworks MCP server (`.mcp.json`) gives you the research tools to",

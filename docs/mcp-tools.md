@@ -53,13 +53,11 @@ source of truth for its tier.
 | `ideate_from_report` | Evidence-first: surface a stored report's forks as grounded idea sketches (chat key). | `report_id`, `store_path` |
 | `assess_from_report` | The **GO / PIVOT / NO-GO** verdict — runs the landscape, then the deterministic demand × landscape gap, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `validate_from_idea` | Run the validation loop headlessly (`--auto`) from a raw idea — ideate → demand → landscape → assess, looping on PIVOT. **Synchronous and slow** (runs a demand pull); the interactive loop lives in the `validate` skill. | `idea`, `max_iterations` (3), `store_path` |
-| `surface_recommend` | Recommend a product surface — grounded rubric + trade-offs, synchronous (chat + embedding keys). | `report_id`, `store_path` |
-| `ux_skeleton_build` | Build a UX skeleton for a stored report on the given surface, synchronous (chat + embeddings). | `report_id`, `surface`, `store_path` |
 | `design_from_report` | Author a grounded-but-directional design system (+ preview HTML) — SAFE/RISK choices read from a real competitor teardown where available; records the `grounding_tier` (chat key). | `report_id`, `name`, `store_path` |
 | `logo_generate` | Generate diverse logo options (+ a self-contained picker) drawn under the design system; the model authors each SVG, an unsafe/empty one is dropped (chat key). | `report_id`, `name`, `store_path` |
 | `design_review` | Deterministically audit a rendered page's computed styles (fonts, heading scale, colors) against design hard-rules and (with a report) its design system. Needs a script-capable browser renderer. | `url`, `report_id`, `store_path` |
 | `launch_assets_build` | Draft grounded, channel-native launch assets — one LLM call per surface; `[]` on a no-go report. Drafting only (chat key). | `report_id`, `store_path` |
-| `build_spec` | Derive an evidence-grounded `BuildSpec` — each feature maps to a real demand cluster with quotes; un-grounded features dropped. Returns the spec; does **not** write files (that is the `metalworks build init` CLI) (chat + embedding keys). | `report_id`, `surface` (`web`), `stack` (`empty`), `store_path` |
+| `build_spec` | Derive an evidence-grounded `BuildSpec` — each feature maps to a real demand cluster with quotes (un-grounded features dropped); `surface="auto"` also picks the surface + a rationale and sketches feature-grounded screens. Returns the spec; does **not** write files (that is the `metalworks build init` CLI) (chat + embedding keys). | `report_id`, `surface` (`auto`), `stack` (`empty`), `store_path` |
 | `research_start` | Start the pipeline as a background job and return a `run_id` immediately (chat + embedding keys). | `brief`, `months`, `store_path` |
 | `research_status` | Status of a background research job. | `run_id`, `store_path` |
 | `research_result` | The finished report for a completed job, or a status payload while running. | `run_id`, `store_path` |
@@ -69,8 +67,8 @@ source of truth for its tier.
 
 <Note>
 The report-derived tools (`positioning_from_report`,
-`landscape_from_report`, `assess_from_report`, `ideate_from_report`, `surface_recommend`,
-`ux_skeleton_build`, `launch_assets_build`, `build_spec`) are **synchronous** —
+`landscape_from_report`, `assess_from_report`, `ideate_from_report`,
+`launch_assets_build`, `build_spec`) are **synchronous** —
 run them after a stored report exists. `validate_from_idea` is the exception: like the pipeline
 it runs a demand pull (minutes), so call it sparingly or prefer the interactive `validate` skill.
 </Note>

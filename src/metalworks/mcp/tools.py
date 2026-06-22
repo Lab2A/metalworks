@@ -448,41 +448,6 @@ def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport
 
 
 @guard
-def surface_recommend(report_id: str, store_path: str | None = None) -> ToolResult:
-    """TIER 2 (chat + embedding keys). Recommend a product surface for a stored
-    report — grounded rubric + trade-offs, synchronous. Needs chat + embeddings."""
-    from metalworks.research import decide_surface
-    from metalworks.research.synthesis import build_positioning_brief
-
-    report = _report_or_not_found(report_id, store_path)
-    if isinstance(report, dict):
-        return report
-    deps = _build_deps(store_path)
-    rec = decide_surface(deps, report, build_positioning_brief(deps, report))
-    return {"surface_recommendation": rec.model_dump(mode="json")}
-
-
-@guard
-def ux_skeleton_build(report_id: str, surface: str, store_path: str | None = None) -> ToolResult:
-    """TIER 2 (chat + embedding keys). Build a UX skeleton for a stored report on
-    the given ``surface`` (sdk/web/mobile/cli/...). Synchronous; needs chat + embeddings."""
-    from typing import cast
-
-    from metalworks.contract.surface import SurfaceKind
-    from metalworks.research import build_ux_skeleton
-    from metalworks.research.synthesis import build_positioning_brief
-
-    report = _report_or_not_found(report_id, store_path)
-    if isinstance(report, dict):
-        return report
-    deps = _build_deps(store_path)
-    skeleton = build_ux_skeleton(
-        deps, report, build_positioning_brief(deps, report), cast("SurfaceKind", surface)
-    )
-    return {"ux_skeleton": skeleton.model_dump(mode="json")}
-
-
-@guard
 def design_from_report(
     report_id: str, name: str | None = None, store_path: str | None = None
 ) -> ToolResult:
@@ -600,27 +565,29 @@ def content_plan_from_report(report_id: str, store_path: str | None = None) -> T
 @guard
 def build_spec(
     report_id: str,
-    surface: str = "web",
+    surface: str = "auto",
     stack: str = "empty",
     store_path: str | None = None,
 ) -> ToolResult:
     """TIER 2 (chat + embedding keys). Derive an evidence-grounded BuildSpec for a
     stored report — each feature maps to a real demand cluster and carries its
-    quotes (un-grounded features are dropped). Does NOT write files (that is the
-    `metalworks build init` CLI); returns the spec for a coding agent to build from."""
-    from typing import cast, get_args
+    quotes (un-grounded features are dropped). With surface='auto' (default) the
+    spec also picks the surface + a one-line rationale and sketches feature-grounded
+    screens; pin a surface (web/cli/...) to skip the pick. Does NOT write files (that
+    is the `metalworks build init` CLI); returns the spec for a coding agent."""
+    from typing import Literal, cast, get_args
 
     from metalworks.build import build_spec_from_report
     from metalworks.contract.surface import SurfaceKind
     from metalworks.research.synthesis import build_positioning_brief
 
     valid = get_args(SurfaceKind)
-    if surface not in valid:
+    if surface != "auto" and surface not in valid:
         return {
             "error": {
                 "error_code": "invalid_argument",
                 "message": f"Unknown surface {surface!r}.",
-                "fix": f"Pass one of: {', '.join(valid)}.",
+                "fix": f"Pass 'auto' or one of: {', '.join(valid)}.",
                 "docs_url": _DOCS_BASE,
             }
         }
@@ -632,7 +599,7 @@ def build_spec(
         deps,
         report,
         build_positioning_brief(deps, report),
-        cast("SurfaceKind", surface),
+        cast("SurfaceKind | Literal['auto']", surface),
         stack=stack,
     )
     return {"build_spec": spec.model_dump(mode="json")}

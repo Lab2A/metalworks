@@ -2064,72 +2064,6 @@ def research_validate(
     _print_validation(result)
 
 
-def _print_surface(rec: object, skeleton: object) -> None:
-    console.print(f"\n[bold]Surface[/bold] — report {getattr(rec, 'report_id', '')}")
-    console.print(
-        f"  [bold]{getattr(rec, 'chosen', '?')}[/bold]"
-        f" (runner-up: {getattr(rec, 'runner_up', None) or 'none'})"
-        f"  [{getattr(rec, 'confidence', '')}]"
-    )
-    console.print(f"  [italic]{getattr(rec, 'rationale', '')}[/italic]")
-    for d in getattr(rec, "rubric", []):
-        tag = "assumption" if d.is_assumption else f"{len(d.evidence_refs)} cited"
-        console.print(f"    - {d.name}: {d.finding}  [dim]({tag})[/dim]")
-    if getattr(rec, "partial", False):
-        console.print(f"  [yellow]partial:[/yellow] {getattr(rec, 'caveat', '')}")
-    console.print(f"  [bold]UX skeleton[/bold] ({getattr(skeleton, 'surface', '')}):")
-    for s in getattr(skeleton, "screens", []):
-        mark = "validated" if s.validated else "[yellow]hypothesis[/yellow]"
-        console.print(f"    - {s.name}: {s.purpose} → {s.primary_action}  [dim]({mark})[/dim]")
-
-
-@research_app.command("surface", rich_help_panel="Pillars & build")
-def research_surface(
-    report_id: Annotated[
-        str | None,
-        typer.Argument(help="Report id or prefix; defaults to your latest run."),
-    ] = None,
-    out: Annotated[
-        Path | None, typer.Option("--out", "-o", help="Write the surface recommendation JSON here.")
-    ] = None,
-) -> None:
-    """Recommend a product surface + UX skeleton for a stored report (grounded)."""
-    from metalworks.research import build_ux_skeleton, decide_surface
-    from metalworks.research.arctic import ArcticReader
-    from metalworks.research.deps import ResearchDeps
-    from metalworks.research.synthesis import build_positioning_brief
-
-    chat = _resolve_chat_or_exit()
-    store = config.default_store()
-    report_id = _resolve_report_id(store, report_id)
-    report = store.get_report(report_id)
-    if report is None:
-        err_console.print(
-            f"[red]No report {report_id!r} in the local store.[/red] "
-            "Run `metalworks research run` first, or check the id."
-        )
-        raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
-    deps = ResearchDeps(
-        chat=chat,
-        embeddings=_resolve_embeddings_or_exit(),
-        corpus=store,
-        reader=reader,
-        search=config.resolve_search(),
-    )
-    console.print(f"[bold]Deciding surface[/bold] for report {report_id}...")
-    try:
-        positioning = build_positioning_brief(deps, report)
-        rec = decide_surface(deps, report, positioning)
-        skeleton = build_ux_skeleton(deps, report, positioning, rec.chosen)
-    finally:
-        reader.close()
-    if out is not None:
-        out.write_text(rec.model_dump_json(indent=2), encoding="utf-8")
-        console.print(f"[green]Wrote surface recommendation[/green] {out}")
-    _print_surface(rec, skeleton)
-
-
 @research_app.command("design", rich_help_panel="Pillars & build")
 def research_design(
     report_id: Annotated[
@@ -2455,15 +2389,16 @@ def build_init(
         str,
         typer.Option(
             "--surface",
-            help="Target surface: web | mobile | cli | api | sdk | browser_extension | desktop.",
+            help="Target surface, or 'auto' to let the spec pick + explain: auto | web | mobile | "
+            "cli | api | sdk | browser_extension | desktop.",
         ),
-    ] = "web",
+    ] = "auto",
     base: Annotated[
         str, typer.Option("--base", help="Stack hint recorded in the spec (e.g. next-shipfast).")
     ] = "empty",
 ) -> None:
     """Derive a grounded BuildSpec and scaffold a cite-or-die build harness (no product code)."""
-    from typing import cast, get_args
+    from typing import Literal, cast, get_args
 
     from metalworks.build import build_spec_from_report, scaffold
     from metalworks.contract.surface import SurfaceKind
@@ -2472,9 +2407,10 @@ def build_init(
     from metalworks.research.synthesis import build_positioning_brief
 
     valid_surfaces = get_args(SurfaceKind)
-    if surface not in valid_surfaces:
+    if surface != "auto" and surface not in valid_surfaces:
         err_console.print(
-            f"[red]Unknown surface {surface!r}.[/red] Choose one of: {', '.join(valid_surfaces)}."
+            f"[red]Unknown surface {surface!r}.[/red] "
+            f"Choose 'auto' or one of: {', '.join(valid_surfaces)}."
         )
         raise typer.Exit(code=1)
 
@@ -2491,17 +2427,23 @@ def build_init(
     try:
         positioning = build_positioning_brief(deps, report_obj)
         spec = build_spec_from_report(
-            deps, report_obj, positioning, cast(SurfaceKind, surface), stack=base
+            deps,
+            report_obj,
+            positioning,
+            cast("SurfaceKind | Literal['auto']", surface),
+            stack=base,
         )
     finally:
         reader.close()
+    if spec.surface_rationale:
+        console.print(f"  [dim]surface:[/dim] {spec.surface} — {spec.surface_rationale}")
     if spec.partial:
         console.print(f"  [yellow]partial:[/yellow] {spec.caveat}")
     written = scaffold(spec, report_obj, dest, base=base)
     console.print(
         f"[green]Scaffolded {len(written)} files[/green] into {dest} "
         f"({len(spec.features)} features, {len(spec.personas)} personas, "
-        f"{len(spec.pricing_tiers)} tiers)."
+        f"{len(spec.pricing_tiers)} tiers, {len(spec.screens)} screens)."
     )
     for path in written:
         console.print(f"  [dim]{path}[/dim]")
