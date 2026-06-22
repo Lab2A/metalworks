@@ -692,6 +692,47 @@ export interface DesignBrief {
   note?: string;
 }
 
+export interface LandscapeSignal {
+  /** The pattern across competitors (directional, not cited). */
+  observation: string;
+  /** The design move it suggests — lean in, or break. */
+  implication: string;
+  /** Competitor names this signal reads from. */
+  competitors?: string[];
+}
+
+export interface DesignChoice {
+  /** The fixed design dimension. */
+  dimension: "aesthetic" | "decoration" | "layout" | "color" | "typography" | "spacing" | "motion";
+  /** The choice, concretely (e.g. 'Fraunces display + Geist body; ink #1A1A1A'). */
+  decision: string;
+  /** safe = category baseline; risk = a deliberate departure with a payoff. */
+  stance: "safe" | "risk";
+  /** Why, one line. For a RISK: what it gains and what it costs. */
+  rationale: string;
+}
+
+export interface DesignSystem {
+  report_id: string;
+  /** The brand the system was designed for. */
+  brand_name: string;
+  /** The one thing someone should remember on first contact — the north star. */
+  memorable_thing: string;
+  /** How grounded: a real competitor teardown, web text, or model knowledge. */
+  grounding_tier: "renderer" | "web" | "model_knowledge";
+  /** The aesthetic direction in one line (e.g. 'editorial monochrome, dark-first'). */
+  aesthetic: string;
+  /** One per design dimension, each SAFE/RISK-labelled. */
+  choices?: DesignChoice[];
+  /** Directional reads of the competition that informed the system (not cited). */
+  landscape_signals?: LandscapeSignal[];
+  /** The rendered DESIGN.md — the per-project source of truth. */
+  design_md?: string;
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
 export interface SiteSection {
   /** Section job on the page: hero/feature/objection/pricing/social_proof/cta. */
   role: string;

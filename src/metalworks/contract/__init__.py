@@ -27,6 +27,14 @@ from metalworks.contract.corpus import (
     CorpusComment,
     CorpusRecord,
 )
+from metalworks.contract.design import (
+    DesignChoice,
+    DesignDimension,
+    DesignStance,
+    DesignSystem,
+    GroundingTier,
+    LandscapeSignal,
+)
 from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
@@ -185,6 +193,13 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "SurfaceRecommendation",
     "TradeOff",
     "UxSkeleton",
+    # Design system (visual) — the grounded-but-directional look (SAFE/RISK + grounding tier).
+    "DesignChoice",
+    "DesignDimension",
+    "DesignStance",
+    "DesignSystem",
+    "GroundingTier",
+    "LandscapeSignal",
     # Site stage (Pillar E) — the grounded marketing site + its sections.
     "MarketingSite",
     "SiteSection",

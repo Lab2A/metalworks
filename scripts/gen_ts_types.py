@@ -56,6 +56,8 @@ from metalworks.contract import (  # noqa: E402
     DecisionLogEntry,
     DemandReport,
     DesignBrief,
+    DesignChoice,
+    DesignSystem,
     DiscoveryContext,
     EvidenceBackedChoice,
     EvidenceRecord,
@@ -73,6 +75,7 @@ from metalworks.contract import (  # noqa: E402
     InboxItem,
     InsightCluster,
     Landscape,
+    LandscapeSignal,
     LaunchAsset,
     LintViolation,
     MarketingSite,
@@ -176,6 +179,10 @@ MODELS: list[type[BaseModel]] = [
     Screen,
     UxSkeleton,
     DesignBrief,
+    # design system (visual) — directional grounding, SAFE/RISK, grounding tier
+    LandscapeSignal,
+    DesignChoice,
+    DesignSystem,
     # site (Pillar E)
     SiteSection,
     MarketingSite,
