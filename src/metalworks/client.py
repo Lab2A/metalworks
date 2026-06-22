@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         ChannelPlan,
         ContentPlan,
         DemandReport,
+        DesignReview,
         DesignSystem,
         DiscoveryContext,
         IdeaSketch,
@@ -492,6 +493,22 @@ class Metalworks:
         from metalworks.research import render_logo_picker_html
 
         return render_logo_picker_html(logos)
+
+    def design_review(self, url: str, *, system: DesignSystem | None = None) -> DesignReview:
+        """Audit a RENDERED page's computed styles deterministically, optionally vs a
+        :class:`DesignSystem`. Needs a script-capable renderer (Playwright); raises
+        :class:`BrowserNotInstalledError` when none is installed, or
+        :class:`StyleAuditUnsupported` for a screenshot-only one."""
+        from metalworks.config import resolve_renderer
+        from metalworks.errors import BrowserNotInstalledError, StyleAuditUnsupported
+        from metalworks.research import review_design
+
+        renderer = resolve_renderer()
+        if renderer is None:
+            raise BrowserNotInstalledError()
+        if not renderer.capabilities.supports_style_audit:
+            raise StyleAuditUnsupported(renderer.renderer_id)
+        return review_design(renderer, url, system=system)
 
     def build_spec(
         self,

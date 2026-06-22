@@ -2317,6 +2317,85 @@ def research_logo(
     console.print(f"[green]Wrote[/green] {len(logos.options)} SVGs + {dest}/picker.html")
 
 
+@research_app.command("design-review", rich_help_panel="Pillars & build")
+def research_design_review(
+    url: Annotated[str, typer.Argument(help="The page URL to audit (http(s):// or file://).")],
+    report_id: Annotated[
+        str | None,
+        typer.Option("--report", help="Also grade against this report's design system."),
+    ] = None,
+    json_out: Annotated[
+        Path | None, typer.Option("--json", help="Write the DesignReview JSON here.")
+    ] = None,
+) -> None:
+    """Audit a rendered page's computed styles against design hard-rules (deterministic).
+
+    Reads the page's ACTUAL fonts / heading scale / colors and flags hard-rule
+    violations; with ``--report`` it also grades them against that report's design
+    system. Needs the browser renderer (``metalworks browser install``) — a
+    screenshot-only backend can't read computed styles.
+    """
+    from metalworks.errors import MetalworksError, StyleAuditUnsupported
+    from metalworks.research import build_design_system, review_design
+
+    renderer = config.resolve_renderer()
+    if renderer is None:
+        err_console.print("[red]No renderer available.[/red]")
+        err_console.print("[dim]metalworks browser install[/dim]")
+        raise typer.Exit(code=1)
+    if not renderer.capabilities.supports_style_audit:
+        err_console.print(
+            f"[red]The '{renderer.renderer_id}' renderer is screenshot-only — "
+            "design review needs the browser.[/red]"
+        )
+        err_console.print("[dim]metalworks browser install[/dim]")
+        raise typer.Exit(code=1)
+
+    system = None
+    if report_id is not None:
+        from metalworks.research.arctic import ArcticReader
+        from metalworks.research.deps import ResearchDeps
+
+        chat = _resolve_chat_or_exit()
+        store = config.default_store()
+        report_id = _resolve_report_id(store, report_id)
+        report = store.get_report(report_id)
+        if report is None:
+            err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+            raise typer.Exit(code=1)
+        reader = ArcticReader(probe_sleep_s=0.0)
+        deps = ResearchDeps(
+            chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+        )
+        try:
+            system = build_design_system(deps, report)
+        finally:
+            reader.close()
+
+    console.print(f"[bold]Reviewing[/bold] {url}...")
+    try:
+        review = review_design(renderer, url, system=system)
+    except (MetalworksError, StyleAuditUnsupported) as exc:
+        err_console.print(f"[red]{exc.message}[/red]")
+        if exc.fix:
+            err_console.print(f"[dim]{exc.fix}[/dim]")
+        raise typer.Exit(code=1) from exc
+
+    color = "green" if review.passed else "yellow"
+    console.print(
+        f"  score: [{color}]{review.score}/10[/{color}]  ({'pass' if review.passed else 'review'})"
+    )
+    console.print(f"  fonts: {', '.join(review.fonts) or '—'}")
+    for finding in review.findings:
+        sev_color = {"fail": "red", "warn": "yellow", "ok": "green"}[finding.severity]
+        console.print(
+            f"  [{sev_color}]{finding.severity}[/{sev_color}] [{finding.category}] {finding.detail}"
+        )
+    if json_out is not None:
+        json_out.write_text(review.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote[/green] {json_out}")
+
+
 @research_app.command("launch", rich_help_panel="Pillars & build")
 def research_launch(
     report_id: Annotated[

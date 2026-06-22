@@ -16,6 +16,7 @@ from metalworks.research.design import (
     render_design_md,
     render_design_preview_html,
 )
+from metalworks.research.design_review import review_design
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
 from metalworks.research.launch import build_launch_assets, plan_channels
@@ -52,6 +53,7 @@ __all__ = [
     "render_design_preview_html",
     "render_logo_picker_html",
     "render_site_html",
+    "review_design",
     "run_assessment",
     "run_competitor_map",
     "run_landscape",

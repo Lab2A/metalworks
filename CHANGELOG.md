@@ -45,6 +45,14 @@ contracts may change in any release.
   `mw.render_site(site, research, design=…)`, `metalworks research site --styled`, and the
   `site_render` MCP tool's `styled=true` build the design and apply it. **Strictly additive** — with no
   design system the site renders exactly the unstyled structural HTML as before.
+- **Design review (`/design-review`) — the audit half of the design pillar.** A **deterministic**
+  computed-style audit of a *rendered* page: it opens the URL in a real browser, reads the actual
+  fonts / heading scale / colors, and flags hard-rule violations (too many fonts, an AI-default
+  convergence-trap body face, a non-monotonic heading scale) plus — with a report — whether the page
+  matches that report's design system. The model writes nothing; every `StyleFinding` is a pure
+  function of the page. `DesignReview` / `StyleFinding` contracts; on all four surfaces:
+  `mw.design_review()`, `metalworks research design-review`, the `design_review` MCP tool, and the
+  `/design-review` skill. Needs a script-capable browser renderer (Playwright).
 
 ## [0.0.5] - 2026-06-18
 

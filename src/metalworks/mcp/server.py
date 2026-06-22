@@ -151,6 +151,13 @@ async def logo_generate(
     return tools.logo_generate(report_id, name, store_path)
 
 
+async def design_review(
+    url: str, report_id: str | None = None, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Audit a rendered page's computed styles vs design rules (+ a report's system)."""
+    return tools.design_review(url, report_id, store_path)
+
+
 async def launch_assets_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Draft grounded, channel-native launch assets for a stored report (chat key)."""
     return tools.launch_assets_build(report_id, store_path)
@@ -242,6 +249,7 @@ _TOOL_WRAPPERS = (
     site_render,
     design_from_report,
     logo_generate,
+    design_review,
     launch_assets_build,
     channel_plan_build,
     content_plan_from_report,

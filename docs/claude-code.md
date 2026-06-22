@@ -67,6 +67,7 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 - **`/generate-site`** — a marketing site whose every load-bearing line is a verbatim real quote, footnoted to its permalink. Calls `site_render`, which returns the `MarketingSite` plus a self-contained `index.html`. A line that can't be exact-matched to a real quote is dropped.
 - **`/design`** — a grounded-but-directional design system: an aesthetic direction + a SAFE/RISK choice per dimension (`design_from_report`), read from a real browser teardown of competitor sites where available. Records its `grounding_tier` (renderer / web / model_knowledge) so the look is never overstated; writes a `DESIGN.md`. Authors a system, not pixels.
 - **`/logo`** — the mark submodule: diverse, company-grade SVG logo options (`logo_generate`), one per design angle, drawn under the brand's design system. Offered, never auto-selected; an unsafe or empty SVG is dropped, never inlined.
+- **`/design-review`** — a deterministic audit of a *rendered* page's actual computed styles (fonts, heading scale, colors) against design hard-rules + the design system (`design_review`). The model writes nothing; needs the browser renderer.
 
 ### Build
 
