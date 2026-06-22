@@ -252,33 +252,38 @@ def _synthesize(
 
 def build_design_system(
     deps: ResearchDeps,
-    research: Research,
+    research: Research | DemandReport,
     *,
     brand_name: str | None = None,
     renderer: PageRenderer | None = None,
     max_teardown: int = 3,
 ) -> DesignSystem:
-    """Author a grounded :class:`DesignSystem` from a finished research bundle.
+    """Author a grounded :class:`DesignSystem` from a report (or a full bundle).
 
     Reads the competition at the richest tier available (a real renderer teardown
     > web text > model knowledge), makes ONE constrained LLM call under the house
     craft bar, and stamps the actual ``grounding_tier`` so the look is never
     overstated. On any synthesis failure, returns an honest partial system — never
-    raises. ``max_teardown`` caps the live teardown (default 3 by traction; ``0``
-    for the full sweep); ``renderer`` defaults to ``config.resolve_renderer()``.
+    raises. Accepts a bare :class:`DemandReport` (no landscape → the teardown
+    degrades) or a full :class:`Research` bundle (its landscape drives the
+    teardown). ``max_teardown`` caps the live teardown (default 3 by traction;
+    ``0`` for the full sweep); ``renderer`` defaults to ``config.resolve_renderer()``.
     """
-    report = research.demand
+    from metalworks.contract.bundle import Research as _Research
+
+    bundle = research if isinstance(research, _Research) else _Research(demand=research)
+    report = bundle.demand
     if renderer is None:
         from metalworks import config
 
         renderer = config.resolve_renderer()
 
-    teardown = _teardown_competitors(research.landscape, renderer, max_teardown=max_teardown)
+    teardown = _teardown_competitors(bundle.landscape, renderer, max_teardown=max_teardown)
     name = (brand_name or "").strip() or _suggest_brand_name(deps, report)
     now = datetime.now(UTC)
 
     try:
-        draft = _synthesize(deps, report, research, teardown, name)
+        draft = _synthesize(deps, report, bundle, teardown, name)
     except Exception as exc:  # synthesis failed — honest partial, never a crash
         return DesignSystem(
             report_id=report.report_id,

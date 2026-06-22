@@ -240,3 +240,29 @@ def test_preview_html_renders_self_contained() -> None:
     assert html.startswith("<!doctype html>")
     assert "grounding: renderer" in html
     assert "RISK" in html
+
+
+# ── four-surface parity ───────────────────────────────────────────────────────
+
+
+def test_design_wired_on_all_surfaces() -> None:
+    import importlib.util
+
+    from typer.testing import CliRunner
+
+    from metalworks import Metalworks
+    from metalworks.cli import app
+
+    # facade
+    assert hasattr(Metalworks, "design") and hasattr(Metalworks, "render_design_preview")
+    # CLI
+    result = CliRunner().invoke(app, ["research", "design", "--help"])
+    assert result.exit_code == 0
+    # MCP (body + async wrapper + _TOOL_WRAPPERS), when the mcp extra is present
+    if importlib.util.find_spec("mcp") is not None:
+        from metalworks.mcp import server, tools
+
+        attr = "_TOOL_WRAPPERS"  # variable, not a literal, to dodge the B009/SLF001 ruff pair
+        names = {getattr(w, "__name__", "") for w in getattr(server, attr)}
+        assert "design_from_report" in names
+        assert hasattr(tools, "design_from_report")

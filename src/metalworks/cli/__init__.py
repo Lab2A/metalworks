@@ -2178,6 +2178,80 @@ def research_site(
         console.print(f"  [bold]{s.role}[/bold] [{s.provenance}]: {s.copy[:70]}")
 
 
+@research_app.command("design", rich_help_panel="Pillars & build")
+def research_design(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", help="Brand name (else the model suggests one).")
+    ] = None,
+    out_dir: Annotated[
+        Path | None,
+        typer.Option("--out", "-o", help="Directory for DESIGN.md + preview.html (default: cwd)."),
+    ] = None,
+    max_teardown: Annotated[
+        int, typer.Option("--max-teardown", help="Competitor sites to teardown (0 = all).")
+    ] = 3,
+) -> None:
+    """Author a grounded design system from a stored report.
+
+    Builds the landscape, then reads the competition at the richest tier available
+    (a real browser teardown when ``metalworks browser install`` has been run > web
+    text > model knowledge) and records the grounding tier. Writes DESIGN.md + a
+    preview.html.
+    """
+    from metalworks.contract.bundle import Research
+    from metalworks.research import (
+        build_design_system,
+        render_design_md,
+        render_design_preview_html,
+        run_landscape,
+    )
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Designing[/bold] for report {report_id}...")
+    try:
+        try:
+            landscape = run_landscape(deps, report)
+        except Exception:  # landscape is best-effort; design degrades honestly without it
+            landscape = None
+        research = Research(demand=report, landscape=landscape)
+        system = build_design_system(deps, research, brand_name=name, max_teardown=max_teardown)
+    finally:
+        reader.close()
+
+    tier_color = {"renderer": "green", "web": "yellow"}.get(system.grounding_tier, "yellow")
+    console.print(f"  grounding: [{tier_color}]{system.grounding_tier}[/{tier_color}]")
+    if system.partial and system.caveat:
+        console.print(f"  [yellow]caveat:[/yellow] {system.caveat}")
+    console.print(f"  [bold]{system.brand_name}[/bold] — {system.aesthetic}")
+    for choice in system.choices:
+        stance_color = "red" if choice.stance == "risk" else "dim"
+        console.print(
+            f"  {choice.dimension:<11} [{stance_color}]{choice.stance}[/{stance_color}]: "
+            f"{choice.decision}"
+        )
+    dest = out_dir or Path()
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "DESIGN.md").write_text(render_design_md(system), encoding="utf-8")
+    (dest / "preview.html").write_text(render_design_preview_html(system), encoding="utf-8")
+    console.print(f"[green]Wrote[/green] {dest}/DESIGN.md + {dest}/preview.html")
+
+
 @research_app.command("launch", rich_help_panel="Pillars & build")
 def research_launch(
     report_id: Annotated[
