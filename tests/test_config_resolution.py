@@ -388,3 +388,70 @@ def test_build_source_drops_unaccepted_kwargs(
     register_source("keyless", lambda: _Keyless())
     sources = config.resolve_sources(override=["keyless"], reader=object(), comments=object())
     assert sources[0].source_id == "keyless"
+
+
+def test_resolve_sources_never_leaks_arctic_reader_into_hn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # resolve_sources passes the Reddit reader/comments to EVERY factory. HN's
+    # __init__ accepts ``reader=`` and swallows extras, so a naive wiring would
+    # mis-wire it with the Arctic reader. Its factory must drop the foreign reader
+    # (and ``comments``) and build its OWN reader — no network, no download.
+    pytest.importorskip("duckdb")  # the HN reader needs duckdb
+    from metalworks.research.sources.hn_archive import (
+        HackerNewsArchiveReader,
+        HackerNewsArchiveSource,
+    )
+
+    class _FakeArctic:
+        """Stand-in for the Reddit reader / comment client resolve_sources passes."""
+
+    sources = config.resolve_sources(
+        override=["hackernews_archive"], reader=_FakeArctic(), comments=_FakeArctic()
+    )
+    assert len(sources) == 1
+    hn = sources[0]
+    assert isinstance(hn, HackerNewsArchiveSource)
+    # Its reader is its OWN archive reader, NOT the foreign Arctic one.
+    assert isinstance(hn._reader, HackerNewsArchiveReader)  # noqa: SLF001 - asserting no leak
+    assert not isinstance(hn._reader, _FakeArctic)  # noqa: SLF001 - asserting no leak
+
+
+def test_resolve_sources_adds_hn_alongside_reddit_with_own_reader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Enabling hackernews_archive next to reddit adds a second source; the Arctic
+    # source keeps the passed reader while HN keeps its own (the wiring stays split).
+    pytest.importorskip("duckdb")
+    from metalworks.research.sources.arctic import ArcticItemSource
+    from metalworks.research.sources.hn_archive import (
+        HackerNewsArchiveReader,
+        HackerNewsArchiveSource,
+    )
+
+    class _FakeArctic:
+        pass
+
+    arctic_reader = _FakeArctic()
+    sources = config.resolve_sources(
+        override=["reddit", "hackernews_archive"], reader=arctic_reader, comments=_FakeArctic()
+    )
+    assert [type(s).__name__ for s in sources] == [
+        ArcticItemSource.__name__,
+        HackerNewsArchiveSource.__name__,
+    ]
+    # Reddit/Arctic got the passed reader; HN built its own.
+    assert sources[0]._reader is arctic_reader  # noqa: SLF001 - asserting split wiring
+    assert isinstance(sources[1]._reader, HackerNewsArchiveReader)  # noqa: SLF001 - split wiring
+
+
+def test_hn_factory_preserves_explicit_archive_reader(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The hardening must NOT clobber a legitimately-passed HN reader (explicit
+    # construction via get_source(..., reader=HackerNewsArchiveReader(...))).
+    pytest.importorskip("duckdb")
+    from metalworks.research.sources import get_source
+    from metalworks.research.sources.hn_archive import HackerNewsArchiveReader
+
+    reader = HackerNewsArchiveReader(data_root="./hn-corpus")
+    source = get_source("hackernews_archive", reader=reader)
+    assert source._reader is reader  # type: ignore[attr-defined]  # noqa: SLF001 - explicit reader kept
