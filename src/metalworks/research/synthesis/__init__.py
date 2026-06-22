@@ -16,7 +16,6 @@ Flow:
       ↓ loader.load_posts / load_comments       (corpus repo → in-memory)
       ↓ embed_group                              (near-dup dedup)
       ↓ cluster_ranker.build_clusters            (LLM theme labeling)
-      ↓ audience.build_audience_profile / describe_audience
       ↓ market.build_market_sizing               (deterministic)
       ↓ pricing.build_price_finding              (only when Price is a Find slot)
       ↓ segments.build_segments                  (LLM, best-effort)
@@ -30,8 +29,9 @@ Structural-provenance contract:
 
 Failure model:
   - The cluster_ranker call RAISES after 3 retries — never returns a silent
-    empty ranked_clusters. Secondary calls (segments, pricing, audience_profile)
-    are best-effort and degrade individually.
+    empty ranked_clusters. Secondary calls (segments, pricing) are best-effort
+    and degrade individually. `audience_profile` is no longer inferred — the
+    demographic subreddit-proxy path was cut, so it is always None.
 """
 
 from __future__ import annotations
@@ -41,9 +41,6 @@ from typing import TYPE_CHECKING
 
 from metalworks.contract import ResearchBrief, SlotPlan, SourceMapEntry
 from metalworks.research.embedding_cache import cached_embed
-from metalworks.research.synthesis import (
-    audience as audience_mod,
-)
 from metalworks.research.synthesis import (
     cluster_ranker,
     demand,
@@ -62,7 +59,6 @@ if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
 
 __all__ = [
-    "audience_mod",
     "build_positioning_brief",
     "cluster_ranker",
     "embed_group",
@@ -93,26 +89,17 @@ def _axis_context(brief: ResearchBrief) -> str:
     return brief.question
 
 
-def _build_source_map(
-    posts: list[LoadedPost],
-    coded_lookup: dict[str, str],
-) -> list[SourceMapEntry]:
+def _build_source_map(posts: list[LoadedPost]) -> list[SourceMapEntry]:
     """One SourceMapEntry per subreddit in the hydrated post set.
 
-    `threads_examined` = number of hydrated posts in that sub. `skew` = the
-    static-map audience descriptor when the sub is coded.
+    `threads_examined` = number of hydrated posts in that sub. `skew` stays None
+    — the demographic subreddit-proxy map that used to fill it was cut.
     """
     counts = Counter(p.subreddit for p in posts if p.subreddit)
     out: list[SourceMapEntry] = []
     for sub, n in counts.most_common():
         sub_label = sub if sub.startswith("r/") else f"r/{sub}"
-        out.append(
-            SourceMapEntry(
-                subreddit=sub_label,
-                threads_examined=n,
-                skew=coded_lookup.get(sub.lower().lstrip("r/").strip()),
-            )
-        )
+        out.append(SourceMapEntry(subreddit=sub_label, threads_examined=n))
     return out
 
 
@@ -153,7 +140,7 @@ def synthesize(
             candidate_wedges=[],
             market_sizing=None,
             price_finding=None,
-            source_map=_build_source_map(posts, {}),
+            source_map=_build_source_map(posts),
             total_distinct_authors=0,
             n_synthesized=0,
         )
@@ -178,36 +165,26 @@ def synthesize(
         comments=units,
     )
 
-    # 4. Audience inference (descriptors + structured profile).
-    sub_counts = Counter(c.subreddit for c in comments).most_common()
-    coded = audience_mod.coded_subreddits(sub_counts)
-    coded_lookup = dict(coded)
-    audience_profile = audience_mod.build_audience_profile(deps, coded)
+    # 4. Demographic audience inference is cut. You can't read age/income/geo off
+    # a subreddit name, so we don't guess: `audience_profile` stays None and the
+    # grounded thing — behavioral segments tied to real quotes — carries the load.
 
-    # 5. Per-cluster attribution_method/confidence from the static map.
-    # member_indices index into `units` (the list handed to build_clusters), so
-    # dereference units here — web units carry an empty subreddit, ignored by the
-    # Reddit-static audience map.
-    for cluster, mi in zip(clusters, member_indices, strict=False):
-        method, confidence = audience_mod.describe_audience([units[i].subreddit for i in mi])
-        cluster.attribution_method = method
-        cluster.attribution_confidence = confidence
-
-    # 6. Market sizing (deterministic).
+    # 5. Market sizing (deterministic).
     total_distinct = len({c.author_hash for c in comments if c.author_hash})
     market_sizing = market.build_market_sizing(total_distinct)
 
-    # 7. Slot plan + pricing (only when Price is a Find slot).
+    # 6. Slot plan + pricing (only when Price is a Find slot).
     slot_plan = _slot_plan_from_brief(brief)
     price_finding = pricing.build_price_finding(deps, comments, slot_plan)
 
-    # 8. Segmentation (best-effort).
-    seg_list = segments.build_segments(deps, clusters, cluster_authors, audience_profile)
+    # 7. Segmentation (best-effort). No demographic fallback profile — segments
+    # synthesize their own preferences-only profile when none is supplied.
+    seg_list = segments.build_segments(deps, clusters, cluster_authors, None)
 
-    # 8b. Candidate wedges (deterministic, grounded — the buildable forks).
+    # 7b. Candidate wedges (deterministic, grounded — the buildable forks).
     wedge_list = wedges.build_wedges(clusters, seg_list)
 
-    # 9. Verdict + source_map (both deterministic).
+    # 8. Verdict + source_map (both deterministic).
     strength_label = demand.report_demand_label(
         [w.breadth_count for w in wedge_list],
         [s.distinct_author_count for s in seg_list],
@@ -219,7 +196,7 @@ def synthesize(
         market=market_sizing,
         price=price_finding,
     )
-    source_map = _build_source_map(posts, coded_lookup)
+    source_map = _build_source_map(posts)
 
     # n_synthesized — distinct post_ids whose comments survived dedup AND ended
     # up in at least one cluster's member set. The honest post-cluster-dedup
@@ -236,7 +213,7 @@ def synthesize(
         ranked_clusters=clusters,
         verdict=verdict_str,
         slot_plan=slot_plan,
-        audience_profile=audience_profile,
+        audience_profile=None,  # demographic inference cut — see step 4
         segments=seg_list,
         candidate_wedges=wedge_list,
         market_sizing=market_sizing,

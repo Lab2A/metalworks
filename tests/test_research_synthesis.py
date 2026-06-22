@@ -393,8 +393,8 @@ def test_synthesize_end_to_end_builds_cluster() -> None:
             ]
         ),
     )
-    # Secondary best-effort calls (audience/segments/pricing) may also hit chat;
-    # they swallow their own failures, so leaving them unscripted is fine — the
+    # Secondary best-effort calls (segments/pricing) may also hit chat; they
+    # swallow their own failures, so leaving them unscripted is fine — the
     # FakeChatModel raises AssertionError, which best-effort wrappers catch.
     deps = _deps(store, chat)
     out = synthesize(deps, brief=_brief(), hydrated_post_ids=["post1"])
@@ -406,5 +406,9 @@ def test_synthesize_end_to_end_builds_cluster() -> None:
     assert c.mention_count == 2
     assert len(c.quotes) >= 1
     assert out.total_distinct_authors == 2
+    # Demographic inference is cut: audience_profile is always None now, and no
+    # source_map entry carries a demographic skew.
+    assert out.audience_profile is None
+    assert all(e.skew is None for e in out.source_map)
     # source_map reflects the hydrated post subset.
     assert any(e.subreddit == "r/Supplements" for e in out.source_map)
