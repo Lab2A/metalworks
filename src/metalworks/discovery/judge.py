@@ -1,10 +1,11 @@
-"""Optional LLM compliance judge — fires only when the heuristic is uncertain.
+"""LLM compliance judge — the authoritative gate for "does this read as authentic."
 
-The deterministic gate (`metalworks.reddit.heuristic_check`) returns a verdict
-plus a confidence; a confidence < 0.7 is the signal that the cheap heuristic
-can't call it. This module ports the source's `build_llm_judge_prompt`
-and runs it on the cheap `filter_model`
-(Haiku judging Sonnet output, or vice versa).
+The deterministic gate (`metalworks.reddit.heuristic_check`) is a cheap first
+pass: its regex denylist hard-rejects the obvious AI-tells, but a finite phrase
+list can't enumerate every inauthentic phrasing. So the discovery pipeline
+escalates any heuristic *pass* to this judge — it, not the phrase list, is the
+real arbiter of whether a reply reads as a genuine human contribution. Runs on
+the cheap `filter_model` (Haiku judging Sonnet output, or vice versa).
 
 The judge is STRICT by design: rejecting a good reply (false positive) costs
 less than shipping spam (false negative). It returns a `ComplianceVerdict`.
@@ -23,9 +24,13 @@ _LLM_JUDGE_SYSTEM = (
     "You are a Reddit reply compliance judge. Given a reply, the post it's "
     "responding to, and the subreddit rules, you decide whether posting it "
     "would: (a) get the comment removed by mods, (b) get downvoted as spam, "
-    "or (c) genuinely add value. You are STRICT — false positives (rejecting "
-    "a good reply) cost less than false negatives (shipping spam). Output a "
-    "single structured verdict, never as free text."
+    "or (c) genuinely add value. You are the authoritative gate for whether the "
+    "reply READS AS AUTHENTIC — written by a real person in this community, not "
+    "generated. Judge the whole voice: AI-tell openers and filler, generic "
+    "advice, marketing register, hedging — not just a fixed list of phrases. You "
+    "are STRICT — false positives (rejecting a good reply) cost less than false "
+    "negatives (shipping spam). Output a single structured verdict, never as "
+    "free text."
 )
 
 
@@ -35,9 +40,10 @@ def build_llm_judge_prompt(
     post: RedditPost,
     subreddit_rules: list[str] | None = None,
 ) -> tuple[str, str]:
-    """Build (system, user) for the optional LLM compliance judge.
+    """Build (system, user) for the LLM compliance judge.
 
-    Use this when `heuristic_check` returns confidence < 0.7.
+    The pipeline runs this on any reply the deterministic `heuristic_check`
+    passes — the judge, not the regex denylist, is the real authentic-voice gate.
     """
     rules_block = ""
     if subreddit_rules:
@@ -66,7 +72,9 @@ def build_llm_judge_prompt(
             "",
             "<task>",
             "Would shipping this reply: get removed by mods, get downvoted as spam, "
-            "or genuinely add value?",
+            "or genuinely add value? Does it read as authentic — a real person in "
+            "this community — or does it carry AI-tells (any inauthentic opener, "
+            "filler, or generic phrasing, not just a fixed list)?",
             "Output with: pass (bool), violations (list of specific issues — "
             "empty when pass=True), confidence (0-1).",
             "</task>",

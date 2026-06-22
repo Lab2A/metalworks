@@ -13,7 +13,10 @@ Two entry points:
   structured per-violation codes/severities/spans for inline editor display.
 
 The em-dash homoglyph family and AI-tell phrase lists are deliberately broad:
-the gate can't be trivially evaded by telling a model "no em-dashes".
+the gate can't be trivially evaded by telling a model "no em-dashes". The
+reply-gate AI-tell denylist lives in `reddit.stylebook` (shared with the
+generator prompt) and is a cheap *first pass* — the authentic-voice gate is the
+LLM judge (`discovery.judge`), which the discovery pipeline escalates a pass to.
 """
 
 from __future__ import annotations
@@ -22,24 +25,14 @@ import re
 from typing import Any
 
 from metalworks.contract import ComplianceVerdict, LintViolation, PostLintVerdict
+from metalworks.reddit.stylebook import AI_TELL_REGEX as _AI_TELL_REGEX
 
 # ── Comment/reply gate ─────────────────────────────────────────────────────
 
-# Phrases that almost always signal an AI-generated marketing reply.
-_AI_TELLS = [
-    r"\bgreat question\b",
-    r"\bgreat point\b",
-    r"\bhope this helps\b",
-    r"\blet me know if\b",
-    r"\bhappy to help\b",
-    r"\bI completely understand\b",
-    r"\bI hear you\b",
-    r"\bdelve into\b",
-    r"\bin today's\s+(landscape|world|environment)\b",
-    r"\b(crucial|pivotal|robust|comprehensive|nuanced|multifaceted)\b",
-    r"\bAs an AI\b",
-]
-_AI_TELL_REGEX = re.compile("|".join(_AI_TELLS), re.IGNORECASE)
+# The AI-tell phrase denylist (`_AI_TELL_REGEX`) is the single source in
+# `reddit.stylebook`, shared with the generator prompt so the two can't drift.
+# It is a cheap deterministic first pass, not the authentic-voice gate — that is
+# the LLM judge (`discovery.judge`), which the pipeline escalates a pass to.
 _CTA_REGEX = re.compile(r"\b(check out|sign up|try (it|us)|click)\b", re.IGNORECASE)
 
 

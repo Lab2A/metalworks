@@ -76,6 +76,16 @@ def _reply(text: str = "loki + grafana is the budget stack. lighter than elk by 
     )
 
 
+def _pass_verdict() -> ComplianceVerdict:
+    """The LLM judge's verdict for a clean reply.
+
+    The pipeline escalates every heuristic *pass* to the judge (the judge, not
+    the regex denylist, is the authentic-voice gate), so any test that drafts a
+    clean reply and expects an opportunity must script this on the judge's model.
+    """
+    return ComplianceVerdict.model_validate({"pass": True, "violations": [], "confidence": 0.9})
+
+
 def _deps(
     *,
     search: StubSearch,
@@ -106,6 +116,7 @@ def test_generate_then_gate_produces_opportunity_with_verdict() -> None:
     chat = FakeChatModel()
     chat.script(FilterDecision, _keep())
     chat.script(ReplyGenerationV2, _reply())
+    chat.script(ComplianceVerdict, _pass_verdict())  # judge gates every heuristic pass
 
     stores = MemoryStores()
     deps = _deps(search=StubSearch([_post()]), stores=stores, chat=chat)
@@ -210,6 +221,40 @@ def test_low_confidence_heuristic_escalates_to_llm_judge() -> None:
     assert ComplianceVerdict in [c.get("output_model") for c in fast.calls]
 
 
+def test_novel_ai_tell_passes_regex_but_judge_blocks() -> None:
+    from metalworks.discovery import FilterDecision, ReplyGenerationV2
+    from metalworks.reddit import heuristic_check
+
+    # A reply that reads as AI but uses NONE of the denylist phrases — a novel
+    # AI-tell opener the finite regex can't enumerate. It clears the heuristic
+    # at high confidence, so only the LLM judge — the real authentic-voice gate
+    # — can catch it. Without judge escalation on a pass, this would ship.
+    novel = (
+        "What a fantastic thing to be exploring! Embarking on this journey, you'll "
+        "find that observability is truly a game-changer for your infrastructure stack."
+    )
+    pre = heuristic_check(novel)
+    assert pre.pass_ is True  # regex denylist does NOT catch it
+    assert pre.confidence >= 0.9
+
+    chat = FakeChatModel()
+    chat.script(FilterDecision, _keep())
+    chat.script(ReplyGenerationV2, _reply(novel))
+    # The judge rejects it as inauthentic — the authoritative style gate.
+    chat.script(
+        ComplianceVerdict,
+        ComplianceVerdict.model_validate(
+            {"pass": False, "violations": ["reads as AI-generated"], "confidence": 0.85}
+        ),
+    )
+
+    deps = _deps(search=StubSearch([_post()]), stores=MemoryStores(), chat=chat)
+    opps = run_discovery(deps, queries=["q"])
+
+    assert opps == []  # blocked by the judge, not the regex
+    assert ComplianceVerdict in [c.get("output_model") for c in chat.calls]
+
+
 def test_pro_to_flash_degradation_retry() -> None:
     from metalworks.discovery import FilterDecision, ReplyGenerationV2
 
@@ -227,6 +272,7 @@ def test_pro_to_flash_degradation_retry() -> None:
     # filter falls back to chat when fast_chat is set? No — filter uses fast_chat.
     fast.script(FilterDecision, _keep())
     fast.script(ReplyGenerationV2, _reply())
+    fast.script(ComplianceVerdict, _pass_verdict())  # judge runs on the filter model
 
     deps = _deps(search=StubSearch([_post()]), stores=MemoryStores(), chat=chat, fast_chat=fast)
     opps = run_discovery(deps, queries=["q"])
@@ -244,6 +290,7 @@ def test_max_opportunities_cap() -> None:
     # Single scripted instance is returned every call.
     chat.script(FilterDecision, _keep())
     chat.script(ReplyGenerationV2, _reply())
+    chat.script(ComplianceVerdict, _pass_verdict())  # judge gates every heuristic pass
 
     deps = _deps(search=StubSearch(posts), stores=MemoryStores(), chat=chat)
     opps = run_discovery(deps, queries=["q"], max_opportunities=2)
@@ -260,6 +307,7 @@ def test_persona_selected_by_account_type() -> None:
     chat = FakeChatModel()
     chat.script(FilterDecision, founder_decision)
     chat.script(ReplyGenerationV2, _reply())
+    chat.script(ComplianceVerdict, _pass_verdict())  # judge gates every heuristic pass
 
     context = DiscoveryContext(
         personas=PersonaSet(
@@ -296,6 +344,7 @@ def test_on_query_result_called_with_counts() -> None:
     chat = FakeChatModel()
     chat.script(FilterDecision, [_keep(), _reject()])
     chat.script(ReplyGenerationV2, _reply())
+    chat.script(ComplianceVerdict, _pass_verdict())  # judge gates every heuristic pass
 
     deps = _deps(
         search=StubSearch(posts),

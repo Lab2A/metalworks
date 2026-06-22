@@ -5,8 +5,9 @@ decoupling seams (see the discovery package docstring / plan). The pipeline per
 post is:
 
     dedup-check → filter (cheap model) → [keep?] → generate (capable model, with
-    pro→flash degradation retry) → compliance gate (deterministic heuristic,
-    escalating to the LLM judge when uncertain) → attach verdict → save.
+    pro→flash degradation retry) → compliance gate (deterministic regex denylist
+    as a cheap first pass, the LLM judge as the authoritative authentic-voice
+    gate on any pass) → attach verdict → save.
 
 Reductions vs. the source: no MEMORY system (knowledge comes from
 `deps.context`), no plan caps (just `max_opportunities`), no DB-loaded queries
@@ -35,9 +36,6 @@ if TYPE_CHECKING:
     from metalworks.contract import DiscoveryContext
     from metalworks.discovery.deps import DiscoveryDeps
     from metalworks.llm import ChatModel
-
-# Confidence below which the deterministic heuristic defers to the LLM judge.
-_ESCALATE_BELOW = 0.7
 
 # Account types the filter may legitimately return; anything else maps to expert.
 _VALID_ACCOUNT_TYPES = frozenset({"founder", "expert", "company"})
@@ -159,9 +157,13 @@ def _process_single_post(deps: DiscoveryDeps, post: RedditPost) -> Opportunity |
     if reply is None:
         return None
 
-    # Stage 3: compliance gate — deterministic heuristic, escalate when uncertain.
+    # Stage 3: compliance gate — the regex denylist is a cheap deterministic
+    # first pass (it hard-rejects the obvious tells); the LLM judge is the
+    # authoritative arbiter of authentic voice. A finite phrase list catches
+    # only its exact strings, so any pass is escalated to the judge — that is
+    # what catches novel AI-tell phrasing the denylist can't enumerate.
     verdict = heuristic_check(reply.reply_text, subreddit_rules)
-    if verdict.confidence < _ESCALATE_BELOW:
+    if verdict.pass_:
         verdict = llm_judge(
             deps, reply_text=reply.reply_text, post=post, subreddit_rules=subreddit_rules
         )
