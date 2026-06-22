@@ -21,9 +21,7 @@ from metalworks.research.design import (
 from metalworks.research.design_review import review_design
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
-from metalworks.research.launch import build_launch_assets, plan_channels
 from metalworks.research.logo import build_logo_set, render_logo_picker_html
-from metalworks.research.marketing import content_plan_from_report
 from metalworks.research.pipeline import run_research
 from metalworks.research.synthesis import build_positioning_brief
 from metalworks.research.validate import validate
@@ -41,13 +39,10 @@ __all__ = [
     "CorpusReader",
     "ResearchDeps",
     "build_design_system",
-    "build_launch_assets",
     "build_logo_set",
     "build_positioning_brief",
-    "content_plan_from_report",
     "ideate_from_idea",
     "ideate_from_report",
-    "plan_channels",
     "render_design_md",
     "render_design_preview_html",
     "render_logo_picker_html",

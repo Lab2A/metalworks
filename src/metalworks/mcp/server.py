@@ -147,21 +147,6 @@ async def design_review(
     return tools.design_review(url, report_id, store_path)
 
 
-async def launch_assets_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
-    """TIER 2. Draft grounded, channel-native launch assets for a stored report (chat key)."""
-    return tools.launch_assets_build(report_id, store_path)
-
-
-async def channel_plan_build(report_id: str, store_path: str | None = None) -> dict[str, Any]:
-    """TIER 1. Deterministic, human-executed launch channel plan for a stored report (zero-key)."""
-    return tools.channel_plan_build(report_id, store_path)
-
-
-async def content_plan_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
-    """TIER 1. Project a stored report into a deterministic content/SEO plan (zero-key)."""
-    return tools.content_plan_from_report(report_id, store_path)
-
-
 async def build_spec(
     report_id: str, surface: str = "auto", stack: str = "empty", store_path: str | None = None
 ) -> dict[str, Any]:
@@ -237,9 +222,6 @@ _TOOL_WRAPPERS = (
     design_from_report,
     logo_generate,
     design_review,
-    launch_assets_build,
-    channel_plan_build,
-    content_plan_from_report,
     build_spec,
     research_start,
     research_status,

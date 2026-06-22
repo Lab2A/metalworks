@@ -158,7 +158,7 @@ def test_facade_runs_the_pillar_arc_offline(
     pytest.importorskip("rank_bm25")
     monkeypatch.chdir(tmp_path)
     _clear_keys(monkeypatch)
-    from metalworks.contract import ChannelPlan, ContentPlan, PositioningBrief
+    from metalworks.contract import PositioningBrief
     from metalworks.embeddings import FakeEmbedding
     from metalworks.llm import FakeChatModel
     from metalworks.research import ResearchDeps
@@ -191,5 +191,3 @@ def test_facade_runs_the_pillar_arc_offline(
 
     assert isinstance(mw.deps, ResearchDeps)  # public escape hatch
     assert isinstance(mw.positioning(research), PositioningBrief)  # Pillar B via facade
-    assert isinstance(mw.content_plan(research), ContentPlan)  # Pillar G via facade
-    assert isinstance(mw.channel_plan(research), ChannelPlan)  # Pillar F (deterministic) via facade

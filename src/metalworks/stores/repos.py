@@ -224,7 +224,7 @@ class InboxRepo(Protocol):
 class StoredArtifact(BaseModel):
     """A persisted Tier-2 pillar output + its provenance stamp.
 
-    The artifact itself is any contract model (PositioningBrief, ContentPlan,
+    The artifact itself is any contract model (PositioningBrief, BuildSpec,
     …) serialized into ``payload_json``. The stamp — ``report_id`` +
     ``generated_at`` — is what makes staleness detectable: when research re-runs
     and mints a new ``report_id``, a snapshot whose ``report_id`` no longer matches
@@ -234,8 +234,8 @@ class StoredArtifact(BaseModel):
 
     project_id: str
     report_id: str
-    stage: str = Field(description="Arc stage: 'design' | 'launch' | 'growth' | ….")
-    kind: str = Field(description="Artifact kind, e.g. 'positioning' | 'site' | 'content_plan'.")
+    stage: str = Field(description="Arc stage: 'design' | 'build' | 'distribution' | ….")
+    kind: str = Field(description="Artifact kind, e.g. 'positioning' | 'build_spec' | 'design'.")
     generated_at: datetime
     payload_json: str = Field(description="The pillar artifact, serialized as JSON.")
 
