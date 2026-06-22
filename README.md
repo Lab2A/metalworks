@@ -87,6 +87,7 @@ pip install "metalworks[all]"
 | `supabase` | `arctic` + `supabase` | `ArcticMirrorReader` — Arctic corpus from a Supabase Storage bucket (`ARCTIC_SHIFT_SOURCE=mirror`) |
 | `exa` | `exa-py` | Exa `SearchProvider` adapter |
 | `tavily` | `tavily-python` | Tavily `SearchProvider` adapter |
+| `browser` | `playwright` | Owned headless Chromium `PageRenderer` (competitor teardowns, design review). **Post-install step:** `metalworks browser install`. On a server, `FIRECRAWL_API_KEY` renders without a local browser. |
 | `mcp` | `mcp[cli]` | MCP server surface |
 | `all` | everything above | Kitchen sink |
 | `dev` | pytest, ruff, pyright, respx | Contributors |
