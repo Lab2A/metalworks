@@ -39,6 +39,9 @@ _MAX_FEATURES = 8
 _MAX_PERSONAS = 3
 _QUOTES_PER_FEATURE = 2
 _MAX_TOKENS = 2048
+# Sort key for a feature whose source-cluster rank is missing/malformed (≤ 0):
+# push it to the end of the build order rather than ahead of rank-1 demand.
+_RANK_LAST = 10_000
 
 
 # ── LLM I/O (private) ────────────────────────────────────────────────────────
@@ -143,7 +146,15 @@ def _pricing_tiers(report: DemandReport) -> list[PricingTier]:
 
 
 def _ground_features(report: DemandReport, drafts: list[_FeatureDraft]) -> list[FeatureSpec]:
-    """Attach each feature's source cluster's quotes; drop the un-grounded ones."""
+    """Attach each feature's source cluster's quotes; drop the un-grounded ones.
+
+    The result is ordered as the BUILD ORDER — strongest validated demand first
+    (by the source cluster's rank) — then capped, so the cap keeps the highest-
+    demand features rather than whatever order the LLM happened to draft. This is
+    the deterministic, grounded residue of the build-blueprint exploration: the
+    sequence comes from real demand, and ``features[0]`` is the spine to build
+    first. No new LLM call — the rank is already on each draft.
+    """
     by_rank = _cluster_by_rank(report)
     seen: set[str] = set()
     out: list[FeatureSpec] = []
@@ -161,12 +172,18 @@ def _ground_features(report: DemandReport, drafts: list[_FeatureDraft]) -> list[
         ]
         out.append(
             FeatureSpec(
-                feature_id=fid, title=d.title.strip(), rationale=d.rationale.strip(), evidence=refs
+                feature_id=fid,
+                title=d.title.strip(),
+                rationale=d.rationale.strip(),
+                evidence=refs,
+                source_cluster_rank=d.source_cluster_rank,
             )
         )
-        if len(out) >= _MAX_FEATURES:
-            break
-    return out
+    # Order by grounded demand (rank 1 first), then cap. Stable sort preserves the
+    # LLM's relative order within a single cluster. Ties on rank are rare (features
+    # usually map to distinct clusters); a malformed rank ≤ 0 sorts last.
+    out.sort(key=lambda f: f.source_cluster_rank if f.source_cluster_rank > 0 else _RANK_LAST)
+    return out[:_MAX_FEATURES]
 
 
 # ── public entry ─────────────────────────────────────────────────────────────

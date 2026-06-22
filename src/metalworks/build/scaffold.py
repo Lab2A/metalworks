@@ -110,16 +110,28 @@ def render_spec_md(spec: BuildSpec, report: DemandReport) -> str:
     ]
     if spec.partial:
         lines += ["", f"> ⚠️ **Partial spec.** {spec.caveat or 'Grounding was thin.'}"]
-    lines += ["", "## Features", ""]
+    lines += ["", "## Features — build in this order", ""]
     if spec.features:
-        for f in spec.features:
+        lines += [
+            "Ordered by validated demand (strongest first). **Build #1 first — it is the "
+            "spine the rest hangs off.** The order is grounded, not arbitrary: each number is "
+            "the rank of the demand cluster behind the feature.",
+            "",
+        ]
+        for i, f in enumerate(spec.features, start=1):
             cites = ", ".join(_cite_line(idx, r.evidence_id) for r in f.evidence) or "_(uncited)_"
+            rank = (
+                f"demand cluster #{f.source_cluster_rank}"
+                if f.source_cluster_rank > 0
+                else "demand rank unknown"
+            )
+            spine = " — the spine, build first" if i == 1 else ""
             lines += [
-                f"### {_md(f.title)}  `{_md(f.feature_id)}`",
+                f"### {i}. {_md(f.title)}  `{_md(f.feature_id)}`{spine}",
                 "",
                 _md(f.rationale),
                 "",
-                f"Evidence: {cites}",
+                f"Why this rank: {rank}.  Evidence: {cites}",
                 "",
             ]
     else:
@@ -169,7 +181,8 @@ def render_claude_md(spec: BuildSpec, report: DemandReport) -> str:
             "",
             "1. Read `docs/SPEC.md` (what to build) and `docs/EVIDENCE.md` (why — the proof).",
             f"2. Pick the `{spec.stack}` starter and stand up the {spec.surface} surface.",
-            "3. Build the features in `SPEC.md`, in order. Each delivers a cited demand.",
+            "3. Build the features in `SPEC.md` in the order given — it is the build order,",
+            "   strongest validated demand first. Start with #1, the spine the rest hangs off.",
             "4. Keep `EVIDENCE.md` frozen. To add a feature, go back to metalworks and",
             "   re-run the research — do not invent demand here.",
             "",

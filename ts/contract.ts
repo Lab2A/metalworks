@@ -901,6 +901,8 @@ export interface FeatureSpec {
   rationale: string;
   /** ≥1 resolvable ref backing the feature. Empty → dropped at assembly. */
   evidence?: EvidenceRef[];
+  /** 1-based rank of the demand cluster this feature derives from (1 = strongest validated demand). Features in a BuildSpec are ordered by this — the build order is grounded in demand, not LLM whim; the lead feature is the spine to build first. 0 means unranked (sorts last). */
+  source_cluster_rank?: number;
 }
 
 export interface BuildPersona {
@@ -930,6 +932,7 @@ export interface BuildSpec {
   surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
   /** The chosen starter/stack hint (e.g. 'next-shipfast', 'empty'). */
   stack: string;
+  /** Core features, ordered as the build order: strongest validated demand first (by ``FeatureSpec.source_cluster_rank``). features[0] is the spine — build it first. */
   features?: FeatureSpec[];
   personas?: BuildPersona[];
   pricing_tiers?: PricingTier[];

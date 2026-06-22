@@ -37,6 +37,15 @@ class FeatureSpec(BaseModel):
         default_factory=list[EvidenceRef],
         description="≥1 resolvable ref backing the feature. Empty → dropped at assembly.",
     )
+    source_cluster_rank: int = Field(
+        default=0,
+        description=(
+            "1-based rank of the demand cluster this feature derives from (1 = strongest "
+            "validated demand). Features in a BuildSpec are ordered by this — the build order "
+            "is grounded in demand, not LLM whim; the lead feature is the spine to build first. "
+            "0 means unranked (sorts last)."
+        ),
+    )
 
 
 class BuildPersona(BaseModel):
@@ -69,7 +78,13 @@ class BuildSpec(BaseModel):
     report_id: str
     surface: SurfaceKind = Field(description="The surface this build targets.")
     stack: str = Field(description="The chosen starter/stack hint (e.g. 'next-shipfast', 'empty').")
-    features: list[FeatureSpec] = Field(default_factory=list[FeatureSpec])
+    features: list[FeatureSpec] = Field(
+        default_factory=list[FeatureSpec],
+        description=(
+            "Core features, ordered as the build order: strongest validated demand first "
+            "(by ``FeatureSpec.source_cluster_rank``). features[0] is the spine — build it first."
+        ),
+    )
     personas: list[BuildPersona] = Field(default_factory=list[BuildPersona])
     pricing_tiers: list[PricingTier] = Field(default_factory=list[PricingTier])
     partial: bool = Field(default=False)
