@@ -145,3 +145,55 @@ class EmbeddingModelMismatch(MetalworksError):
             "retrieval would degrade silently.",
             fix="Re-embed the index with the current model, or configure the original model.",
         )
+
+
+class BrowserNotInstalledError(MetalworksError):
+    """The ``browser`` extra is installed but its Chromium binary is missing.
+
+    Distinct from :class:`MissingExtraError` (the extra itself is absent): here
+    ``playwright`` imports fine, but ``playwright install chromium`` was never run.
+    """
+
+    error_code = "browser_not_installed"
+
+    def __init__(self, *, detail: str | None = None):
+        extra = f" ({detail})" if detail else ""
+        super().__init__(
+            f"The browser renderer is installed but its Chromium binary is missing{extra}.",
+            fix="metalworks browser install",
+        )
+
+
+class BrowserLaunchError(MetalworksError):
+    """Chromium is present but failed to launch (usually missing system libraries).
+
+    The common case is a stock Linux / CI / serverless image without the shared
+    libraries Chromium needs. The fix installs them; the env-var alternative
+    skips the local browser entirely.
+    """
+
+    error_code = "browser_launch"
+
+    def __init__(self, *, detail: str | None = None):
+        extra = f" ({detail})" if detail else ""
+        super().__init__(
+            f"The browser is installed but failed to launch{extra}. On Linux this "
+            "usually means missing system libraries.",
+            fix="metalworks browser install --with-deps  (or set FIRECRAWL_API_KEY to "
+            "render without a local browser)",
+        )
+
+
+class StyleAuditUnsupported(MetalworksError):
+    """A computed-style audit was requested from a screenshot-only renderer."""
+
+    error_code = "style_audit_unsupported"
+
+    def __init__(self, renderer_id: str):
+        self.renderer_id = renderer_id
+        super().__init__(
+            f"The '{renderer_id}' renderer is screenshot-only and cannot extract computed "
+            "styles (it does not run page scripts).",
+            fix="Install the browser renderer (metalworks browser install) for style audits; "
+            "Firecrawl is screenshot-only.",
+        )

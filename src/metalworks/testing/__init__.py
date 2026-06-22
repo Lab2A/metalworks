@@ -44,8 +44,10 @@ from metalworks.contract import (
     TargetSubreddit,
 )
 from metalworks.embeddings import FakeEmbedding, IndexIdentity
-from metalworks.errors import EmbeddingModelMismatch
+from metalworks.errors import EmbeddingModelMismatch, StyleAuditUnsupported
 from metalworks.llm.fake import FakeChatModel
+from metalworks.render import ComputedStyle, PageRenderer, RenderedPage, RendererCapabilities
+from metalworks.render.fake import FakeRenderer
 from metalworks.research.sources import ItemSource, SourceWindow
 from metalworks.stores.repos import (
     AccountRepo,
@@ -287,10 +289,63 @@ def check_all_repos(backend: AllRepos, *, corpus_rows: int = 1500) -> None:
     check_inbox_repo(backend)
 
 
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def check_page_renderer(renderer: PageRenderer, *, url: str = "https://example.com") -> None:
+    """Assert that ``renderer`` honors the :class:`~metalworks.render.PageRenderer` contract.
+
+    A renderer adapter self-verifies with this before shipping. Point it at a
+    reachable ``url`` (a real page for Playwright/Firecrawl, anything for the
+    Fake). It checks the surface every consumer relies on:
+
+    * ``renderer_id`` is a non-empty string and ``capabilities`` is a
+      :class:`~metalworks.render.RendererCapabilities`.
+    * ``render()`` returns a :class:`~metalworks.render.RenderedPage` whose
+      ``screenshot`` is PNG bytes (or empty), ``html`` is a string, and
+      ``final_url`` is set.
+    * if ``capabilities.supports_style_audit``: ``extract_computed_styles()``
+      yields :class:`~metalworks.render.ComputedStyle`; otherwise it raises
+      :class:`~metalworks.errors.StyleAuditUnsupported`.
+    """
+    assert isinstance(renderer.renderer_id, str) and renderer.renderer_id, (
+        "renderer_id must be a non-empty string"
+    )
+    assert isinstance(renderer.capabilities, RendererCapabilities), (
+        "capabilities must be a RendererCapabilities"
+    )
+
+    page = renderer.render(url)
+    assert isinstance(page, RenderedPage), f"render() must return RenderedPage, got {type(page)!r}"
+    assert isinstance(page.screenshot, bytes), "screenshot must be bytes"
+    assert page.screenshot[:8] == _PNG_MAGIC or page.screenshot == b"", (
+        "screenshot must be PNG bytes (or empty when the backend couldn't capture)"
+    )
+    assert isinstance(page.html, str), "html must be a string"
+    assert page.final_url, "final_url must be set (resolved URL after redirects)"
+
+    if renderer.capabilities.supports_style_audit:
+        styles = renderer.extract_computed_styles(url, ["body"])
+        assert all(isinstance(s, ComputedStyle) for s in styles), (
+            "extract_computed_styles() must yield ComputedStyle"
+        )
+    else:
+        raised = False
+        try:
+            renderer.extract_computed_styles(url, ["body"])
+        except StyleAuditUnsupported:
+            raised = True
+        assert raised, (
+            "a screenshot-only renderer (supports_style_audit=False) must raise "
+            "StyleAuditUnsupported from extract_computed_styles()"
+        )
+
+
 __all__ = [
     "AllRepos",
     "FakeChatModel",
     "FakeEmbedding",
+    "FakeRenderer",
     "check_account_repo",
     "check_all_repos",
     "check_brief_repo",
@@ -298,5 +353,6 @@ __all__ = [
     "check_inbox_repo",
     "check_item_source",
     "check_opportunity_repo",
+    "check_page_renderer",
     "check_run_repo",
 ]
