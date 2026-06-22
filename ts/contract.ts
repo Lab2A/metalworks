@@ -315,8 +315,10 @@ export interface DemandReport {
   parent_report_id?: string | null;
   query: string;
   fork: Fork;
-  pinned_axis: string;
-  optimized_axis: string;
+  /** The fork's pinned axis when computed; None otherwise. */
+  pinned_axis?: string | null;
+  /** The fork's optimized axis when computed; None otherwise. */
+  optimized_axis?: string | null;
   /** Provenance of the corpus this run drew on: 'reddit_arctic_shift' | 'reddit_live' | 'hackernews' | 'reviews' | 'mixed'. */
   source?: string;
   date_range_start: string;

@@ -91,6 +91,10 @@ contracts may change in any release.
 
 ### Changed
 
+- **`DemandReport.pinned_axis` / `optimized_axis` are now optional (`str | None`, default `None`).**
+  They were required `str` but never computed — the pipeline filled them with sentinel strings
+  (`"(slot_plan-driven)"`, `"(no corpus)"`) that read like data. No code consumed them; the pipeline
+  now leaves them `None` (honestly "not computed") instead of shipping a placeholder.
 - **Renamed `DemandReport.verdict` → `demand_summary`.** The field is a demand-strength *summary*
   ("Strong demand — 130 distinct voices; ~130 reachable on Reddit"), not the authoritative
   go/no-go — that remains `assess`'s `Decision` (GO / PIVOT / NO_GO). Because the summary carries no

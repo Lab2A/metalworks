@@ -1327,8 +1327,17 @@
       "type": "object"
     },
     "optimized_axis": {
-      "title": "Optimized Axis",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The fork's optimized axis when computed; None otherwise.",
+      "title": "Optimized Axis"
     },
     "parent_report_id": {
       "anyOf": [
@@ -1349,8 +1358,17 @@
       "type": "boolean"
     },
     "pinned_axis": {
-      "title": "Pinned Axis",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The fork's pinned axis when computed; None otherwise.",
+      "title": "Pinned Axis"
     },
     "price_finding": {
       "anyOf": [
@@ -1435,8 +1453,6 @@
     "report_id",
     "query",
     "fork",
-    "pinned_axis",
-    "optimized_axis",
     "date_range_start",
     "date_range_end",
     "total_threads",

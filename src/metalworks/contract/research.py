@@ -743,8 +743,12 @@ class DemandReport(BaseModel):
     )
     query: str
     fork: Fork
-    pinned_axis: str
-    optimized_axis: str
+    pinned_axis: str | None = Field(
+        default=None, description="The fork's pinned axis when computed; None otherwise."
+    )
+    optimized_axis: str | None = Field(
+        default=None, description="The fork's optimized axis when computed; None otherwise."
+    )
     source: str = Field(
         default="reddit_arctic_shift",
         description="Provenance of the corpus this run drew on: "
