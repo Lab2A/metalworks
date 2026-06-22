@@ -62,6 +62,7 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
 | `metalworks research surface REPORT_ID` | Recommend a product surface + UX skeleton for a stored report (grounded). | chat key |
 | `metalworks research site REPORT_ID` | Build a grounded marketing site (verbatim, cited copy) from a stored report. | chat key |
+| `metalworks research design REPORT_ID` | Author a grounded-but-directional design system (SAFE/RISK choices + `DESIGN.md`) from a stored report; a real competitor teardown when a browser is installed. | chat key |
 | `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
 | `metalworks research content-plan REPORT_ID` | Project a stored report into a deterministic content/SEO plan. **No LLM.** | zero-key |
 
@@ -87,6 +88,7 @@ Options:
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
 - `research position` / `landscape` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
 - `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON.
+- `research design` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for `DESIGN.md` + `preview.html`; `--max-teardown N` competitor sites to teardown (`0` = all).
 
 ## corpus
 
