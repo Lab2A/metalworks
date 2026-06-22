@@ -21,6 +21,17 @@ never overstated.
    It builds the landscape, reads the competition at the richest tier available, and
    returns a `DesignSystem` + a self-contained preview HTML. It writes a `DESIGN.md`.
 
+   **Pick a `taste` preset** (the director voice) — pass `taste=` (MCP) or `--taste`
+   (CLI). One small, curated set, each an opinionated director:
+   - `editorial` — the default house voice (editorial monochrome, dark-first). Use
+     when the brief is silent; it preserves the original output.
+   - `brutalist` — raw, structural, anti-decorative; one loud signal color, hard edges.
+   - `warm-minimal` — calm, warm, paper-ground; a single muted earthy accent.
+   - `technical` — instrument-grade tool aesthetic; mono/grotesque, dense, precise.
+
+   The same report under two presets yields a visibly different system; the chosen
+   preset is recorded on the result's `taste` and drives the preview chrome.
+
 3. **Lead with the grounding tier — this is the honesty bit.** The result's
    `grounding_tier` is one of:
    - `renderer` — a REAL teardown: a browser screenshotted rival sites and read

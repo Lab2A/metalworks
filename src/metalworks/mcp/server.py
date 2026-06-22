@@ -119,17 +119,25 @@ async def validate_from_idea(
 
 
 async def design_from_report(
-    report_id: str, name: str | None = None, store_path: str | None = None
+    report_id: str,
+    name: str | None = None,
+    taste: str = "editorial",
+    store_path: str | None = None,
 ) -> dict[str, Any]:
-    """TIER 2. Author a grounded design system (+ preview HTML) for a stored report (chat key)."""
-    return tools.design_from_report(report_id, name, store_path)
+    """TIER 2. Author a grounded design system (+ preview HTML) for a stored report (chat key).
+    taste picks the director preset: editorial (default) / brutalist / warm-minimal / technical."""
+    return tools.design_from_report(report_id, name, taste, store_path)
 
 
 async def logo_generate(
-    report_id: str, name: str | None = None, store_path: str | None = None
+    report_id: str,
+    name: str | None = None,
+    taste: str = "editorial",
+    store_path: str | None = None,
 ) -> dict[str, Any]:
-    """TIER 2. Generate diverse logo options (under the design system) + a picker (chat key)."""
-    return tools.logo_generate(report_id, name, store_path)
+    """TIER 2. Generate diverse logo options (under the design system) + a picker (chat key).
+    taste picks the design preset the mark draws under (editorial / brutalist / …)."""
+    return tools.logo_generate(report_id, name, taste, store_path)
 
 
 async def design_review(

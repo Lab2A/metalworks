@@ -5,8 +5,11 @@ reads the demand report and the competitive landscape and authors a
 :class:`~metalworks.contract.design.DesignSystem`: an aesthetic direction, one
 SAFE/RISK :class:`~metalworks.contract.design.DesignChoice` per design dimension,
 and directional :class:`~metalworks.contract.design.LandscapeSignal`s. The model
-authors under a constant house craft bar (``TASTE``); metalworks records WHICH
-grounding tier produced the system so the look is never overstated.
+authors under one of a few curated taste presets (:data:`TASTE_PRESETS`, default
+:data:`DEFAULT_TASTE` — the original single house voice, output unchanged); the
+chosen preset is recorded on the system and also paints the preview chrome.
+metalworks records WHICH grounding tier produced the system so the look is never
+overstated.
 
 Grounding is DIRECTIONAL, never cited per-decision. The grounding tier is set by
 how the competition was actually read:
@@ -53,10 +56,11 @@ if TYPE_CHECKING:
 # The seven design dimensions every system covers, in render order.
 _DIMENSIONS = ("aesthetic", "decoration", "layout", "color", "typography", "spacing", "motion")
 
-# The house craft bar + the curated knowledge, held constant across every brand.
-# This is the portable design IP: the quality bar, the aesthetic taxonomy, the
-# font allow/block + convergence-trap lists, and the anti-slop rules.
-TASTE = """You are the house design director. Hold to this system exactly.
+# The house craft bar + the curated knowledge — the portable design IP held in
+# common across every preset: the quality bar, the aesthetic taxonomy, the font
+# allow/block + convergence-trap lists, the anti-slop rules. A preset is this BAR
+# plus one opinionated DIRECTION on top of it, then the shared output contract.
+_BAR = """You are the house design director. Hold to this system exactly.
 
 THE BAR
 A design system a well-funded startup would actually ship — the craft of Stripe,
@@ -81,14 +85,142 @@ Color is rare and meaningful, not decoration.
 
 ANTI-SLOP (never): purple/violet gradient accents; 3-column icon-in-a-circle grids;
 centered-everything with uniform spacing; uniform bubbly border-radius; gradient CTAs;
-generic stock-photo heroes; system-ui as the display/body face.
+generic stock-photo heroes; system-ui as the display/body face."""
 
-OUTPUT
+_OUTPUT = """OUTPUT
 Exactly one DesignChoice per dimension (aesthetic, decoration, layout, color,
 typography, spacing, motion), each labelled SAFE (category baseline users expect)
 or RISK (a deliberate departure — say what it gains AND costs). At least TWO RISKs.
 Plus the one memorable thing someone should remember, and directional landscape
 signals (what rivals converge on → the move it implies). Be specific and opinionated."""
+
+# The opinionated DIRECTION each preset adds on top of the shared bar. The
+# `editorial` direction is empty — that preset reproduces the original single-voice
+# house default, so its director prompt (bar + output) is byte-for-byte the old
+# ``TASTE`` and its output is unchanged. The others are alternate directors.
+_DIRECTIONS: dict[str, str] = {
+    "editorial": "",  # the original house voice — no extra steer beyond the bar.
+    "brutalist": """DIRECTION (brutalist/raw)
+Lean hard into raw, structural, anti-decorative. Exposed grids and hairline rules,
+oversized utilitarian type, stark high-contrast monochrome with one loud signal
+color. Sharp corners (radius 0), visible structure over polish. Reject softness:
+no rounded cards, no gentle shadows, no pastel. The RISKS should feel deliberately
+severe — the brand's face is its refusal to be friendly.""",
+    "warm-minimal": """DIRECTION (warm-minimal / organic)
+Calm, warm, and quiet. A soft paper/cream ground, a humanist serif or rounded
+grotesque for display, generous air, and a single muted earthy accent (terracotta,
+sage, clay — never neon). Restraint is the whole point: minimal but warm, never
+clinical. The RISKS earn their keep through softness and warmth, not loudness.""",
+    "technical": """DIRECTION (industrial / technical)
+A precise, instrument-grade tool aesthetic — Linear/Vercel/Stripe-dashboard rigor.
+Mono or grotesque type, a tight monochrome neutral scale, dense data-first layout,
+one functional accent reserved for state. Everything reads like a measured
+instrument: aligned to a grid, labelled, exact. The RISKS are in the precision and
+the density, not in ornament.""",
+}
+
+# The named taste presets — a small, curated set of opinionated directors (not
+# infinite knobs). Each value is a complete director prompt: the shared craft bar,
+# the preset's direction, then the output contract. ``DEFAULT_TASTE`` preserves
+# today's output exactly.
+DEFAULT_TASTE = "editorial"
+TASTE_PRESETS: dict[str, str] = {
+    name: f"{_BAR}\n\n{_OUTPUT}" if not direction else f"{_BAR}\n\n{direction}\n\n{_OUTPUT}"
+    for name, direction in _DIRECTIONS.items()
+}
+
+# Backwards-compatible alias: the single global voice is now the default preset.
+TASTE = TASTE_PRESETS[DEFAULT_TASTE]
+
+
+# The faces every AI design tool reaches for — a chrome's body face must never
+# LEAD with one (the design system's own review rejects them; see design_review).
+_CONVERGENCE_FACES = frozenset(
+    {"inter", "roboto", "arial", "helvetica", "open sans", "montserrat", "poppins", "space grotesk"}
+)
+
+
+@dataclass(frozen=True)
+class _Chrome:
+    """The preview-page chrome derived from a preset — never a blacklisted face."""
+
+    bg: str
+    ink: str
+    muted: str
+    line: str
+    body_font: str  # the FIRST family must never be a convergence-trap face
+    mono_font: str
+    risk_ink: str  # text color on the inverted RISK chip
+    accent: str  # the caveat / signal accent
+    logo_ground: str  # the logo picker's (light) page ground — marks read on it
+    logo_card: str  # the logo picker's card surface, a touch off the ground
+
+
+# Each preset paints its own preview chrome (and logo ground), so the renderers no
+# longer hardcode one dark/Geist/cream theme. The `editorial` chrome reproduces the
+# original preview palette. No `body_font` leads with a convergence-trap face
+# (Inter/Roboto/Arial/…) — that subsumes the font half of the cleanup issue.
+_CHROMES: dict[str, _Chrome] = {
+    "editorial": _Chrome(
+        bg="#0E0E0E",
+        ink="#F4F1EA",
+        muted="#8A8578",
+        line="#26251F",
+        body_font="'Geist','Inter Tight',system-ui,sans-serif",
+        mono_font="'Geist Mono',monospace",
+        risk_ink="#0E0E0E",
+        accent="#C9893F",
+        logo_ground="#F4F1EA",
+        logo_card="#FBFAF6",
+    ),
+    "brutalist": _Chrome(
+        bg="#0A0A0A",
+        ink="#F5F5F5",
+        muted="#8C8C8C",
+        line="#2A2A2A",
+        body_font="'Geist Mono','IBM Plex Mono',monospace",
+        mono_font="'Geist Mono',monospace",
+        risk_ink="#0A0A0A",
+        accent="#E5484D",
+        logo_ground="#F5F5F5",
+        logo_card="#FFFFFF",
+    ),
+    "warm-minimal": _Chrome(
+        bg="#FBF7F0",
+        ink="#2B2620",
+        muted="#8A8175",
+        line="#E7DECD",
+        body_font="'General Sans','Instrument Sans',system-ui,sans-serif",
+        mono_font="'JetBrains Mono',monospace",
+        risk_ink="#FBF7F0",
+        accent="#B5654A",
+        logo_ground="#FBF7F0",
+        logo_card="#FFFDF8",
+    ),
+    "technical": _Chrome(
+        bg="#0C0E12",
+        ink="#E6E9EF",
+        muted="#7B8294",
+        line="#1E2230",
+        body_font="'Geist','Instrument Sans',system-ui,sans-serif",
+        mono_font="'IBM Plex Mono',monospace",
+        risk_ink="#0C0E12",
+        accent="#3B82F6",
+        logo_ground="#F3F5F8",
+        logo_card="#FFFFFF",
+    ),
+}
+
+
+def resolve_taste(taste: str | None) -> str:
+    """The preset key to author under — falls back to the default for an unknown one."""
+    key = (taste or "").strip()
+    return key if key in TASTE_PRESETS else DEFAULT_TASTE
+
+
+def resolve_chrome(taste: str | None) -> _Chrome:
+    """The preview/picker chrome for a preset (falls back to the default)."""
+    return _CHROMES[resolve_taste(taste)]
 
 
 class _DesignDraft(BaseModel):
@@ -214,8 +346,9 @@ def _synthesize(
     research: Research,
     teardown: _Teardown,
     brand_name: str,
+    taste: str,
 ) -> _DesignDraft:
-    """The one constrained structured call that authors the system under TASTE."""
+    """The one constrained structured call that authors the system under a preset."""
     lines = [f"Brand (the wordmark): {brand_name}", f"What it does: {report.query}"]
     labels = _cluster_labels(report)
     if labels:
@@ -242,7 +375,7 @@ def _synthesize(
 
     user = "\n".join(lines)
     return deps.chat.complete_structured(
-        system=TASTE,
+        system=TASTE_PRESETS[taste],
         user=user,
         output_model=_DesignDraft,
         max_tokens=2400,
@@ -255,22 +388,26 @@ def build_design_system(
     research: Research | DemandReport,
     *,
     brand_name: str | None = None,
+    taste: str = DEFAULT_TASTE,
     renderer: PageRenderer | None = None,
     max_teardown: int = 3,
 ) -> DesignSystem:
     """Author a grounded :class:`DesignSystem` from a report (or a full bundle).
 
     Reads the competition at the richest tier available (a real renderer teardown
-    > web text > model knowledge), makes ONE constrained LLM call under the house
-    craft bar, and stamps the actual ``grounding_tier`` so the look is never
-    overstated. On any synthesis failure, returns an honest partial system — never
-    raises. Accepts a bare :class:`DemandReport` (no landscape → the teardown
+    > web text > model knowledge), makes ONE constrained LLM call under the chosen
+    ``taste`` preset's director bar, and stamps the actual ``grounding_tier`` so the
+    look is never overstated. ``taste`` is one of :data:`TASTE_PRESETS` (default
+    :data:`DEFAULT_TASTE`, which preserves prior output); an unknown key falls back
+    to the default. On any synthesis failure, returns an honest partial system —
+    never raises. Accepts a bare :class:`DemandReport` (no landscape → the teardown
     degrades) or a full :class:`Research` bundle (its landscape drives the
     teardown). ``max_teardown`` caps the live teardown (default 3 by traction;
     ``0`` for the full sweep); ``renderer`` defaults to ``config.resolve_renderer()``.
     """
     from metalworks.contract.bundle import Research as _Research
 
+    taste = resolve_taste(taste)
     bundle = research if isinstance(research, _Research) else _Research(demand=research)
     report = bundle.demand
     if renderer is None:
@@ -283,7 +420,7 @@ def build_design_system(
     now = datetime.now(UTC)
 
     try:
-        draft = _synthesize(deps, report, bundle, teardown, name)
+        draft = _synthesize(deps, report, bundle, teardown, name, taste)
     except Exception as exc:  # synthesis failed — honest partial, never a crash
         return DesignSystem(
             report_id=report.report_id,
@@ -291,6 +428,7 @@ def build_design_system(
             memorable_thing="",
             grounding_tier=teardown.tier,
             aesthetic="",
+            taste=taste,
             generated_at=now,
             partial=True,
             caveat=f"Design synthesis unavailable ({type(exc).__name__}); no system authored.",
@@ -310,6 +448,7 @@ def build_design_system(
         memorable_thing=draft.memorable_thing,
         grounding_tier=teardown.tier,
         aesthetic=draft.aesthetic,
+        taste=taste,
         choices=list(draft.choices),
         landscape_signals=list(draft.landscape_signals),
         generated_at=now,
@@ -330,6 +469,7 @@ def render_design_md(system: DesignSystem) -> str:
         f"> {system.memorable_thing}",
         "",
         f"**Aesthetic:** {system.aesthetic}",
+        f"**Taste:** {system.taste}",
         f"**Grounding:** {system.grounding_tier}",
     ]
     if system.caveat:
@@ -373,34 +513,38 @@ def render_design_preview_html(system: DesignSystem) -> str:
         if signals
         else ""
     )
+    # Chrome derives from the chosen preset, not a fixed dark theme. The body face
+    # is never a convergence-trap (Inter/Roboto/…) — that subsumes the font fix.
+    c = resolve_chrome(system.taste)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} — design system</title><style>
-:root{{--bg:#0E0E0E;--ink:#F4F1EA;--muted:#8A8578;--line:#26251F;--card:#161614;}}
+:root{{--bg:{c.bg};--ink:{c.ink};--muted:{c.muted};--line:{c.line};}}
 *{{box-sizing:border-box;}}
 body{{margin:0;background:var(--bg);color:var(--ink);
- font-family:'Geist','Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}}
+ font-family:{c.body_font};-webkit-font-smoothing:antialiased;}}
 .wrap{{max-width:920px;margin:0 auto;padding:64px 36px 120px;}}
 h1{{font-size:32px;font-weight:600;letter-spacing:-0.02em;margin:0;}}
 .sub{{color:var(--muted);font-size:14px;margin:10px 0 0;}}
 .memo{{font-size:20px;margin:28px 0 4px;line-height:1.4;}}
-.tier{{display:inline-block;font-family:'Geist Mono',monospace;font-size:12px;color:var(--muted);
+.tier{{display:inline-block;font-family:{c.mono_font};font-size:12px;color:var(--muted);
  border:1px solid var(--line);border-radius:4px;padding:2px 8px;margin-top:14px;}}
-.note{{color:#C9893F;font-size:13px;margin-top:14px;}}
+.note{{color:{c.accent};font-size:13px;margin-top:14px;}}
 table{{width:100%;border-collapse:collapse;margin-top:34px;}}
 td{{border-top:1px solid var(--line);padding:16px 10px;vertical-align:top;font-size:14px;}}
 td.dim{{text-transform:uppercase;letter-spacing:0.05em;font-size:12px;color:var(--muted);width:130px;}}
 td span{{display:block;color:var(--muted);font-size:13px;margin-top:5px;}}
-.stance{{font-family:'Geist Mono',monospace;font-size:11px;border-radius:4px;padding:2px 7px;}}
+.stance{{font-family:{c.mono_font};font-size:11px;border-radius:4px;padding:2px 7px;}}
 .stance.safe{{color:var(--muted);border:1px solid var(--line);}}
-.stance.risk{{color:#0E0E0E;background:var(--ink);}}
+.stance.risk{{color:{c.risk_ink};background:var(--ink);}}
 ul{{margin-top:18px;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.7;}}
 ul b{{color:var(--ink);}}
 </style></head><body><div class="wrap">
 <h1>{name}</h1>
 <p class="sub">Design system &mdash; {escape(system.aesthetic)}</p>
 <p class="memo">{escape(system.memorable_thing)}</p>
-<span class="tier">grounding: {escape(system.grounding_tier)}</span>
+<span class="tier">grounding: {escape(system.grounding_tier)} \
+&middot; taste: {escape(system.taste)}</span>
 {note}
 <table>{"".join(rows)}</table>
 {signals_block}

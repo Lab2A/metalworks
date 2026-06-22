@@ -2073,6 +2073,13 @@ def research_design(
     name: Annotated[
         str | None, typer.Option("--name", help="Brand name (else the model suggests one).")
     ] = None,
+    taste: Annotated[
+        str,
+        typer.Option(
+            "--taste",
+            help="Design taste preset: editorial (default), brutalist, warm-minimal, technical.",
+        ),
+    ] = "editorial",
     out_dir: Annotated[
         Path | None,
         typer.Option("--out", "-o", help="Directory for DESIGN.md + preview.html (default: cwd)."),
@@ -2085,11 +2092,13 @@ def research_design(
 
     Builds the landscape, then reads the competition at the richest tier available
     (a real browser teardown when ``metalworks browser install`` has been run > web
-    text > model knowledge) and records the grounding tier. Writes DESIGN.md + a
-    preview.html.
+    text > model knowledge) and records the grounding tier. ``--taste`` picks the
+    director preset (editorial / brutalist / warm-minimal / technical); editorial is
+    the default and preserves prior output. Writes DESIGN.md + a preview.html.
     """
     from metalworks.contract.bundle import Research
     from metalworks.research import (
+        TASTE_PRESETS,
         build_design_system,
         render_design_md,
         render_design_preview_html,
@@ -2098,6 +2107,11 @@ def research_design(
     from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
+    if taste not in TASTE_PRESETS:
+        err_console.print(
+            f"[red]Unknown taste {taste!r}.[/red] Choose: {', '.join(TASTE_PRESETS)}."
+        )
+        raise typer.Exit(code=1)
     chat = _resolve_chat_or_exit()
     store = config.default_store()
     report_id = _resolve_report_id(store, report_id)
@@ -2116,11 +2130,14 @@ def research_design(
         except Exception:  # landscape is best-effort; design degrades honestly without it
             landscape = None
         research = Research(demand=report, landscape=landscape)
-        system = build_design_system(deps, research, brand_name=name, max_teardown=max_teardown)
+        system = build_design_system(
+            deps, research, brand_name=name, taste=taste, max_teardown=max_teardown
+        )
     finally:
         reader.close()
 
     tier_color = {"renderer": "green", "web": "yellow"}.get(system.grounding_tier, "yellow")
+    console.print(f"  taste: [bold]{system.taste}[/bold]")
     console.print(f"  grounding: [{tier_color}]{system.grounding_tier}[/{tier_color}]")
     if system.partial and system.caveat:
         console.print(f"  [yellow]caveat:[/yellow] {system.caveat}")
@@ -2147,6 +2164,14 @@ def research_logo(
     name: Annotated[
         str | None, typer.Option("--name", help="Brand name (else the model suggests one).")
     ] = None,
+    taste: Annotated[
+        str,
+        typer.Option(
+            "--taste",
+            help="Design taste preset the mark draws under: editorial (default), brutalist, "
+            "warm-minimal, technical.",
+        ),
+    ] = "editorial",
     out_dir: Annotated[
         Path | None,
         typer.Option("--out", "-o", help="Directory for the SVGs + picker.html (default: cwd)."),
@@ -2157,14 +2182,24 @@ def research_logo(
 ) -> None:
     """Generate diverse logo options for a stored report, drawn under its design system.
 
-    Builds the brand's design system, then authors N diverse marks under it (one per
-    design angle). Writes each SVG + a `picker.html`. Options are offered, never
-    auto-selected; an unsafe or empty SVG is dropped, never faked.
+    Builds the brand's design system (under ``--taste``), then authors N diverse
+    marks under it (one per design angle). Writes each SVG + a `picker.html`. Options
+    are offered, never auto-selected; an unsafe or empty SVG is dropped, never faked.
     """
-    from metalworks.research import build_design_system, build_logo_set, render_logo_picker_html
+    from metalworks.research import (
+        TASTE_PRESETS,
+        build_design_system,
+        build_logo_set,
+        render_logo_picker_html,
+    )
     from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
+    if taste not in TASTE_PRESETS:
+        err_console.print(
+            f"[red]Unknown taste {taste!r}.[/red] Choose: {', '.join(TASTE_PRESETS)}."
+        )
+        raise typer.Exit(code=1)
     chat = _resolve_chat_or_exit()
     store = config.default_store()
     report_id = _resolve_report_id(store, report_id)
@@ -2178,7 +2213,7 @@ def research_logo(
     )
     console.print(f"[bold]Designing logos[/bold] for report {report_id}...")
     try:
-        system = build_design_system(deps, report, brand_name=name)
+        system = build_design_system(deps, report, brand_name=name, taste=taste)
         logos = build_logo_set(chat, system, n=count)
     finally:
         reader.close()
@@ -2189,7 +2224,9 @@ def research_logo(
     for i, opt in enumerate(logos.options, 1):
         (dest / f"{i}_{opt.angle}.svg").write_text(opt.svg, encoding="utf-8")
         console.print(f"  [bold]{i}. {opt.angle}[/bold] — {opt.concept}")
-    (dest / "picker.html").write_text(render_logo_picker_html(logos), encoding="utf-8")
+    (dest / "picker.html").write_text(
+        render_logo_picker_html(logos, taste=system.taste), encoding="utf-8"
+    )
     console.print(f"[green]Wrote[/green] {len(logos.options)} SVGs + {dest}/picker.html")
 
 

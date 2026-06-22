@@ -30,15 +30,16 @@ from metalworks import Metalworks
 mw = Metalworks()
 research = mw.research("a calm focus timer for makers")
 
-system = mw.design(research, brand_name="Cadence")   # reads the landscape, authors the system
+system = mw.design(research, brand_name="Cadence", taste="editorial")  # author under a preset
 print(system.grounding_tier)                          # renderer | web | model_knowledge
+print(system.taste)                                   # the preset it was authored under
 for c in system.choices:
     print(c.dimension, c.stance, "—", c.decision)     # SAFE / RISK per dimension
 open("preview.html", "w").write(mw.render_design_preview(system))
 ```
 
 ```bash CLI
-metalworks design <report-id> --out ./brand
+metalworks design <report-id> --taste brutalist --out ./brand
 ```
 
 </CodeGroup>
@@ -54,6 +55,20 @@ never saw a competitor can't masquerade as a grounded one:
 | `web` | No live teardown, but real competitor names/taglines from the landscape informed it. |
 | `model_knowledge` | No competitor data — the system is category convention, not this brand's landscape. Returned `partial` with a caveat. |
 
+## Taste presets
+
+A small, curated set of opinionated directors — pick one with `taste=` (Python/MCP)
+or `--taste` (CLI). The chosen preset is recorded on `system.taste` and drives the
+preview/logo-picker chrome. The same report under two presets yields a visibly
+different system.
+
+| Preset | Voice |
+| --- | --- |
+| `editorial` *(default)* | The house voice — editorial monochrome, dark-first. Preserves the original output. |
+| `brutalist` | Raw, structural, anti-decorative; one loud signal color, hard edges. |
+| `warm-minimal` | Calm and warm; soft paper ground, a single muted earthy accent. |
+| `technical` | Instrument-grade tool aesthetic; mono/grotesque type, dense, precise. |
+
 ## What you get back
 
 | Field | What it is |
@@ -62,6 +77,7 @@ never saw a competitor can't masquerade as a grounded one:
 | `memorable_thing` | The one thing someone should remember on first sight. |
 | `choices[]` | One `DesignChoice` per dimension: the `decision`, a `stance` (`safe`/`risk`), and the rationale. |
 | `landscape_signals[]` | Directional reads of the competition (observation → the move it implies). |
+| `taste` | The preset it was authored under (`editorial` / `brutalist` / `warm-minimal` / `technical`). |
 | `grounding_tier` | `renderer` / `web` / `model_knowledge` — how grounded the look is. |
 | `design_md` | The rendered `DESIGN.md` — your per-project source of truth. |
 
