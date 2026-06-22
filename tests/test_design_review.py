@@ -81,22 +81,33 @@ def test_clean_page_passes() -> None:
     assert review.ink == "rgb(20, 20, 20)"
 
 
-def test_too_many_fonts_warns() -> None:
+def test_too_many_fonts_fails() -> None:
     styles = _clean()
+    # Five distinct families (body Geist + four more) — font soup, a hard fail.
     styles["h1"] = _cs("h1", font="Fraunces", size="40px")
     styles["h2"] = _cs("h2", font="Arial", size="28px")
     styles["a"] = _cs("a", font="Times")
     styles["button"] = _cs("button", font="Courier")
     review = review_design(_StyledFake(styles), "https://x")
-    assert any(f.category == "fonts" and "distinct" in f.detail for f in review.findings)
-    assert review.score < 10
+    fonts_finding = next(
+        f for f in review.findings if f.category == "fonts" and "distinct" in f.detail
+    )
+    assert fonts_finding.severity == "fail"
+    assert review.passed is False
+    # One font fail + the Arial convergence-trap body? No — body is Geist here,
+    # so exactly one fail: score = 10 - 3*1 = 7 (the -3*fails penalty is live).
+    assert sum(f.severity == "fail" for f in review.findings) == 1
+    assert review.score == 7
 
 
-def test_convergence_trap_body_font_warns() -> None:
+def test_convergence_trap_body_font_fails() -> None:
     styles = _clean()
     styles["body"] = _cs("body", font="Inter")
     review = review_design(_StyledFake(styles), "https://x")
-    assert any(f.category == "fonts" and "convergence" in f.detail for f in review.findings)
+    trap = next(f for f in review.findings if f.category == "fonts" and "convergence" in f.detail)
+    assert trap.severity == "fail"
+    assert review.passed is False
+    assert review.score == 7  # 10 - 3*1, the convergence body face is the sole fail
 
 
 def test_non_monotonic_headings_warns() -> None:
@@ -139,6 +150,23 @@ def test_system_match_ok_when_aligned() -> None:
         _StyledFake(_clean()), "https://x", system=_system("Fraunces display + Geist body")
     )
     assert any(f.category == "system_match" and f.severity == "ok" for f in review.findings)
+
+
+def test_system_match_token_not_substring() -> None:
+    # "Sans" as a body face must NOT be treated as matching a "Comic Sans"
+    # system: naive substring containment ("sans" in "comic sans") said aligned;
+    # token matching ({"sans"} <= {"comic", "sans"}) keeps it a real subset, so
+    # this aligns — but a body face with a token absent from the decision must
+    # not match. Use "Helvetica" vs a "Comic Sans" system to prove that.
+    styles = _clean()
+    styles["body"] = _cs("body", font="Helvetica")
+    review = review_design(_StyledFake(styles), "https://x", system=_system("Comic Sans"))
+    assert any(f.category == "system_match" and f.severity == "warn" for f in review.findings)
+    # And a face that is a token subset of the decision aligns (no substring needed).
+    styles2 = _clean()
+    styles2["body"] = _cs("body", font="Geist")
+    review2 = review_design(_StyledFake(styles2), "https://x", system=_system("geist-body mono"))
+    assert any(f.category == "system_match" and f.severity == "ok" for f in review2.findings)
 
 
 def test_screenshot_only_renderer_refused() -> None:

@@ -16,6 +16,7 @@ screenshot-only backend (Firecrawl) raises
 from __future__ import annotations
 
 import itertools
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -45,6 +46,11 @@ def _first_family(style: ComputedStyle | None) -> str:
     if style is None or not style.font_family:
         return ""
     return style.font_family.split(",")[0].strip().strip("'\"")
+
+
+def _tokens(text: str) -> set[str]:
+    """Lowercased word tokens of ``text`` (font names, system descriptions)."""
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 def _px(style: ComputedStyle | None) -> float:
@@ -82,7 +88,7 @@ def review_design(
     if len(fonts) > 3:
         findings.append(
             StyleFinding(
-                severity="warn",
+                severity="fail",
                 category="fonts",
                 detail=f"{len(fonts)} distinct font families rendered (keep it to 3 or fewer): "
                 f"{', '.join(fonts)}.",
@@ -92,7 +98,7 @@ def review_design(
     if body_face and body_face.lower() in _CONVERGENCE:
         findings.append(
             StyleFinding(
-                severity="warn",
+                severity="fail",
                 category="fonts",
                 detail=f"Body font is '{body_face}' — the AI-default convergence-trap face. "
                 "Pick a typeface with a point of view.",
@@ -101,6 +107,11 @@ def review_design(
     h_px = [_px(styles.get(h)) for h in ("h1", "h2", "h3")]
     present = [x for x in h_px if x > 0]
     if len(present) >= 2 and any(a < b for a, b in itertools.pairwise(present)):
+        # warn, not fail: an inverted heading is a real smell, but legitimate
+        # editorial layouts (a small eyebrow h2 above a hero h1, oversized
+        # pull-quote h3s) break strict monotonicity by design. Font soup and the
+        # convergence-trap body face have no such defensible exception, so only
+        # those two fail the page.
         findings.append(
             StyleFinding(
                 severity="warn",
@@ -111,8 +122,14 @@ def review_design(
 
     against = system is not None
     if system is not None:
-        typ = next((c.decision for c in system.choices if c.dimension == "typography"), "").lower()
-        if body_face and typ and body_face.lower() not in typ:
+        typ = next((c.decision for c in system.choices if c.dimension == "typography"), "")
+        # Token/equivalence match, not substring containment: a body face of
+        # "Sans" must not "match" a "Comic Sans" system, and "Geist" must match
+        # "Geist Mono" / "geist-body". Compare the body face's word tokens
+        # against the typography decision's tokens.
+        typ_tokens = _tokens(typ)
+        face_tokens = _tokens(body_face)
+        if body_face and typ and not (face_tokens and face_tokens <= typ_tokens):
             findings.append(
                 StyleFinding(
                     severity="warn",
