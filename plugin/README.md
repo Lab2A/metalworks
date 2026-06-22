@@ -1,8 +1,9 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and fifteen skills: the five engagement skills below,
-plus ten grounded pillars that build on a finished demand report.
+the metalworks MCP server and eighteen skills: the five engagement skills below,
+ten grounded pillars that build on a finished demand report, and three
+validation-loop skills (`/ideate`, `/go-no-go`, `/validate`).
 
 ## Install
 
@@ -68,6 +69,15 @@ Reddit quote by permalink:
 - **/build-spec** — an evidence-grounded build harness for a coding agent: core
   features each mapped to a real demand cluster, plus a scaffolded repo with a
   cite-or-die rule and a frozen quote table. metalworks specs it; you build it.
+
+The validation loop wraps the front of the arc:
+
+- **/ideate** — frame a raw idea into one testable hypothesis + a research brief,
+  or surface a report's forks as grounded idea sketches to pick from.
+- **/go-no-go** — an honest GO / PIVOT / NO-GO verdict from the gap between demand
+  and what already exists, argued with quotes; the human makes the call.
+- **/validate** — run the whole loop (ideate → demand → landscape → assess → loop)
+  with the human gating each step.
 
 ## Keys (optional)
 
