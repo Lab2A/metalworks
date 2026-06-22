@@ -82,8 +82,10 @@ def _landscape() -> Landscape:
     return Landscape(landscape_id="ls", report_id="rpt-1", competitor_map=cm, generated_at=_CLOCK)
 
 
-def _assessment(decision: Decision, *, pivot_to: str | None = None) -> Assessment:
-    pt = PivotTarget(kind="wedge", target_id=pivot_to, why="aim narrower") if pivot_to else None
+def _assessment(
+    decision: Decision, *, pivot_to: str | None = None, why: str = "aim narrower"
+) -> Assessment:
+    pt = PivotTarget(kind="wedge", target_id=pivot_to, why=why) if pivot_to else None
     gap = GapAnalysis(
         demand_strength=SignalStrength.HIGH,
         demand_summary="strong",
@@ -180,6 +182,29 @@ def test_max_iterations_cap_yields_exhausted() -> None:
     assert result.outcome == "exhausted"
     assert result.iterations == 2
     assert counts["research"] == 1  # all reuse, no re-pulls
+
+
+def test_same_fork_light_then_fresh_pivot_dedupes_to_exhausted() -> None:
+    # The dedup guarantee: the SAME fork target_id, offered once via a light (in-corpus)
+    # pivot and again via a fresh-pull pivot with DIFFERENT `why` prose, must collide on
+    # one canonical key and exit `exhausted` — never re-propose the killed fork.
+    #
+    # Old bug: a light pivot keyed `seen` on the raw fork id while a fresh pull keyed it
+    # on the rationale sentence, so two phrasings of one dead fork never matched and the
+    # loop circled. Here `w:ext` is out of corpus (fresh pull); the second offer of it
+    # carries different prose. With one key function both keys are `w:ext`.
+    ext = "w:ext"  # not in the report's wedges → fresh-pull branch
+    result, counts = _run(
+        [
+            _assessment(Decision.PIVOT, pivot_to=ext, why="because the niche is underserved"),
+            _assessment(Decision.PIVOT, pivot_to=ext, why="a totally different rationale sentence"),
+        ],
+        max_iterations=6,
+    )
+    assert result.outcome == "exhausted"
+    # round 1 + round 2 logged; round 3 hits the dedup guard before assessing → no 3rd entry.
+    assert result.iterations == 2
+    assert counts["research"] == 3  # round 1 seed pull + two fresh pulls (one per fresh pivot)
 
 
 def test_custom_decide_overrides_recommendation() -> None:

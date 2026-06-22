@@ -4,8 +4,12 @@
 round produces a GO/PIVOT/NO-GO verdict; the ``decide`` callback chooses the lane
 (default ``--auto``: take the assessment's own deterministic recommendation). GO
 exits, NO-GO terminates, PIVOT loops toward the under-served fork — accumulating a
-decision log and refusing to re-propose a killed idea (semantic dedup on the idea
-text, NOT a hash id, since content-addressed ids recompute every round).
+decision log and refusing to re-propose a killed idea. Dedup keys on ONE canonical
+identity per round (see ``_focus_key``): the lowercased seed idea, or — for any
+pivot, light or fresh — the lowercased fork ``target_id``. The fork id is the stable
+identity of "which idea"; the rationale prose (``pt.why``) varies between phrasings
+of the same pivot and must NOT key the set, or two wordings of one dead fork never
+collide.
 
 The interactive, human-gated loop lives in the ``validate`` skill, which drives
 the discrete ideate / landscape / assess tools and lets the human be the callback;
@@ -96,7 +100,7 @@ def validate(
     sketch = do_ideate(deps, idea)
     report = do_research(deps, sketch)
     landscape = do_landscape(deps, report)
-    focus = idea.strip().lower()
+    focus = _focus_key(idea)
     pulled = True
 
     for i in range(1, max_iterations + 1):
@@ -132,14 +136,16 @@ def validate(
             # (narrowed to the fork) and the SAME landscape. No re-pull, no re-synthesis.
             report = _narrow(report, pt)
             pulled = False
-            focus = pt.target_id
+            focus = _focus_key(pt.target_id)
         else:
             # FRESH PULL: the pivot left the corpus (a genuinely new idea/space).
             sketch = do_ideate(deps, pt.why or pt.target_id)
             report = do_research(deps, sketch)
             landscape = do_landscape(deps, report)
             pulled = True
-            focus = (pt.why or pt.target_id).strip().lower()
+            # Key on the fork identity, NOT the rationale prose: the same fork
+            # offered light then fresh must collide (light pivot keys the same way).
+            focus = _focus_key(pt.target_id)
 
     return ValidationResult(
         outcome=outcome,  # type: ignore[arg-type]
@@ -147,6 +153,17 @@ def validate(
         decision_log=log,
         iterations=len(log),
     )
+
+
+def _focus_key(identity: str) -> str:
+    """The ONE canonical dedup key for a round's focus — applied to every ``seen``
+    write so ids, idea text, and rationale prose can never mix.
+
+    ``identity`` is the seed idea text (round 1) or a pivot's ``target_id`` (every
+    later round). Both collapse to a lowercased, whitespace-trimmed key, so the same
+    fork offered via a light pivot then a fresh pivot — different ``why`` prose, same
+    ``target_id`` — produces the same key and dedupes."""
+    return identity.strip().lower()
 
 
 def _fork_in_report(report: DemandReport, pt: object) -> bool:
