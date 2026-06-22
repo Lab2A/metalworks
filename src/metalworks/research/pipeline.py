@@ -291,6 +291,8 @@ def run_research(
 
     corpus_stats = _build_corpus_stats(relevant_items)
     exploration_report.threads_synthesized = synthesis_out.n_synthesized
+    # Surface the near-dup merge rate (breadth-collapse observability, issue #82).
+    exploration_report.dedup_merge_rate = synthesis_out.dedup_merge_rate
 
     deps.emit("triangulating")
     triangulation_error: str | None = None

@@ -125,8 +125,9 @@ def synthesize(
     # — when there is no comment thread the record itself is the demand signal.
     # For the Reddit path every post has comments, so `units == comments` and the
     # downstream math is byte-identical.
+    syn_thresholds = brief.synthesis_thresholds
     posts = loader.load_posts(deps, hydrated_post_ids)
-    comments = loader.load_comments(deps, hydrated_post_ids)
+    comments = loader.load_comments(deps, hydrated_post_ids, cap=syn_thresholds.comment_cap)
     units = comments + loader.load_commentless_records_as_units(
         deps, hydrated_post_ids, exclude_ids={c.post_id for c in comments}
     )
@@ -155,8 +156,10 @@ def synthesize(
     def _embed(c: LoadedComment) -> list[float] | None:
         return vectors.get(c.comment_id)
 
-    groups = embed_group.embed_group(units, _embed)
+    groups = embed_group.embed_group(units, _embed, threshold=syn_thresholds.dedup_cosine_threshold)
     representatives = [units[g[0]] for g in groups]  # one per near-dup group
+    # Observability (issue #82): how much breadth the near-dup merge collapsed.
+    dedup_merge_rate = embed_group.merge_rate(groups, len(units))
 
     # 3. LLM theme labeling — RAISES after retries.
     clusters, cluster_authors, _cluster_subs, member_indices = cluster_ranker.build_clusters(
@@ -223,4 +226,5 @@ def synthesize(
         source_map=source_map,
         total_distinct_authors=total_distinct,
         n_synthesized=len(synthesized_post_ids),
+        dedup_merge_rate=dedup_merge_rate,
     )

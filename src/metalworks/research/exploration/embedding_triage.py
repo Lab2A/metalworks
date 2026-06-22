@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Any
 
 from metalworks.errors import MissingExtraError
 from metalworks.research.embedding_cache import cached_embed
+from metalworks.research.exploration.llm_classifier import classify_middle
 from metalworks.research.types import ExplorationItem, TriageBuckets
 
 if TYPE_CHECKING:
@@ -233,3 +234,69 @@ def triage_by_embedding(
         hybrid_scores=hybrid,
         band_percentile_disagreement=disagreement,
     )
+
+
+def estimate_false_reject_rate(
+    deps: ResearchDeps,
+    *,
+    question: str,
+    relevance_rubric: str,
+    items: list[ExplorationItem],
+    rejected_indices: list[int],
+    sample_size: int,
+) -> tuple[float, int] | None:
+    """Recall backstop: measure what the rank-only auto-reject band actually costs.
+
+    Samples up to ``sample_size`` threads from the auto-rejected band and runs
+    them through the SAME middle-bucket LLM classifier the live path uses, then
+    returns ``(false_reject_rate, n_sampled)`` — the fraction the classifier
+    would have KEPT had they reached it. A high rate means ``auto_reject_pct`` is
+    too aggressive: genuinely relevant threads are being discarded on rank alone.
+
+    This is observability ONLY: the sampled threads are classified, not promoted,
+    so the surviving corpus is unchanged. Returns ``None`` when the band is empty
+    or the backstop is disabled (``sample_size <= 0``) — nothing to measure.
+
+    The sample is deterministic (evenly spaced across the rejected band, so it
+    spans the whole band rather than only its top edge) — reproducible across
+    re-runs and offline tests.
+    """
+    if sample_size <= 0 or not rejected_indices:
+        return None
+
+    n = len(rejected_indices)
+    take = min(sample_size, n)
+    # Evenly spaced indices across the band so the estimate isn't biased toward
+    # the just-missed top edge (which a contiguous head-slice would over-sample).
+    step = n / take
+    sampled = [rejected_indices[min(n - 1, int(i * step))] for i in range(take)]
+    sampled = sorted(set(sampled))
+
+    verdicts = classify_middle(
+        deps,
+        question=question,
+        relevance_rubric=relevance_rubric,
+        items=items,
+        middle_indices=sampled,
+    )
+    if not verdicts:
+        return None
+    kept = sum(1 for v in verdicts.values() if v.relevant)
+    rate = kept / len(verdicts)
+    if rate > 0.0:
+        logger.warning(
+            "embedding_triage: recall backstop — classifier would KEEP %.1f%% (%d of %d) of a "
+            "sample from the %d-thread auto-reject band. A non-trivial false-reject rate means "
+            "auto_reject_pct may be too aggressive.",
+            rate * 100,
+            kept,
+            len(verdicts),
+            n,
+        )
+    else:
+        logger.info(
+            "embedding_triage: recall backstop — classifier kept 0%% of %d sampled rejects; "
+            "the reject band looks clean.",
+            len(verdicts),
+        )
+    return rate, len(verdicts)

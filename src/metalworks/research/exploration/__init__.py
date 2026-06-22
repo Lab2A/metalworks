@@ -27,7 +27,10 @@ from typing import TYPE_CHECKING
 
 from metalworks.contract import ExplorationReport
 from metalworks.research.exploration.corpus_shape import build_exploration_report
-from metalworks.research.exploration.embedding_triage import triage_by_embedding
+from metalworks.research.exploration.embedding_triage import (
+    estimate_false_reject_rate,
+    triage_by_embedding,
+)
 from metalworks.research.exploration.llm_classifier import classify_middle
 from metalworks.research.types import ClassifierVerdict, ExplorationItem, TriageBuckets
 
@@ -43,6 +46,7 @@ __all__ = [
     "TriageBuckets",
     "build_exploration_report",
     "classify_middle",
+    "estimate_false_reject_rate",
     "run_exploration_triage",
     "triage_by_embedding",
 ]
@@ -103,9 +107,28 @@ def run_exploration_triage(
     # Preserve cosine-descending order in the output.
     relevant_indices.sort(key=lambda i: buckets.cosines[i], reverse=True)
 
+    # Recall backstop: sample the auto-reject band back through the SAME
+    # classifier and measure the false-reject rate. Observability only — the
+    # sampled threads are NOT promoted into relevant_indices.
+    false_reject = estimate_false_reject_rate(
+        deps,
+        question=question,
+        relevance_rubric=relevance_rubric,
+        items=items,
+        rejected_indices=buckets.rejected,
+        sample_size=thresholds.backstop_sample_size,
+    )
+    if false_reject is not None:
+        logger.info(
+            "exploration: recall backstop — est. false-reject rate %.1f%% over %d sampled",
+            false_reject[0] * 100,
+            false_reject[1],
+        )
+
     report = build_exploration_report(
         n_threads_pulled=len(items),
         buckets=buckets,
         middle_verdicts=verdicts,
+        false_reject=false_reject,
     )
     return relevant_indices, report

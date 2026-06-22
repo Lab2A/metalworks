@@ -13,13 +13,30 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from metalworks.contract import SynthesisThresholds
 from metalworks.research.types import LoadedComment
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Comments closer than this are treated as near-duplicates.
-DEDUP_COSINE_THRESHOLD = 0.92
+# Comments closer than this are treated as near-duplicates. Surfaced as
+# ``SynthesisThresholds.dedup_cosine_threshold`` (issue #82); this constant is
+# the same value, kept as the module default so callers that don't thread a
+# policy through still get the documented behavior.
+DEDUP_COSINE_THRESHOLD = SynthesisThresholds.model_fields["dedup_cosine_threshold"].default
+
+
+def merge_rate(groups: list[list[int]], n_units: int) -> float:
+    """Fraction of input units collapsed by near-dup merging: ``1 - groups/units``.
+
+    0.0 when every unit is its own group (no merges); approaches 1.0 when many
+    units fold into few groups. The observability signal for breadth-collapse
+    (issue #82): a high rate means the dedup threshold is shrinking the distinct
+    voices that drive demand magnitude. Empty input → 0.0.
+    """
+    if n_units <= 0:
+        return 0.0
+    return 1.0 - (len(groups) / n_units)
 
 
 def _cosine(a: list[float], b: list[float]) -> float:

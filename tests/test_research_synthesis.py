@@ -185,6 +185,28 @@ def test_embed_group_failed_embed_is_singleton() -> None:
     assert sorted(groups) == [[0], [1]]
 
 
+def test_embed_group_merge_rate_surfaces_breadth_collapse() -> None:
+    # Observability (issue #82): two of three units collapse into one group → the
+    # merge rate is 1 - 2/3 == 0.333. None merging → 0.0.
+    assert embed_group.merge_rate([[0, 1], [2]], 3) == 1.0 - (2 / 3)
+    assert embed_group.merge_rate([[0], [1], [2]], 3) == 0.0
+    assert embed_group.merge_rate([], 0) == 0.0  # empty corpus, no div-by-zero
+
+
+def test_synthesis_thresholds_surface_documented_defaults() -> None:
+    # Issue #82: the two synthesis-stage cutoffs are config fields whose defaults
+    # preserve the prior hard-coded behavior, and the module constants mirror them.
+    from metalworks.contract import SynthesisThresholds
+    from metalworks.research.synthesis.embed_group import DEDUP_COSINE_THRESHOLD
+    from metalworks.research.synthesis.loader import DEFAULT_COMMENT_CAP
+
+    policy = SynthesisThresholds()
+    assert policy.dedup_cosine_threshold == 0.92
+    assert policy.comment_cap == 2000
+    assert policy.dedup_cosine_threshold == DEDUP_COSINE_THRESHOLD
+    assert policy.comment_cap == DEFAULT_COMMENT_CAP
+
+
 # ── cluster_ranker: quote verification (no-quote-no-theme) ──────────────────
 
 

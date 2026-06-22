@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Evidence-gating observability + a recall backstop.** The cosine/percentile thresholds that
+  decide which evidence reaches synthesis are now visible and measured, not blind. The previously
+  un-surfaced cutoffs are config fields with documented defaults: the embed-group near-dup cosine
+  (`0.92`) and the synthesis comment cap (`2000`) move onto the new additive
+  `SynthesisThresholds` on `ResearchBrief`, and the landscape gap→complaint / product→cluster match
+  floors are surfaced as `LandscapeMatchPolicy` — and tightened from `0.55`/`0.45` to `0.62`/`0.55`
+  so a coincidental, topically-adjacent complaint no longer attaches as a competitor gap. A run now
+  emits a **false-reject-rate estimate**: the triage step samples N threads from the auto-rejected
+  band, runs them back through the same LLM classifier, and surfaces the fraction it would have kept
+  on the `corpus_shape` contract (`ExplorationReport.false_reject_rate` / `_sample_size`), plus the
+  embed-group **merge rate** (`dedup_merge_rate`) so breadth-collapse is visible. Finally
+  `TriageThresholds.cosine_ceiling` ships a non-None default (`0.50`) — the recall safety valve —
+  so a high-cosine thread mis-ranked into the reject band is rescued to the middle bucket instead of
+  being silently auto-rejected on percentile alone. All additive + defaulted; behavior is unchanged
+  except the two raised landscape floors and the now-on safety valve. (#82)
+
 - **Taste presets for the design pillar.** The single global `TASTE` director is now a small,
   curated set of opinionated presets — `editorial` (the default, byte-for-byte the old voice, so
   output is unchanged), `brutalist`, `warm-minimal`, and `technical`. Pick one with a `taste`

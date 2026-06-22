@@ -36,6 +36,8 @@ def build_exploration_report(
     buckets: TriageBuckets,
     middle_verdicts: dict[int, ClassifierVerdict],
     threads_synthesized: int = 0,
+    false_reject: tuple[float, int] | None = None,
+    dedup_merge_rate: float | None = None,
 ) -> ExplorationReport:
     """Compose the ExplorationReport contract field.
 
@@ -48,6 +50,11 @@ def build_exploration_report(
         threads_synthesized: filled by the downstream synthesis stage, after
             cluster dedup. Pass 0 from the triage step alone; the orchestrator
             overwrites this once synthesis completes.
+        false_reject: optional `(rate, sample_size)` from the recall backstop
+            (`estimate_false_reject_rate`) — the measured cost of the rank-only
+            auto-reject band. None ⇒ backstop not run.
+        dedup_merge_rate: optional embed_group near-dup merge rate, filled by the
+            synthesis stage once it has run. None ⇒ synthesis hasn't run yet.
     """
     n_accepted = len(buckets.accepted)
     n_rejected = len(buckets.rejected)
@@ -93,6 +100,9 @@ def build_exploration_report(
             "p90": round(_percentile(hyb, 0.90), 4),
         }
 
+    false_reject_rate = round(false_reject[0], 4) if false_reject is not None else None
+    false_reject_sample_size = false_reject[1] if false_reject is not None else 0
+
     return ExplorationReport(
         threads_pulled=n_threads_pulled,
         threads_auto_accepted=n_accepted,
@@ -101,6 +111,9 @@ def build_exploration_report(
         threads_relevant=threads_relevant,
         threads_synthesized=threads_synthesized,
         noise_composition=dict(noise_counter),
+        false_reject_rate=false_reject_rate,
+        false_reject_sample_size=false_reject_sample_size,
+        dedup_merge_rate=(round(dedup_merge_rate, 4) if dedup_merge_rate is not None else None),
         similarity_percentiles=sim_percentiles,
         hybrid_percentiles=hybrid_percentiles,
     )

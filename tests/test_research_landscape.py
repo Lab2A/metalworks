@@ -417,3 +417,88 @@ def test_corpus_mine_drops_hallucinated_cluster() -> None:
     )
     cmap = run_competitor_map(_deps(chat), report)
     assert all(c.name != "Ghost" for c in cmap.competitors)
+
+
+# ── tightened match thresholds (issue #82) ───────────────────────────────────
+
+
+class _ControlledEmbedding:
+    """Embedding stub mapping known texts to fixed vectors, for cosine control.
+
+    Lets a test set the EXACT cosine between a gap and a complaint, so a match
+    that sits in the just-loosened band (old 0.55 floor → matched; new 0.62 floor
+    → dropped) is exercised deterministically. Unknown texts fall back to an
+    orthogonal vector (cosine 0 to the anchors), so they never coincidentally
+    match.
+    """
+
+    protocol_version = "test"
+    model_id = "controlled/embedding"
+
+    def __init__(self, vectors: dict[str, list[float]]) -> None:
+        self._vectors = vectors
+
+    def embed(self, texts: Any, *, task: str = "document") -> list[list[float]]:
+        return [self._vectors.get(t, [0.0, 0.0, 1.0]) for t in texts]
+
+
+def test_coincidental_low_similarity_complaint_no_longer_attaches_as_gap() -> None:
+    """A gap whose cosine to the nearest complaint is 0.58 — above the OLD 0.55
+    floor, below the NEW 0.62 floor — must NOT attach (no-quote-no-gap drops it).
+
+    Proves the tightened landscape match (issue #82): a coincidental, topically-
+    adjacent complaint no longer inflates a competitor's gap set or severity.
+    """
+    from metalworks.research.landscape import _MATCH_THRESHOLD
+
+    assert _MATCH_THRESHOLD == 0.62  # the raised floor under test
+
+    complaint = "the serum stings on broken skin"
+    gap = "packaging leaks in a gym bag"
+    # cos([1,0,0], [0.58, 0.8146, 0]) == 0.58 — between old 0.55 and new 0.62.
+    import math
+
+    vectors = {
+        complaint: [1.0, 0.0, 0.0],
+        gap: [0.58, math.sqrt(1.0 - 0.58**2), 0.0],
+    }
+    q = _quote(complaint, "https://r/1")
+    report = _report(clusters=[_cluster(1, quotes=[q], distinct_authors=12)])
+    cand = _CompetitorCand(name="X", kind="direct", one_liner="y")
+    chat = _chat(competitors=[cand], harvest=_Harvest(gaps=[gap]))
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_ControlledEmbedding(vectors),
+        corpus=MemoryStores(),
+        reader=_NullReader(),
+        clock=lambda: _CLOCK,
+    )
+    cmap = run_competitor_map(deps, report)
+    assert cmap.competitors[0].gaps == []  # 0.58 < 0.62 → dropped, not attached
+
+
+def test_genuine_paraphrase_gap_still_attaches_above_tightened_floor() -> None:
+    """A gap at cosine 0.95 to the complaint stays matched — the tightening drops
+    coincidental matches without losing real paraphrase ones."""
+    import math
+
+    complaint = "the serum stings on broken skin"
+    gap = "it burns when applied to damaged areas"
+    vectors = {
+        complaint: [1.0, 0.0, 0.0],
+        gap: [0.95, math.sqrt(1.0 - 0.95**2), 0.0],
+    }
+    q = _quote(complaint, "https://r/1")
+    report = _report(clusters=[_cluster(1, quotes=[q], distinct_authors=12)])
+    cand = _CompetitorCand(name="X", kind="direct", one_liner="y")
+    chat = _chat(competitors=[cand], harvest=_Harvest(gaps=[gap]))
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=_ControlledEmbedding(vectors),
+        corpus=MemoryStores(),
+        reader=_NullReader(),
+        clock=lambda: _CLOCK,
+    )
+    cmap = run_competitor_map(deps, report)
+    assert len(cmap.competitors[0].gaps) == 1
+    assert cmap.competitors[0].gaps[0].evidence.evidence_id == q.id
