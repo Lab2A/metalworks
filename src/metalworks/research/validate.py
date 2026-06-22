@@ -57,12 +57,9 @@ AssessFn = Callable[["ResearchDeps", DemandReport, Landscape], Assessment]
 
 def default_research(deps: ResearchDeps, sketch: IdeaSketch) -> DemandReport:
     from metalworks.research.pipeline import run_research
+    from metalworks.research.planner import brief_or_question
 
-    brief = sketch.brief
-    if brief is None:
-        from metalworks.research.planner import brief_from_question
-
-        brief = brief_from_question(deps, sketch.idea)
+    brief = brief_or_question(deps, sketch.brief, sketch.idea)
     return run_research(deps, brief=brief)
 
 

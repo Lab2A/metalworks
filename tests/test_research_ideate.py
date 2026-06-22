@@ -8,7 +8,10 @@ a pure transform over a report's forks — candidate wedges first, else top clus
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
+
+import pytest
+from pydantic import BaseModel
 
 from metalworks.contract import (
     CandidateWedge,
@@ -20,12 +23,26 @@ from metalworks.contract import (
     SignalStrength,
 )
 from metalworks.embeddings import FakeEmbedding
+from metalworks.errors import MissingKeyError, StructuredOutputError
 from metalworks.llm import FakeChatModel
 from metalworks.research.deps import ResearchDeps
 from metalworks.research.ideate import _IdeaExtract, ideate_from_idea, ideate_from_report
 from metalworks.stores import MemoryStores
 
 _CLOCK = datetime(2026, 2, 2, tzinfo=UTC)
+
+_T = TypeVar("_T", bound=BaseModel)
+
+
+class _RaisingChat(FakeChatModel):
+    """A FakeChatModel whose structured call always raises ``exc`` (error-path tests)."""
+
+    def __init__(self, exc: Exception) -> None:
+        super().__init__()
+        self._exc = exc
+
+    def complete_structured(self, *, output_model: type[_T], **_kw: Any) -> _T:  # type: ignore[override]
+        raise self._exc
 
 
 class _NullReader:
@@ -105,42 +122,71 @@ def test_ideate_from_idea_sharpens_and_builds_brief() -> None:
     assert sketch.partial is False
 
 
-def test_ideate_from_idea_degrades_to_raw_idea_when_extraction_fails() -> None:
-    chat = FakeChatModel()  # _IdeaExtract not scripted → complete_structured raises → fallback
+def test_ideate_from_idea_degrades_to_raw_idea_when_model_declines() -> None:
+    # A genuine "model declined" (StructuredOutputError) → degrade to the raw idea.
+    chat = _RaisingChat(StructuredOutputError("fake/chat", "no schema-valid output"))
     sketch = ideate_from_idea(_deps(chat), "a focus app", subreddits=["nootropics"])
     assert sketch.hypothesis == "a focus app"  # raw idea is its own hypothesis
     assert sketch.brief is not None  # brief still built (subreddits passed)
 
 
+def test_ideate_from_idea_propagates_infra_error() -> None:
+    # #76: an auth/network error during extraction must RAISE — never silently
+    # downgrade to a "thin" hypothesis the caller can't tell apart from success.
+    chat = _RaisingChat(MissingKeyError("GOOGLE_API_KEY", provider="gemini"))
+    with pytest.raises(MissingKeyError):
+        ideate_from_idea(_deps(chat), "a focus app", subreddits=["nootropics"])
+
+
 # ── evidence-first ────────────────────────────────────────────────────────────
 
 
-def test_ideate_from_report_prefers_candidate_wedges() -> None:
+def test_ideate_from_report_preserves_wedge_order_no_re_rank() -> None:
+    # candidate_wedges arrives already ranked from synthesis/wedges; ideate must
+    # NOT re-sort it (one ranking source). The first wedge in stays the first out.
     wedges = [
         CandidateWedge(
-            label="weak wedge",
-            pain="p-lo",
+            label="first wedge",
+            pain="p-1",
             scope="minimal",
             breadth_count=2,
-            evidence=[EvidenceRef(kind="cluster", cluster_rank=2)],
-        ),
-        CandidateWedge(
-            label="strong wedge",
-            pain="p-hi",
-            scope="broad",
-            breadth_count=40,
             rationale="the obvious one",
             evidence=[EvidenceRef(kind="cluster", cluster_rank=1)],
+        ),
+        CandidateWedge(
+            label="second wedge",
+            pain="p-2",
+            scope="broad",
+            breadth_count=40,  # higher breadth must NOT jump it to the top
+            evidence=[EvidenceRef(kind="cluster", cluster_rank=2)],
         ),
     ]
     result = ideate_from_report(_deps(FakeChatModel()), _report(wedges=wedges))
     assert result.report_id == "rpt-1"
-    assert [s.idea for s in result.sketches] == ["strong wedge", "weak wedge"]  # by breadth desc
+    assert [s.idea for s in result.sketches] == ["first wedge", "second wedge"]  # input order
     top = result.sketches[0]
     assert top.provenance == "evidence-first"
-    assert top.hypothesis == "the obvious one"
+    assert top.hypothesis == "the obvious one"  # the wedge's grounded rationale
     assert top.evidence[0].cluster_rank == 1
     assert result.partial is False
+
+
+def test_ideate_from_report_emits_no_templated_hypothesis() -> None:
+    # #75: a wedge without a rationale carries an empty hypothesis, never a Mad-Lib.
+    wedges = [
+        CandidateWedge(
+            label="rationale-less wedge",
+            pain="p-x",
+            scope="minimal",
+            breadth_count=5,
+            evidence=[EvidenceRef(kind="cluster", cluster_rank=1)],
+        ),
+    ]
+    result = ideate_from_report(_deps(FakeChatModel()), _report(wedges=wedges))
+    s = result.sketches[0]
+    assert s.hypothesis == ""  # no rationale → no hypothesis, not a template
+    assert "Build the narrowest thing" not in s.hypothesis
+    assert "Build for the people" not in s.hypothesis
 
 
 def test_ideate_from_report_falls_back_to_clusters() -> None:
@@ -150,7 +196,20 @@ def test_ideate_from_report_falls_back_to_clusters() -> None:
     s = result.sketches[0]
     assert s.provenance == "evidence-first"
     assert s.pain == "PIE lingers"
+    assert s.hypothesis == ""  # cluster sketches carry no templated hypothesis
     assert s.evidence[0].kind == "cluster" and s.evidence[0].cluster_rank == 1
+
+
+def test_ideate_from_report_cluster_order_not_re_ranked() -> None:
+    # ranked_clusters arrives ordered by the cluster ranker; ideate preserves it.
+    report = _report(
+        clusters=[
+            _cluster(1, "top pain", demand_score=3.0),  # lower score but rank 1, already first
+            _cluster(2, "second pain", demand_score=9.0),
+        ]
+    )
+    result = ideate_from_report(_deps(FakeChatModel()), report)
+    assert [s.idea for s in result.sketches] == ["top pain", "second pain"]
 
 
 def test_ideate_from_report_empty_is_partial() -> None:
