@@ -483,9 +483,10 @@ def ux_skeleton_build(report_id: str, surface: str, store_path: str | None = Non
 
 
 @guard
-def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
+def site_render(report_id: str, store_path: str | None = None, styled: bool = False) -> ToolResult:
     """TIER 2 (chat + embedding keys). Build a grounded marketing site for a stored
-    report and return the MarketingSite plus a self-contained index.html."""
+    report and return the MarketingSite plus a self-contained index.html. With
+    styled=True, also build the design system and style the HTML like the brand."""
     from metalworks.research import build_marketing_site, render_site_html
     from metalworks.research.synthesis import build_positioning_brief
 
@@ -494,7 +495,12 @@ def site_render(report_id: str, store_path: str | None = None) -> ToolResult:
         return report
     deps = _build_deps(store_path)
     site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
-    return {"site": site.model_dump(mode="json"), "html": render_site_html(site, report)}
+    design = None
+    if styled:
+        from metalworks.research import build_design_system
+
+        design = build_design_system(deps, report)
+    return {"site": site.model_dump(mode="json"), "html": render_site_html(site, report, design)}
 
 
 @guard

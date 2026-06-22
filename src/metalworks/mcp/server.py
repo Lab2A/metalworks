@@ -130,9 +130,11 @@ async def ux_skeleton_build(
     return tools.ux_skeleton_build(report_id, surface, store_path)
 
 
-async def site_render(report_id: str, store_path: str | None = None) -> dict[str, Any]:
-    """TIER 2. Build a grounded marketing site (+ index.html) for a stored report (chat + emb)."""
-    return tools.site_render(report_id, store_path)
+async def site_render(
+    report_id: str, store_path: str | None = None, styled: bool = False
+) -> dict[str, Any]:
+    """TIER 2. Build a grounded marketing site; styled=True styles it like the brand (chat+emb)."""
+    return tools.site_render(report_id, store_path, styled)
 
 
 async def design_from_report(

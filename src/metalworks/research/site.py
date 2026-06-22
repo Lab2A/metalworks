@@ -49,6 +49,7 @@ from metalworks.contract import (
 from metalworks.contract.site import MarketingSite, SiteSection
 
 if TYPE_CHECKING:
+    from metalworks.contract.design import DesignSystem
     from metalworks.contract.positioning import PositioningBrief
     from metalworks.research.deps import ResearchDeps
 
@@ -349,7 +350,73 @@ def _evidence_by_id(report_evidence: list[EvidenceRecord]) -> dict[str, Evidence
     return {e.id: e for e in report_evidence}
 
 
-def render_site_html(site: MarketingSite, report: DemandReport | None = None) -> str:
+# The curated faces a known font name maps to — so a DesignSystem's free-text
+# typography choice ("Fraunces display + Geist body") yields a usable stack.
+_KNOWN_FONTS = (
+    "Fraunces",
+    "Cabinet Grotesk",
+    "Instrument Serif",
+    "General Sans",
+    "Clash Grotesk",
+    "Geist Mono",
+    "Geist",
+    "Inter Tight",
+    "Instrument Sans",
+    "Source Sans 3",
+    "JetBrains Mono",
+    "IBM Plex Mono",
+)
+_HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
+
+
+def _design_tokens(system: DesignSystem) -> dict[str, str]:
+    """Best-effort CSS tokens from a DesignSystem's typography + color choices.
+
+    The choices are free text ("Fraunces display + Geist body; ink #1A1A1A, accent
+    #C2410C"), so we extract a display/body font and an accent hex, and pick a
+    coherent light/dark mode from the aesthetic — with legible fallbacks for
+    anything not found, so the result is always usable, never half-styled.
+    """
+    by_dim = {c.dimension: c.decision for c in system.choices}
+    typ = by_dim.get("typography", "")
+    fonts = [f for f in _KNOWN_FONTS if f.lower() in typ.lower()]
+    display = fonts[0] if fonts else "Georgia"
+    body = next((f for f in fonts[1:]), "system-ui")
+
+    dark = "dark" in (system.aesthetic or "").lower()
+    bg, ink = ("#0E0E0E", "#F4F1EA") if dark else ("#FBFAF6", "#1A1A1A")
+    hexes = _HEX_RE.findall(by_dim.get("color", ""))
+    accent = hexes[0] if hexes else ink
+    return {"display": display, "body": body, "ink": ink, "bg": bg, "accent": accent}
+
+
+def _site_style(t: dict[str, str]) -> str:
+    """A small, self-contained brand stylesheet from the extracted tokens."""
+    return (
+        f":root{{--bg:{t['bg']};--ink:{t['ink']};--accent:{t['accent']};"
+        f"--display:'{t['display']}';--body:'{t['body']}';}}"
+        "*{box-sizing:border-box;}"
+        "body{margin:0;background:var(--bg);color:var(--ink);"
+        "font-family:var(--body),system-ui,-apple-system,sans-serif;"
+        "-webkit-font-smoothing:antialiased;line-height:1.6;}"
+        "main{max-width:720px;margin:0 auto;padding:80px 28px;}"
+        ".section{padding:14px 0;}"
+        ".section p{font-size:18px;margin:0;}"
+        ".section--hero p{font-family:var(--display),Georgia,serif;font-size:40px;"
+        "line-height:1.12;letter-spacing:-0.02em;}"
+        ".section--cta p{font-weight:600;}"
+        ".fn a,.section--cta a{color:var(--accent);text-decoration:none;}"
+        ".footnotes{max-width:720px;margin:0 auto;padding:0 28px 80px;"
+        "font-size:12px;color:color-mix(in srgb,var(--ink) 55%,transparent);}"
+        ".footnotes a{color:inherit;}"
+    )
+
+
+def render_site_html(
+    site: MarketingSite,
+    report: DemandReport | None = None,
+    system: DesignSystem | None = None,
+) -> str:
     """Render ``site`` as one self-contained ``index.html`` string.
 
     Each verbatim section's copy is followed by a superscript footnote linking
@@ -357,6 +424,11 @@ def render_site_html(site: MarketingSite, report: DemandReport | None = None) ->
     evidence id); connective sections render with no footnote. When ``report`` is
     supplied, footnote permalinks resolve through its ``evidence``; otherwise the
     footnote falls back to the bare evidence id.
+
+    When ``system`` (a :class:`~metalworks.contract.design.DesignSystem`) is
+    supplied, a brand stylesheet derived from it is inlined so the site looks like
+    the brand; without it the output is exactly the unstyled structural HTML
+    (additive — the no-system output is unchanged).
     """
     lookup = _evidence_by_id(report.evidence) if report is not None else {}
 
@@ -408,6 +480,10 @@ def render_site_html(site: MarketingSite, report: DemandReport | None = None) ->
         '  <meta charset="utf-8">',
         '  <meta name="viewport" content="width=device-width, initial-scale=1">',
         f"  <title>{html.escape(site.site_id)}</title>",
+    ]
+    if system is not None:
+        parts.append(f"  <style>{_site_style(_design_tokens(system))}</style>")
+    parts += [
         "</head>",
         "<body>",
         "  <main>",
