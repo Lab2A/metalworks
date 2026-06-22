@@ -55,7 +55,6 @@ source of truth for its tier.
 | `validate_from_idea` | Run the validation loop headlessly (`--auto`) from a raw idea — ideate → demand → landscape → assess, looping on PIVOT. **Synchronous and slow** (runs a demand pull); the interactive loop lives in the `validate` skill. | `idea`, `max_iterations` (3), `store_path` |
 | `surface_recommend` | Recommend a product surface — grounded rubric + trade-offs, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ux_skeleton_build` | Build a UX skeleton for a stored report on the given surface, synchronous (chat + embeddings). | `report_id`, `surface`, `store_path` |
-| `site_render` | Build a grounded marketing site + a self-contained `index.html`; `styled=true` also builds the design system and styles it like the brand (chat + embeddings). | `report_id`, `store_path`, `styled` |
 | `design_from_report` | Author a grounded-but-directional design system (+ preview HTML) — SAFE/RISK choices read from a real competitor teardown where available; records the `grounding_tier` (chat key). | `report_id`, `name`, `store_path` |
 | `logo_generate` | Generate diverse logo options (+ a self-contained picker) drawn under the design system; the model authors each SVG, an unsafe/empty one is dropped (chat key). | `report_id`, `name`, `store_path` |
 | `design_review` | Deterministically audit a rendered page's computed styles (fonts, heading scale, colors) against design hard-rules and (with a report) its design system. Needs a script-capable browser renderer. | `url`, `report_id`, `store_path` |
@@ -71,7 +70,7 @@ source of truth for its tier.
 <Note>
 The report-derived tools (`positioning_from_report`,
 `landscape_from_report`, `assess_from_report`, `ideate_from_report`, `surface_recommend`,
-`ux_skeleton_build`, `site_render`, `launch_assets_build`, `build_spec`) are **synchronous** —
+`ux_skeleton_build`, `launch_assets_build`, `build_spec`) are **synchronous** —
 run them after a stored report exists. `validate_from_idea` is the exception: like the pipeline
 it runs a demand pull (minutes), so call it sparingly or prefer the interactive `validate` skill.
 </Note>

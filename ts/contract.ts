@@ -786,30 +786,6 @@ export interface LogoSet {
   caveat?: string | null;
 }
 
-export interface SiteSection {
-  /** Section job on the page: hero/feature/objection/pricing/social_proof/cta. */
-  role: string;
-  /** Rendered section text (contains a verbatim fragment if claimed). */
-  copy: string;
-  /** Refs backing the section — one quote ref for verbatim, empty for connective. */
-  evidence_refs?: EvidenceRef[];
-  /** verbatim = exact-matched quote fragment; connective = claim-free glue. */
-  provenance: "verbatim" | "derived" | "connective";
-}
-
-export interface MarketingSite {
-  /** Stable id for this generated site. */
-  site_id: string;
-  /** The DemandReport this site was derived from. */
-  report_id: string;
-  /** Ordered sections; verbatim sections carry quote refs, connective ones none. */
-  sections?: SiteSection[];
-  /** True when synthesis was unavailable and the site is empty. */
-  partial?: boolean;
-  /** Why the site is partial / what to treat as unbuilt. */
-  caveat?: string | null;
-}
-
 export interface ClaimCitation {
   /** The exact claim substring as it appears in the asset body. */
   claim_text: string;

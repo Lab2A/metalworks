@@ -35,7 +35,6 @@ if TYPE_CHECKING:
         Landscape,
         LaunchAsset,
         LogoSet,
-        MarketingSite,
         Opportunity,
         Persona,
         PositioningBrief,
@@ -430,28 +429,6 @@ class Metalworks:
         from metalworks.research import build_ux_skeleton
 
         return build_ux_skeleton(self.deps, _demand(research), positioning, surface)
-
-    def site(
-        self, research: Research | DemandReport, positioning: PositioningBrief | None = None
-    ) -> MarketingSite:
-        """Pillar E — a grounded marketing site (verbatim, cited copy)."""
-        from metalworks.research import build_marketing_site
-
-        return build_marketing_site(self.deps, _demand(research), positioning)
-
-    def render_site(
-        self,
-        site: MarketingSite,
-        research: Research | DemandReport | None = None,
-        design: DesignSystem | None = None,
-    ) -> str:
-        """Render a :class:`MarketingSite` to a self-contained ``index.html``.
-
-        Pass a :class:`DesignSystem` (from :meth:`design`) to style the site like the
-        brand; without it the output is the unstyled structural HTML (unchanged)."""
-        from metalworks.research import render_site_html
-
-        return render_site_html(site, _demand(research) if research is not None else None, design)
 
     def design(
         self,

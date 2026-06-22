@@ -62,6 +62,18 @@ contracts may change in any release.
   `mw.design_review()`, `metalworks research design-review`, the `design_review` MCP tool, and the
   `/design-review` skill. Needs a script-capable browser renderer (Playwright).
 
+### Removed
+
+- **Retired `/generate-site` (the grounded marketing-site generator).** It optimized provenance, not
+  conversion — forcing the hero to be a raw forum quote, stripping every number and superlative from
+  the copy, and shipping no `<h1>`/nav/CTA/pricing — so its likely output was an empty `partial`
+  page nobody ships. Its honest use (a quote wall) is already covered by the demand report +
+  `/content-plan`. Removed across all four surfaces: the `mw.site()` / `mw.render_site()` facade
+  methods, the `metalworks research site` CLI command, the `site_render` MCP tool, and the
+  `/generate-site` skill, plus the core `research/site.py`. **Contract:** the `MarketingSite` and
+  `SiteSection` models are removed from `metalworks.contract` (and from the generated `ts/contract.ts`).
+  `DesignSystem` and `/design-review` are unaffected; `/content-plan` (the separate content pillar) stays.
+
 ## [0.0.5] - 2026-06-18
 
 The CLI gets a real front door. Still pre-1.0; anything outside `metalworks.contract` and the MCP

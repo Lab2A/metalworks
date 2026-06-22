@@ -34,7 +34,7 @@ genuinely different directions, not one.
 
 5. Let the user pick. This is a choice, not an automation: do not declare a winner
    yourself. Once they choose, hand the chosen `svg` off — it is self-contained and
-   drops straight into a site (`/generate-site`) or a repo.
+   drops straight into a site or a repo.
 
 ## Rules
 

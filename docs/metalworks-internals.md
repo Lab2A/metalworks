@@ -114,7 +114,6 @@ dropped at assembly.
 | `LogoSet` / `LogoOption` | `logo.py` | authored SVG logo options, drawn under the `DesignSystem` (§7) |
 | `BuildSpec` | `build.py` | `features` (each evidence-backed, cite-or-die), `personas`, `pricing_tiers`, `stack` hint |
 | `Assessment` / `Decision` | `assess.py` | GO / PIVOT / NO_GO — **deterministic** from demand × landscape; LLM only writes the rationale |
-| `MarketingSite` | `contract/site.py` (rendered by `research/site.py`) | verbatim-cited site sections + `render_site_html` |
 | `ContentPlan` | `marketing.py` | deterministic SEO/content plan, one page per cluster |
 
 The deterministic verdict is the heart of the honesty model: `assess()` computes the gap
@@ -214,13 +213,13 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
 ## 5. Surfaces
 
 - **Library facade** (`client.py`, `Metalworks`): `.research()`, `.positioning()`,
-  `.landscape()`, `.assess()`, `.ideate()`, `.validate()`, `.surface()`, `.ux()`, `.site()`,
-  `.render_site(site, research, design=…)`, `.design()`, `.render_design_preview()`,
+  `.landscape()`, `.assess()`, `.ideate()`, `.validate()`, `.surface()`, `.ux()`,
+  `.design()`, `.render_design_preview()`,
   `.logo()`, `.render_logo_picker()`, `.design_review()`, `.build_spec()`, `.scaffold()`,
   `.launch()`, `.channel_plan()`, `.content_plan()`, plus `.reddit` and `.discovery`
   namespaces and a `.deps` escape hatch. `.research()` returns the `Research` bundle;
   sub-pillars are pure functions over it.
-- **CLI** (`cli/`): `metalworks` with sub-apps `research` (the pillars: `site`, `design`,
+- **CLI** (`cli/`): `metalworks` with sub-apps `research` (the pillars: `design`,
   `logo`, `design-review`, `launch`, …), `reddit`, `arctic`, `config`, `models`, `sources`,
   `corpus`, `browser` (`browser install`), `mcp serve`, plus a top-level interactive menu,
   `doctor`, and a `render` debug command. Lazy-imports providers so the CLI starts free of
@@ -231,10 +230,10 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
   discovery), Tier 3 gated + confirmed (Reddit posting requires a compliance pass + HMAC
   token + `METALWORKS_ALLOW_POSTING=1`). Each tool body is a plain function in `mcp/tools.py`;
   `mcp/server.py` registers a thin async wrapper per the `_TOOL_WRAPPERS` tuple.
-- **Claude Code plugin** (`plugin/`): **18 skills** over the MCP tools — five engagement
+- **Claude Code plugin** (`plugin/`): skills over the MCP tools — five engagement
   (`/demand-report`, `/find-threads`, `/draft-reply`, `/subreddit-intel`, `/discovery`) plus
   the grounded pillars (`/position-wedge`, `/market-landscape`, `/surface-and-ux`,
-  `/generate-site`, `/design`, `/logo`, `/design-review`, `/launch-kit`, `/content-plan`,
+  `/design`, `/logo`, `/design-review`, `/launch-kit`, `/content-plan`,
   `/build-spec`, `/go-no-go`, `/ideate`, `/validate`).
 
 **Reddit engagement** (`reddit/`) is its own subsystem: OAuth + encrypted tokens, public
@@ -294,11 +293,8 @@ negative-space, reference, expressive). Offered, never auto-selected. An angle t
 no valid SVG — or an **unsafe** one (a `<script>` / event handler / `<foreignObject>`) — is
 dropped, never inlined.
 
-### The styled site + the review
+### The design review
 
-- **`render_site_html(site, report, system)`** inlines a brand stylesheet from the
-  `DesignSystem` (fonts, accent, light/dark) — strictly additive: with no system, the site is
-  the unstyled structural HTML as before.
 - **`review_design(renderer, url, system=…)`** (`research/design_review.py`) is the QA half:
   a **deterministic** audit of a *rendered* page's computed styles (fonts, heading scale,
   colors) against design hard-rules (too many fonts, a convergence-trap body face, a
