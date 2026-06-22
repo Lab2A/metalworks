@@ -273,7 +273,7 @@ def test_mcp_assess_not_found(monkeypatch: Any) -> None:
     assert res["error"]["error_code"] == "not_found"
 
 
-# ── advisory per-fork saturation ──────────────────────────────────────────────
+# ── per-fork saturation gates the GO ──────────────────────────────────────────
 
 
 def _tagged_landscape(comp_clusters: list[list[int]]) -> Landscape:
@@ -323,8 +323,26 @@ def test_per_fork_saturation_diverges_by_cluster() -> None:
     by = {f.label: f for f in a.fork_verdicts}
     assert by["indie"].landscape_saturation == SignalStrength.HIGH  # 6 rivals hit its cluster
     assert by["enterprise"].landscape_saturation == SignalStrength.LOW  # none hit cluster 2
-    # the gate stays GLOBAL (advisory): report-level saturation is the space-level number.
+    # the report-level gap still reports the GLOBAL (space-level) saturation.
     assert a.gap.landscape_saturation == SignalStrength.HIGH
+
+
+def test_fork_in_open_niche_goes_while_global_is_crowded() -> None:
+    # The headline #80 scenario: a fork open inside a CROWDED space can GO. Two
+    # equally-broad wedges; all 6 rivals crowd cluster 1, so the space (global)
+    # saturation is HIGH — yet the cluster-2 wedge's OWN saturation is LOW, so the
+    # GO gate (now per-fork) lets it GO while the report-level gap reads crowded.
+    report = _report(
+        200,
+        wedges=[_wedge_on("indie", 100, [1]), _wedge_on("enterprise", 100, [2])],
+    )
+    land = _tagged_landscape([[1]] * 6)  # 6 rivals, all on cluster 1 → global HIGH
+    a = run_assessment(_deps(), report, land)
+    by = {f.label: f for f in a.fork_verdicts}
+    assert a.gap.landscape_saturation == SignalStrength.HIGH  # the space is crowded
+    assert by["indie"].decision == Decision.NO_GO  # its own niche is crowded
+    assert by["enterprise"].decision == Decision.GO  # but THIS niche is open → GO
+    assert a.decision == Decision.GO  # a fork GOes → top-line GO
 
 
 def test_untagged_landscape_falls_back_to_global_per_fork() -> None:
