@@ -552,6 +552,34 @@ def logo_generate(
 
 
 @guard
+def design_review(
+    url: str, report_id: str | None = None, store_path: str | None = None
+) -> ToolResult:
+    """TIER 2 (chat key only when ``report_id`` is given). Deterministically audit a
+    rendered page's computed styles (fonts, heading scale, colors) against design
+    hard-rules, and — with ``report_id`` — that report's design system. Needs a
+    script-capable browser renderer (Playwright); screenshot-only backends can't
+    read computed styles."""
+    from metalworks.config import resolve_renderer
+    from metalworks.errors import BrowserNotInstalledError, StyleAuditUnsupported
+    from metalworks.research import build_design_system, review_design
+
+    renderer = resolve_renderer()
+    if renderer is None:
+        raise BrowserNotInstalledError()
+    if not renderer.capabilities.supports_style_audit:
+        raise StyleAuditUnsupported(renderer.renderer_id)
+    system = None
+    if report_id is not None:
+        report = _report_or_not_found(report_id, store_path)
+        if isinstance(report, dict):
+            return report
+        system = build_design_system(_build_deps(store_path), report)
+    review = review_design(renderer, url, system=system)
+    return {"design_review": review.model_dump(mode="json")}
+
+
+@guard
 def launch_assets_build(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Draft grounded, channel-native launch assets for a stored
     report — one LLM call per surface. Returns [] on a no-go report. DRAFTING ONLY."""

@@ -57,6 +57,7 @@ from metalworks.contract import (  # noqa: E402
     DemandReport,
     DesignBrief,
     DesignChoice,
+    DesignReview,
     DesignSystem,
     DiscoveryContext,
     EvidenceBackedChoice,
@@ -107,6 +108,7 @@ from metalworks.contract import (  # noqa: E402
     SlotPlan,
     SourceMapEntry,
     StrengthClaim,
+    StyleFinding,
     SubredditIntel,
     SurfaceRecommendation,
     TargetSubreddit,
@@ -185,6 +187,9 @@ MODELS: list[type[BaseModel]] = [
     LandscapeSignal,
     DesignChoice,
     DesignSystem,
+    # design review — deterministic audit of a rendered page
+    StyleFinding,
+    DesignReview,
     # logo (the mark submodule)
     LogoOption,
     LogoSet,

@@ -64,6 +64,7 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research site REPORT_ID` | Build a grounded marketing site (verbatim, cited copy) from a stored report. | chat key |
 | `metalworks research design REPORT_ID` | Author a grounded-but-directional design system (SAFE/RISK choices + `DESIGN.md`) from a stored report; a real competitor teardown when a browser is installed. | chat key |
 | `metalworks research logo REPORT_ID` | Generate diverse logo options (SVGs + a picker) drawn under the report's design system. | chat key |
+| `metalworks research design-review URL` | Deterministically audit a rendered page's computed styles vs design hard-rules (and, with `--report`, a design system). Needs the browser. | none (chat with `--report`) |
 | `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
 | `metalworks research content-plan REPORT_ID` | Project a stored report into a deterministic content/SEO plan. **No LLM.** | zero-key |
 
@@ -91,6 +92,7 @@ Options:
 - `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON; `--styled` also builds the design system and styles the site like the brand.
 - `research design` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for `DESIGN.md` + `preview.html`; `--max-teardown N` competitor sites to teardown (`0` = all).
 - `research logo` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for the SVGs + `picker.html`; `--count, -n` how many options (design angles).
+- `research design-review` — `URL` argument; `--report REPORT_ID` to also grade against that report's design system; `--json PATH` for the `DesignReview` JSON.
 
 ## corpus
 

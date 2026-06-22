@@ -30,10 +30,12 @@ from metalworks.contract.corpus import (
 from metalworks.contract.design import (
     DesignChoice,
     DesignDimension,
+    DesignReview,
     DesignStance,
     DesignSystem,
     GroundingTier,
     LandscapeSignal,
+    StyleFinding,
 )
 from metalworks.contract.evidence import (
     EvidenceRecord,
@@ -204,6 +206,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "DesignSystem",
     "GroundingTier",
     "LandscapeSignal",
+    # Design review — the deterministic audit of a rendered page vs the system.
+    "DesignReview",
+    "StyleFinding",
     # Logo (the mark submodule of the design system) — authored SVG options.
     "LogoOption",
     "LogoSet",

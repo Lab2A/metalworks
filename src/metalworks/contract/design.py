@@ -108,3 +108,46 @@ class DesignSystem(BaseModel):
     generated_at: datetime
     partial: bool = Field(default=False)
     caveat: str | None = Field(default=None)
+
+
+# ── Design review — the audit of a RENDERED page against the system ────────────
+
+ReviewSeverity = Literal["fail", "warn", "ok"]
+ReviewCategory = Literal["fonts", "headings", "palette", "system_match", "slop"]
+
+
+class StyleFinding(BaseModel):
+    """One deterministic finding from auditing a rendered page's computed styles."""
+
+    severity: ReviewSeverity = Field(description="fail (hard) / warn (soft) / ok (positive note).")
+    category: ReviewCategory
+    detail: str = Field(description="What was observed and why it's flagged, one line.")
+
+
+class DesignReview(BaseModel):
+    """A computed-style audit of a RENDERED page — what's actually on screen.
+
+    Deterministic: the findings are pure functions of the page's computed styles
+    (fonts, heading scale, colors) plus, when supplied, the brand's
+    :class:`DesignSystem`. The model writes nothing here. Requires a script-capable
+    renderer (Playwright) — a screenshot-only backend can't read computed styles.
+    """
+
+    url: str = Field(description="The page that was audited.")
+    fonts: list[str] = Field(
+        default_factory=list[str], description="Distinct font families actually rendered."
+    )
+    headings: list[str] = Field(
+        default_factory=list[str], description="Rendered h1/h2/h3 font sizes, in document order."
+    )
+    ink: str = Field(default="", description="The rendered body text color.")
+    background: str = Field(default="", description="The rendered body background color.")
+    findings: list[StyleFinding] = Field(default_factory=list[StyleFinding])
+    score: int = Field(default=10, ge=0, le=10, description="10 minus penalties for findings.")
+    passed: bool = Field(default=True, description="True when there are no fail-severity findings.")
+    against_system: bool = Field(
+        default=False, description="Whether it was graded against a DesignSystem (not just rules)."
+    )
+    generated_at: datetime
+    partial: bool = Field(default=False)
+    caveat: str | None = Field(default=None)

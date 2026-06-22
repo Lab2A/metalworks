@@ -733,6 +733,37 @@ export interface DesignSystem {
   caveat?: string | null;
 }
 
+export interface StyleFinding {
+  /** fail (hard) / warn (soft) / ok (positive note). */
+  severity: "fail" | "warn" | "ok";
+  category: "fonts" | "headings" | "palette" | "system_match" | "slop";
+  /** What was observed and why it's flagged, one line. */
+  detail: string;
+}
+
+export interface DesignReview {
+  /** The page that was audited. */
+  url: string;
+  /** Distinct font families actually rendered. */
+  fonts?: string[];
+  /** Rendered h1/h2/h3 font sizes, in document order. */
+  headings?: string[];
+  /** The rendered body text color. */
+  ink?: string;
+  /** The rendered body background color. */
+  background?: string;
+  findings?: StyleFinding[];
+  /** 10 minus penalties for findings. */
+  score?: number;
+  /** True when there are no fail-severity findings. */
+  passed?: boolean;
+  /** Whether it was graded against a DesignSystem (not just rules). */
+  against_system?: boolean;
+  generated_at: string;
+  partial?: boolean;
+  caveat?: string | null;
+}
+
 export interface LogoOption {
   /** The design angle that produced it, e.g. 'logotype'. */
   angle: string;
