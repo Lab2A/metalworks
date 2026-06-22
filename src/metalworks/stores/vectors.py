@@ -10,7 +10,7 @@ comments — re-plan section 10 / Decision 10). Vectors serialize with the stdli
 from __future__ import annotations
 
 from array import array
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from metalworks.errors import MissingExtraError
 
@@ -59,9 +59,14 @@ def cosine_topk(
     if not ids or k <= 0:
         return []
     try:
-        import numpy as np
+        import numpy
     except ImportError as exc:  # pragma: no cover - exercised only on a bare install
         raise MissingExtraError("research", package="numpy") from exc
+
+    # numpy's overloaded stubs (2.5.0+) report linalg.norm / where / argsort as
+    # "partially unknown" under pyright strict; bind numpy behind Any so this
+    # pure-math helper stays green across numpy stub churn (the SDK-behind-Any rule).
+    np: Any = numpy
 
     matrix = np.asarray([list(vectors[i]) for i in ids], dtype="float64")
     q = np.asarray(list(query), dtype="float64")
