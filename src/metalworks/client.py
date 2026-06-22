@@ -415,6 +415,7 @@ class Metalworks:
         research: Research | DemandReport,
         *,
         brand_name: str | None = None,
+        taste: str = "editorial",
         max_teardown: int = 3,
     ) -> DesignSystem:
         """Visual-design pillar — a grounded-but-directional :class:`DesignSystem`.
@@ -422,16 +423,20 @@ class Metalworks:
         Reads the competition at the richest tier available (a real renderer
         teardown when a ``Research`` bundle carries a landscape and a browser is
         installed > web text > model knowledge) and records the ``grounding_tier``
-        so the look is never overstated. ``max_teardown`` caps the live teardown
-        (``0`` for the full sweep)."""
+        so the look is never overstated. ``taste`` picks the director preset
+        (``editorial`` default, ``brutalist`` / ``warm-minimal`` / ``technical``;
+        unknown → default); the default preserves prior output. ``max_teardown``
+        caps the live teardown (``0`` for the full sweep)."""
         from metalworks.research import build_design_system
 
         return build_design_system(
-            self.deps, research, brand_name=brand_name, max_teardown=max_teardown
+            self.deps, research, brand_name=brand_name, taste=taste, max_teardown=max_teardown
         )
 
     def render_design_preview(self, system: DesignSystem) -> str:
-        """Render a :class:`DesignSystem` to a self-contained preview HTML page."""
+        """Render a :class:`DesignSystem` to a self-contained preview HTML page.
+
+        The preview chrome derives from the system's ``taste`` preset."""
         from metalworks.research import render_design_preview_html
 
         return render_design_preview_html(system)
@@ -445,11 +450,14 @@ class Metalworks:
 
         return build_logo_set(self.deps.chat, system, n=n)
 
-    def render_logo_picker(self, logos: LogoSet) -> str:
-        """Render a :class:`LogoSet` to a self-contained picker HTML page."""
+    def render_logo_picker(self, logos: LogoSet, *, taste: str | None = None) -> str:
+        """Render a :class:`LogoSet` to a self-contained picker HTML page.
+
+        Pass the design system's ``taste`` so the picker chrome tracks the brand's
+        chosen voice (default: the ``editorial`` chrome)."""
         from metalworks.research import render_logo_picker_html
 
-        return render_logo_picker_html(logos)
+        return render_logo_picker_html(logos, taste=taste)
 
     def design_review(self, url: str, *, system: DesignSystem | None = None) -> DesignReview:
         """Audit a RENDERED page's computed styles deterministically, optionally vs a

@@ -682,6 +682,8 @@ export interface DesignSystem {
   grounding_tier: "renderer" | "web" | "model_knowledge";
   /** The aesthetic direction in one line (e.g. 'editorial monochrome, dark-first'). */
   aesthetic: string;
+  /** The taste preset the system was authored under (e.g. 'editorial', 'brutalist', 'warm-minimal', 'technical') — drives the director voice + preview chrome. */
+  taste?: string;
   /** One per design dimension, each SAFE/RISK-labelled. */
   choices?: DesignChoice[];
   /** Directional reads of the competition that informed the system (not cited). */

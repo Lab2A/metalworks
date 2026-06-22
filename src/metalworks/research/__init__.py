@@ -12,6 +12,8 @@ no provider dependencies (the heavy bits live behind the `[research]` extra).
 from metalworks.research.assess import run_assessment
 from metalworks.research.deps import CommentSource, CorpusReader, ResearchDeps
 from metalworks.research.design import (
+    DEFAULT_TASTE,
+    TASTE_PRESETS,
     build_design_system,
     render_design_md,
     render_design_preview_html,
@@ -33,6 +35,8 @@ from metalworks.research.validate import validate
 # from `metalworks.research.types` if you need them; they are not part of the
 # stable surface.
 __all__ = [
+    "DEFAULT_TASTE",
+    "TASTE_PRESETS",
     "CommentSource",
     "CorpusReader",
     "ResearchDeps",

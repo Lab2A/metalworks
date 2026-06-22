@@ -278,8 +278,9 @@ renderer tier without launching it.
 
 `build_design_system(deps, research)` reads the competition at the richest tier available — a
 real renderer **teardown** of competitor sites (their actual fonts/colors) > web text > the
-model's own knowledge — and authors a system under a constant house craft bar: an aesthetic
-direction, one **SAFE/RISK** `DesignChoice` per dimension (typography, color, layout, …), and
+model's own knowledge — and authors a system under one of a few curated **taste presets**
+(`editorial` default / `brutalist` / `warm-minimal` / `technical`, recorded on `DesignSystem.taste`):
+an aesthetic direction, one **SAFE/RISK** `DesignChoice` per dimension (typography, color, layout, …), and
 directional `LandscapeSignal`s. Two honesty signals: the SAFE/RISK stance, and the
 **`grounding_tier`** (`renderer` / `web` / `model_knowledge`) so the look is never overstated.
 Grounding is directional — there are *no per-decision evidence_refs*. Writes a `DESIGN.md`.

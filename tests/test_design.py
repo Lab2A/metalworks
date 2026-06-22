@@ -32,11 +32,16 @@ from metalworks.llm import FakeChatModel
 from metalworks.render.fake import FakeRenderer
 from metalworks.research.deps import ResearchDeps
 from metalworks.research.design import (
+    _CONVERGENCE_FACES,
     _DIMENSIONS,
+    DEFAULT_TASTE,
+    TASTE_PRESETS,
     _DesignDraft,
     build_design_system,
     render_design_md,
     render_design_preview_html,
+    resolve_chrome,
+    resolve_taste,
 )
 from metalworks.stores import MemoryStores
 
@@ -266,3 +271,123 @@ def test_design_wired_on_all_surfaces() -> None:
         names = {getattr(w, "__name__", "") for w in getattr(server, attr)}
         assert "design_from_report" in names
         assert hasattr(tools, "design_from_report")
+
+
+# ── taste presets ─────────────────────────────────────────────────────────────
+
+
+def test_at_least_three_presets_plus_default() -> None:
+    assert DEFAULT_TASTE in TASTE_PRESETS
+    assert len(TASTE_PRESETS) >= 3
+    assert {"editorial", "brutalist", "warm-minimal", "technical"} <= set(TASTE_PRESETS)
+
+
+def test_resolve_taste_falls_back_for_unknown() -> None:
+    assert resolve_taste("brutalist") == "brutalist"
+    assert resolve_taste("nope") == DEFAULT_TASTE
+    assert resolve_taste(None) == DEFAULT_TASTE
+
+
+def test_default_taste_preserves_prior_output() -> None:
+    # The default preset's director prompt is the original single-voice TASTE: the
+    # old constant (bar + output, no extra direction) byte-for-byte.
+    from metalworks.research.design import _BAR, _OUTPUT
+
+    assert TASTE_PRESETS[DEFAULT_TASTE] == f"{_BAR}\n\n{_OUTPUT}"
+    # And a default-taste system stamps `taste` without otherwise changing the build.
+    system = build_design_system(
+        _deps(_chat()), _research(landscape=_landscape(with_urls=True)), renderer=FakeRenderer()
+    )
+    assert system.taste == DEFAULT_TASTE
+    assert system.aesthetic == "editorial monochrome, dark-first"  # unchanged from the draft
+
+
+def test_two_presets_steer_the_model_differently() -> None:
+    # Same report, two presets → different director prompt reaches the model AND a
+    # different `taste`/chrome on the result (visibly different DesignSystem).
+    chat_a, chat_b = _chat(), _chat()
+    sys_a = build_design_system(
+        _deps(chat_a),
+        _research(landscape=_landscape(with_urls=True)),
+        taste="editorial",
+        renderer=FakeRenderer(),
+    )
+    sys_b = build_design_system(
+        _deps(chat_b),
+        _research(landscape=_landscape(with_urls=True)),
+        taste="brutalist",
+        renderer=FakeRenderer(),
+    )
+    assert sys_a.taste == "editorial" and sys_b.taste == "brutalist"
+    director_a = next(c["system"] for c in chat_a.calls if c["kind"] == "structured")
+    director_b = next(c["system"] for c in chat_b.calls if c["kind"] == "structured")
+    assert director_a != director_b
+    # And the preview chrome diverges (palette + body face), not one fixed theme.
+    html_a = render_design_preview_html(sys_a)
+    html_b = render_design_preview_html(sys_b)
+    assert html_a != html_b
+    assert "taste: editorial" in html_a and "taste: brutalist" in html_b
+
+
+def test_unknown_taste_falls_back_to_default_in_build() -> None:
+    system = build_design_system(
+        _deps(_chat()),
+        _research(landscape=_landscape(with_urls=True)),
+        taste="does-not-exist",
+        renderer=FakeRenderer(),
+    )
+    assert system.taste == DEFAULT_TASTE
+
+
+def test_no_preset_chrome_leads_with_a_blacklisted_body_face() -> None:
+    for name in TASTE_PRESETS:
+        first_family = resolve_chrome(name).body_font.split(",")[0].strip().strip("'\"").lower()
+        assert first_family not in _CONVERGENCE_FACES, f"{name} leads with {first_family!r}"
+
+
+def test_preview_and_logo_picker_avoid_blacklisted_fonts() -> None:
+    from metalworks.contract.logo import LogoOption, LogoSet
+    from metalworks.research.logo import render_logo_picker_html
+
+    system = build_design_system(
+        _deps(_chat()), _research(landscape=_landscape(with_urls=True)), renderer=FakeRenderer()
+    )
+    preview = render_design_preview_html(system)
+    # The preview's body face is Geist (the editorial chrome), never Inter-led.
+    assert "font-family:'Geist'" in preview
+    assert "font-family:'Inter'" not in preview
+    logo_set = LogoSet(
+        report_id="rpt-1",
+        brand_name="Cadence",
+        options=[LogoOption(angle="symbol", concept="x", svg="<svg></svg>")],
+    )
+    picker = render_logo_picker_html(logo_set, taste=system.taste)
+    assert "font-family:'Inter'" not in picker  # was the blacklisted default
+    assert "font-family:'Geist'" in picker
+
+
+def test_taste_param_present_on_all_surfaces() -> None:
+    import importlib.util
+    import inspect
+
+    from metalworks import Metalworks
+    from metalworks.cli import research_design, research_logo
+
+    # facade
+    assert "taste" in inspect.signature(Metalworks.design).parameters
+    # CLI — inspect the command callbacks directly (bare-safe: no click import, no
+    # Typer help rendering). `--taste` is the `taste` parameter on each callback;
+    # scraping --help is brittle (Typer caps help at 100 cols and colorizes names).
+    assert "taste" in inspect.signature(research_design).parameters
+    assert "taste" in inspect.signature(research_logo).parameters
+    # MCP (tool body + async wrapper)
+    if importlib.util.find_spec("mcp") is not None:
+        from metalworks.mcp import server, tools
+
+        assert "taste" in inspect.signature(tools.design_from_report).parameters
+        assert "taste" in inspect.signature(server.design_from_report).parameters
+    # Skill (the /design SKILL.md documents the param)
+    from pathlib import Path
+
+    skill = Path(__file__).resolve().parents[1] / "plugin" / "skills" / "design" / "SKILL.md"
+    assert "taste" in skill.read_text(encoding="utf-8")

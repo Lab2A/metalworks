@@ -10,6 +10,17 @@ contracts may change in any release.
 
 ### Added
 
+- **Taste presets for the design pillar.** The single global `TASTE` director is now a small,
+  curated set of opinionated presets — `editorial` (the default, byte-for-byte the old voice, so
+  output is unchanged), `brutalist`, `warm-minimal`, and `technical`. Pick one with a `taste`
+  param threaded through all four surfaces (`Metalworks.design(... , taste=)`, `metalworks design
+  --taste`, the `design_from_report` / `logo_generate` MCP tools, and the `/design` skill); the
+  chosen preset is recorded on the new additive `DesignSystem.taste` field. The preview and logo
+  picker now derive their chrome (palette + fonts) from the chosen preset instead of one hardcoded
+  dark/cream theme — and no longer render in a convergence-trap face (the logo picker stops leading
+  with `Inter`, which the design system's own review rejects). The same report under two presets
+  yields a visibly different system. (Subsumes the font half of the preview/picker cleanup.)
+
 - **Grounded build order in the build spec.** `BuildSpec.features` now come back ordered by the
   demand strength of the cluster behind each (the new `FeatureSpec.source_cluster_rank`, 1 =
   strongest), and the cap keeps the highest-demand features. `features[0]` is the spine — the

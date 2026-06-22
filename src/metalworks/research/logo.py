@@ -184,12 +184,19 @@ def build_logo_set(chat: ChatModel, system: DesignSystem, *, n: int = DEFAULT_N)
     )
 
 
-def render_logo_picker_html(logo_set: LogoSet) -> str:
+def render_logo_picker_html(logo_set: LogoSet, *, taste: str | None = None) -> str:
     """A self-contained page showing every option for a human to pick from.
 
-    Each ``svg`` was validated by :func:`_extract_svg` (no script / handler /
-    foreignObject) before it reached the set, so it is safe to inline here.
+    The picker chrome derives from the brand's ``taste`` preset (pass
+    ``system.taste``) so it tracks the chosen design voice instead of a fixed
+    cream/Inter theme — and its body face is never a convergence-trap (Inter/
+    Roboto/…), which the design system's own review would reject. Each ``svg`` was
+    validated by :func:`_extract_svg` (no script / handler / foreignObject) before
+    it reached the set, so it is safe to inline here.
     """
+    from metalworks.research.design import resolve_chrome
+
+    c = resolve_chrome(taste)
     cards: list[str] = []
     for i, opt in enumerate(logo_set.options, 1):
         cards.append(
@@ -204,17 +211,17 @@ def render_logo_picker_html(logo_set: LogoSet) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} — pick a logo</title><style>
-:root{{--bg:#F4F1EA;--ink:#1A1A1A;--muted:#8A8578;--line:#E3DECF;--card:#FBFAF6;}}
+:root{{--bg:{c.logo_ground};--ink:{c.bg};--muted:{c.muted};--line:{c.line};--card:{c.logo_card};}}
 *{{box-sizing:border-box;}}
 body{{margin:0;background:var(--bg);color:var(--ink);
- font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;}}
+ font-family:{c.body_font};-webkit-font-smoothing:antialiased;}}
 .wrap{{max-width:1080px;margin:0 auto;padding:64px 36px 120px;}}
 .top{{border-bottom:1px solid var(--line);padding-bottom:20px;}}
 .top h1{{font-size:24px;font-weight:600;margin:0;letter-spacing:-0.01em;}}
 .top p{{color:var(--muted);font-size:13px;margin:8px 0 0;}}
-.note{{color:#9a5b2a;font-size:13px;}}
+.note{{color:{c.accent};font-size:13px;}}
 .grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:28px;}}
-.card{{margin:0;background:var(--card);border:1px solid var(--line);border-radius:14px;
+.card{{margin:0;background:var(--card);border:1px solid var(--line);border-radius:6px;
  padding:18px;transition:border-color .15s;}}
 .card:hover{{border-color:var(--ink);}}
 .art{{display:flex;align-items:center;justify-content:center;min-height:200px;}}
@@ -222,7 +229,7 @@ body{{margin:0;background:var(--bg);color:var(--ink);
 figcaption{{margin-top:12px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;
  color:var(--muted);}}
 figcaption span{{display:block;text-transform:none;letter-spacing:0;font-size:13px;
- color:#444;margin-top:5px;}}
+ color:var(--ink);margin-top:5px;}}
 </style></head><body><div class="wrap"><div class="top">
 <h1>{name}</h1>
 <p>Pick a logo &mdash; {len(logo_set.options)} options, each a different design angle.</p>

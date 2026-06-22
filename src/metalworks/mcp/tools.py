@@ -449,13 +449,18 @@ def _report_or_not_found(report_id: str, store_path: str | None) -> DemandReport
 
 @guard
 def design_from_report(
-    report_id: str, name: str | None = None, store_path: str | None = None
+    report_id: str,
+    name: str | None = None,
+    taste: str = "editorial",
+    store_path: str | None = None,
 ) -> ToolResult:
     """TIER 2 (chat key). Author a grounded design system for a stored report:
     builds the landscape, reads the competition at the richest tier available
     (a real browser teardown > web text > model knowledge), and returns the
-    DesignSystem plus a self-contained preview HTML. The result's grounding_tier
-    records how grounded the look actually is."""
+    DesignSystem plus a self-contained preview HTML. ``taste`` picks the director
+    preset (editorial / brutalist / warm-minimal / technical; default editorial
+    preserves prior output). The result's grounding_tier records how grounded the
+    look actually is."""
     from metalworks.contract.bundle import Research
     from metalworks.research import build_design_system, render_design_preview_html, run_landscape
 
@@ -468,7 +473,7 @@ def design_from_report(
     except Exception:  # landscape is best-effort; design degrades honestly without it
         landscape = None
     system = build_design_system(
-        deps, Research(demand=report, landscape=landscape), brand_name=name
+        deps, Research(demand=report, landscape=landscape), brand_name=name, taste=taste
     )
     return {
         "design_system": system.model_dump(mode="json"),
@@ -478,21 +483,28 @@ def design_from_report(
 
 @guard
 def logo_generate(
-    report_id: str, name: str | None = None, store_path: str | None = None
+    report_id: str,
+    name: str | None = None,
+    taste: str = "editorial",
+    store_path: str | None = None,
 ) -> ToolResult:
     """TIER 2 (chat key). Generate diverse logo options for a stored report, drawn
     under its design system. Returns a LogoSet + a self-contained picker HTML. The
     model authors each SVG; an unsafe or empty one is dropped, never faked. Options
-    are offered, never auto-selected."""
+    are offered, never auto-selected. ``taste`` picks the design preset the mark
+    draws under (editorial / brutalist / warm-minimal / technical)."""
     from metalworks.research import build_design_system, build_logo_set, render_logo_picker_html
 
     report = _report_or_not_found(report_id, store_path)
     if isinstance(report, dict):
         return report
     deps = _build_deps(store_path)
-    system = build_design_system(deps, report, brand_name=name)
+    system = build_design_system(deps, report, brand_name=name, taste=taste)
     logos = build_logo_set(deps.chat, system, n=5)
-    return {"logo_set": logos.model_dump(mode="json"), "html": render_logo_picker_html(logos)}
+    return {
+        "logo_set": logos.model_dump(mode="json"),
+        "html": render_logo_picker_html(logos, taste=system.taste),
+    }
 
 
 @guard

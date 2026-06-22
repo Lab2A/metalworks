@@ -15,8 +15,9 @@ Two honesty signals instead:
   from a real competitor teardown (a renderer), web text, or only the model's own
   design knowledge — so a consumer is never misled about how grounded the look is.
 
-The model authors the system under a constant house craft bar; metalworks records
-WHICH tier produced it and never pretends taste is evidence.
+The model authors the system under one of a few curated taste presets (recorded in
+``taste``); metalworks records WHICH tier produced it and never pretends taste is
+evidence.
 """
 
 from __future__ import annotations
@@ -93,6 +94,11 @@ class DesignSystem(BaseModel):
     )
     aesthetic: str = Field(
         description="The aesthetic direction in one line (e.g. 'editorial monochrome, dark-first')."
+    )
+    taste: str = Field(
+        default="editorial",
+        description="The taste preset the system was authored under (e.g. 'editorial', "
+        "'brutalist', 'warm-minimal', 'technical') — drives the director voice + preview chrome.",
     )
     choices: list[DesignChoice] = Field(
         default_factory=list[DesignChoice],
