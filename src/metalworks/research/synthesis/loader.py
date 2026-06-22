@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from metalworks.contract import SynthesisThresholds
 from metalworks.research.types import LoadedComment, LoadedPost
 
 if TYPE_CHECKING:
@@ -34,8 +35,10 @@ if TYPE_CHECKING:
 
 # Same upper bound the marketing pipeline used. Past this, the LLM synthesis
 # call's input grows faster than its recall improves; the embed-group dedup
-# stage gets the load down to a sane number anyway.
-DEFAULT_COMMENT_CAP = 2000
+# stage gets the load down to a sane number anyway. Surfaced as
+# ``SynthesisThresholds.comment_cap`` (issue #82); this constant mirrors that
+# documented default for callers that don't thread a policy through.
+DEFAULT_COMMENT_CAP = SynthesisThresholds.model_fields["comment_cap"].default
 
 
 def _source_label(source: str, subreddit: str) -> str:

@@ -187,6 +187,10 @@ class SynthesisOutput:
     source_map: list[SourceMapEntry]
     total_distinct_authors: int
     n_synthesized: int
+    # Fraction of synthesis units folded together by embed_group near-dup merging
+    # (1 - groups/units). Surfaces breadth-collapse onto ExplorationReport
+    # (issue #82). None when no units were synthesized.
+    dedup_merge_rate: float | None = None
 
 
 @dataclass

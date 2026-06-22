@@ -54,8 +54,53 @@ if TYPE_CHECKING:
 _MAX_COMPETITORS = 6
 _MAX_GAPS_PER = 3
 _MAX_STATUS_QUO_GAPS = 3
-_MATCH_THRESHOLD = 0.55  # cosine floor for a gap↔complaint match
 _MAX_TOKENS = 2048
+
+
+class LandscapeMatchPolicy(BaseModel):
+    """Cosine floors for the landscape stage's two evidence-attach matches.
+
+    Surfaced + raised per issue #82. A landscape match decides whether a
+    competitor *gap* (and the severity derived from it) or a shipped *product*
+    attaches to one of the report's real demand clusters — and both feed the
+    GO/NO-GO read. The prior 0.55 / 0.45 floors were loose enough to attach a
+    coincidental complaint (same broad topic, different point), inflating
+    competitor weakness and supply on noise.
+
+    DECISION (issue #82, option: TIGHTEN, not judge-replace): we RAISE the floors
+    rather than route gap→complaint through ``discovery/judge.py``. The judge is
+    purpose-built for *reply authenticity* (a different question), and adding a
+    per-gap LLM call would make a deterministic, side-effect-free match stage
+    non-deterministic and slower — against the repo's "decisions are
+    deterministic" rule. Raising the cosine floor is the cheap, reproducible fix:
+    it removes the coincidental attachments these specific floors were chosen to
+    catch, and the no-quote-no-gap drop already handles a now-unmatched gap
+    honestly (it's dropped, not invented).
+    """
+
+    gap_complaint_floor: float = Field(
+        default=0.62,
+        ge=0.0,
+        le=1.0,
+        description="Cosine floor for a competitor gap → report-complaint match. Raised from the "
+        "prior 0.55: at 0.55 two statements about the same broad topic but different points still "
+        "matched, attaching a coincidental complaint and inflating the gap's service-assigned "
+        "severity. 0.62 keeps genuine paraphrases while dropping topical-but-unrelated matches.",
+    )
+    product_cluster_floor: float = Field(
+        default=0.55,
+        ge=0.0,
+        le=1.0,
+        description="Cosine floor for a shipped-product → demand-cluster match in the existing-"
+        "solutions scan. Raised from the prior 0.45 (which let almost any same-domain product "
+        "attach to a cluster, overstating real supply). 0.55 requires the product to actually "
+        "address the cluster's pain, not merely share its vocabulary.",
+    )
+
+
+DEFAULT_MATCH_POLICY = LandscapeMatchPolicy()
+# Back-compat module constants (same names, now sourced from the surfaced policy).
+_MATCH_THRESHOLD = DEFAULT_MATCH_POLICY.gap_complaint_floor  # cosine floor: gap↔complaint
 
 
 # ── LLM I/O shapes (private) ─────────────────────────────────────────────────
@@ -480,7 +525,7 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
 # ── existing-solutions scan (empirical product pull, matched to clusters) ─────
 
 _MAX_EXISTING = 8
-_EXISTING_MATCH_THRESHOLD = 0.45  # cosine floor for a product↔cluster match
+_EXISTING_MATCH_THRESHOLD = DEFAULT_MATCH_POLICY.product_cluster_floor  # product↔cluster floor
 
 
 def _existing_solutions(

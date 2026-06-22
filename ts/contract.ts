@@ -198,8 +198,17 @@ export interface TriageThresholds {
   auto_reject_pct?: number;
   /** Absolute cosine below which to auto-reject regardless of percentile. None = percentile-only. */
   cosine_floor?: number | null;
-  /** Absolute cosine above which to auto-accept regardless of percentile. None = percentile-only. */
+  /** Absolute cosine above which a thread is RESCUED from the auto-reject band back to the middle for the LLM to check, regardless of percentile. The recall safety valve: with `auto_reject_pct=0.50` half the corpus is rejected on rank alone, so a genuinely relevant thread mis-ranked into the bottom band would vanish unseen. 0.50 is a deliberately conservative non-None default — well above the cosine of off-topic noise, so it rescues the obvious mis-rankings without flooding the middle bucket; set None to restore the old percentile-only behavior. */
   cosine_ceiling?: number | null;
+  /** How many auto-rejected threads to sample back through the LLM classifier to ESTIMATE the false-reject rate (the fraction the rank-only reject band wrongly discarded). 0 disables the backstop. The sample is classified but NOT promoted — this measures the threshold, it does not change the corpus. */
+  backstop_sample_size?: number;
+}
+
+export interface SynthesisThresholds {
+  /** Cosine at/above which two comments are treated as near-duplicates and merged (feeds distinct-author/breadth counts → demand magnitude). */
+  dedup_cosine_threshold?: number;
+  /** Max comments loaded into synthesis (engagement-sorted, so the cap chops noise not signal). */
+  comment_cap?: number;
 }
 
 export interface ResearchBrief {
@@ -230,6 +239,7 @@ export interface ResearchBrief {
   /** One-paragraph definition of relevance the exploration classifier follows. Goes in the user role of the classifier prompt, never system. */
   relevance_rubric: string;
   triage_thresholds?: TriageThresholds;
+  synthesis_thresholds?: SynthesisThresholds;
   output_template?: "full" | "brief_only";
   confidence_threshold?: SignalStrength;
   /** When the user confirmed the brief preview and kicked off the run. */
@@ -263,6 +273,12 @@ export interface ExplorationReport {
   threads_relevant: number;
   threads_synthesized: number;
   noise_composition?: Record<string, number>;
+  /** Estimated fraction of the auto-rejected band the LLM classifier would have kept (sampled, not exhaustive). None ⇒ backstop not run (empty band / disabled / legacy report). A high value means auto_reject_pct is too aggressive — relevant threads are being discarded on rank alone. */
+  false_reject_rate?: number | null;
+  /** How many auto-rejected threads the backstop sampled to estimate false_reject_rate. 0 ⇒ backstop not run. */
+  false_reject_sample_size?: number;
+  /** Fraction of synthesis units collapsed by embed_group near-dup merging (1 - groups/units). Surfaces breadth-collapse: a high rate means the dedup cosine threshold is folding many comments into few groups, shrinking distinct-author/breadth counts → demand magnitude. None ⇒ synthesis dedup hasn't run for this report. */
+  dedup_merge_rate?: number | null;
   similarity_percentiles?: Record<string, number>;
   /** Percentile bands (p10..p90) of the blended cosine + BM25 hybrid score that actually drives the bucketing. Empty for legacy reports that ran on cosine-only triage. */
   hybrid_percentiles?: Record<string, number>;

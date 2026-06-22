@@ -256,3 +256,157 @@ def test_run_exploration_triage_empty_items() -> None:
     )
     assert relevant == []
     assert report.threads_pulled == 0
+
+
+# ── recall backstop + cosine_ceiling safety valve (issue #82) ───────────────
+
+
+class _MapEmbedding:
+    """Embedding stub: known texts → fixed vectors, others → an orthogonal vector.
+
+    Lets a test pin the EXACT cosine of one 'trap' thread to the question, so the
+    cosine_ceiling rescue path is exercised deterministically.
+    """
+
+    protocol_version = "test"
+    model_id = "map/embedding"
+    dim = 3
+
+    def __init__(self, vectors: dict[str, list[float]]) -> None:
+        self._vectors = vectors
+
+    def embed(
+        self, texts: Sequence[str], *, task: Literal["document", "query"] = "document"
+    ) -> list[list[float]]:
+        return [self._vectors.get(t, [0.0, 0.0, 1.0]) for t in texts]
+
+
+def test_cosine_ceiling_has_non_none_default() -> None:
+    # Issue #82: the safety valve must be ON by default so a high-cosine thread
+    # can't be silently auto-rejected on percentile alone.
+    assert TriageThresholds().cosine_ceiling == 0.50
+    assert TriageThresholds().cosine_ceiling is not None
+
+
+def test_high_cosine_item_in_reject_band_is_rescued_to_middle() -> None:
+    pytest.importorskip("rank_bm25")
+    # The trap thread shares the question's vector (cosine 1.0) but carries NO
+    # lexical overlap. Bucketing on BM25 only (alpha=0) ranks it into the bottom
+    # band; the non-None cosine_ceiling must RESCUE it back to the middle.
+    question = "alpha beta gamma delta unique"
+    trap = "zzz"  # cosine 1.0 to the question, but shares no tokens → BM25 0
+    vectors = {question: [1.0, 0.0, 0.0], trap: [1.0, 0.0, 0.0]}
+    items = [
+        ExplorationItem(idx=0, post_id="p0", title=question, selftext=""),  # lexical top
+        ExplorationItem(idx=1, post_id="p1", title="alpha beta gamma", selftext=""),
+        ExplorationItem(idx=2, post_id="p2", title="alpha beta", selftext=""),
+        ExplorationItem(idx=3, post_id="p3", title="alpha", selftext=""),
+        ExplorationItem(idx=4, post_id="p4", title=trap, selftext=""),  # cosine 1.0, BM25 0
+    ]
+    deps = ResearchDeps(
+        chat=FakeChatModel(),
+        embeddings=_MapEmbedding(vectors),
+        corpus=MemoryStores(),
+        reader=_NullReader(),
+    )
+    # No ceiling → the trap is auto-rejected on rank alone (the old silent-drop bug).
+    no_valve = triage_by_embedding(
+        deps,
+        question=question,
+        items=items,
+        thresholds=TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.4, cosine_ceiling=None),
+        hybrid_alpha=0.0,
+    )
+    assert 4 in no_valve.rejected
+    assert 4 not in no_valve.middle
+
+    # With the default-on ceiling (0.50) the high-cosine trap is rescued to middle.
+    rescued = triage_by_embedding(
+        deps,
+        question=question,
+        items=items,
+        thresholds=TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.4, cosine_ceiling=0.50),
+        hybrid_alpha=0.0,
+    )
+    assert 4 in rescued.middle
+    assert 4 not in rescued.rejected
+    assert (rescued.band_percentile_disagreement or 0.0) > 0.0
+
+
+def test_estimate_false_reject_rate_measures_rejected_band() -> None:
+    # The backstop samples the reject band and runs it through the SAME classifier;
+    # the kept fraction IS the false-reject-rate estimate. Here the scripted
+    # classifier keeps everything it sees → rate 1.0.
+    chat = FakeChatModel()
+    chat.script(
+        _BatchVerdicts,
+        _BatchVerdicts(verdicts=[_Verdict(batch_index=0, relevant=True, reason="on_topic")]),
+    )
+    deps = _deps(fast_chat=chat)
+    from metalworks.research.exploration import estimate_false_reject_rate
+
+    out = estimate_false_reject_rate(
+        deps,
+        question="q",
+        relevance_rubric="r",
+        items=_items(5),
+        rejected_indices=[3],
+        sample_size=20,
+    )
+    assert out is not None
+    rate, n = out
+    assert rate == 1.0  # classifier kept the one sampled reject
+    assert n == 1
+
+
+def test_estimate_false_reject_rate_none_when_band_empty_or_disabled() -> None:
+    deps = _deps()
+    assert estimate_false_reject_rate_proxy(deps, rejected=[], n=20) is None  # empty band
+    assert estimate_false_reject_rate_proxy(deps, rejected=[1, 2], n=0) is None  # disabled
+
+
+def estimate_false_reject_rate_proxy(deps: Any, *, rejected: list[int], n: int):
+    from metalworks.research.exploration import estimate_false_reject_rate
+
+    return estimate_false_reject_rate(
+        deps,
+        question="q",
+        relevance_rubric="r",
+        items=_items(5),
+        rejected_indices=rejected,
+        sample_size=n,
+    )
+
+
+def test_run_exploration_triage_emits_false_reject_rate() -> None:
+    pytest.importorskip("rank_bm25")
+    # The orchestrator runs the backstop and surfaces the estimate on corpus_shape.
+    chat = FakeChatModel()
+    chat.script(
+        _BatchVerdicts,
+        _BatchVerdicts(
+            verdicts=[_Verdict(batch_index=i, relevant=True, reason="on_topic") for i in range(50)]
+        ),
+    )
+    deps = _deps(fast_chat=chat)
+    items = _items(10)
+    thresholds = TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.5, backstop_sample_size=20)
+    _relevant, report = run_exploration_triage(
+        deps, question="thread 3", relevance_rubric="r", items=items, thresholds=thresholds
+    )
+    # 5 rejected, all sampled, classifier keeps all → false_reject_rate 1.0.
+    assert report.false_reject_rate == 1.0
+    assert report.false_reject_sample_size == 5
+
+
+def test_run_exploration_triage_no_backstop_when_disabled() -> None:
+    pytest.importorskip("rank_bm25")
+    chat = FakeChatModel()
+    chat.script(_BatchVerdicts, _BatchVerdicts(verdicts=[]))
+    deps = _deps(fast_chat=chat)
+    thresholds = TriageThresholds(auto_accept_pct=0.2, auto_reject_pct=0.5, backstop_sample_size=0)
+    _relevant, report = run_exploration_triage(
+        deps, question="thread 3", relevance_rubric="r", items=_items(10), thresholds=thresholds
+    )
+    assert report.false_reject_rate is None
+    assert report.false_reject_sample_size == 0

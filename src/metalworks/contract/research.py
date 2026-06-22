@@ -445,9 +445,56 @@ class TriageThresholds(BaseModel):
         "None = percentile-only.",
     )
     cosine_ceiling: float | None = Field(
-        default=None,
-        description="Absolute cosine above which to auto-accept regardless of percentile. "
-        "None = percentile-only.",
+        default=0.50,
+        description="Absolute cosine above which a thread is RESCUED from the auto-reject "
+        "band back to the middle for the LLM to check, regardless of percentile. The "
+        "recall safety valve: with `auto_reject_pct=0.50` half the corpus is rejected on "
+        "rank alone, so a genuinely relevant thread mis-ranked into the bottom band would "
+        "vanish unseen. 0.50 is a deliberately conservative non-None default — well above "
+        "the cosine of off-topic noise, so it rescues the obvious mis-rankings without "
+        "flooding the middle bucket; set None to restore the old percentile-only behavior.",
+    )
+
+    # ── Recall backstop (issue #82): measure what the auto-reject band costs ──
+    backstop_sample_size: int = Field(
+        default=20,
+        ge=0,
+        description="How many auto-rejected threads to sample back through the LLM classifier "
+        "to ESTIMATE the false-reject rate (the fraction the rank-only reject band wrongly "
+        "discarded). 0 disables the backstop. The sample is classified but NOT promoted — "
+        "this measures the threshold, it does not change the corpus.",
+    )
+
+
+class SynthesisThresholds(BaseModel):
+    """Synthesis-stage cutoffs that shape how much evidence reaches the LLM.
+
+    Surfaced (issue #82) so the numbers that gate breadth/magnitude are visible
+    and overridable, not buried as module constants. Defaults preserve the prior
+    hard-coded behavior exactly.
+
+    - ``dedup_cosine_threshold`` (was ``embed_group.DEDUP_COSINE_THRESHOLD``):
+      comments closer than this cosine are merged into one near-dup group, so the
+      LLM labels distinct ideas instead of N paraphrases. It directly drives
+      distinct-author / breadth counts → demand magnitude; too LOW collapses real
+      breadth, too HIGH lets paraphrases inflate it.
+    - ``comment_cap`` (was ``loader.DEFAULT_COMMENT_CAP``): upper bound on comments
+      loaded into synthesis, taken highest-engagement-first so the cap trims the
+      long tail, not the signal.
+    """
+
+    dedup_cosine_threshold: float = Field(
+        default=0.92,
+        ge=0.0,
+        le=1.0,
+        description="Cosine at/above which two comments are treated as near-duplicates and "
+        "merged (feeds distinct-author/breadth counts → demand magnitude).",
+    )
+    comment_cap: int = Field(
+        default=2000,
+        ge=0,
+        description="Max comments loaded into synthesis (engagement-sorted, so the cap chops "
+        "noise not signal).",
     )
 
 
@@ -507,6 +554,7 @@ class ResearchBrief(BaseModel):
         "Goes in the user role of the classifier prompt, never system."
     )
     triage_thresholds: TriageThresholds = Field(default_factory=TriageThresholds)
+    synthesis_thresholds: SynthesisThresholds = Field(default_factory=SynthesisThresholds)
 
     # Output (planner D8)
     output_template: Literal["full", "brief_only"] = Field(default="full")
@@ -578,6 +626,29 @@ class ExplorationReport(BaseModel):
     threads_relevant: int
     threads_synthesized: int
     noise_composition: dict[str, int] = Field(default_factory=dict)
+    # ── Recall backstop (issue #82): turn the blind reject threshold into a
+    # measured one. We sample N threads from the auto-rejected band, run them
+    # back through the SAME LLM classifier, and surface what fraction it would
+    # have kept — the estimated cost of the rank-only reject cut.
+    false_reject_rate: float | None = Field(
+        default=None,
+        description="Estimated fraction of the auto-rejected band the LLM classifier would have "
+        "kept (sampled, not exhaustive). None ⇒ backstop not run (empty band / disabled / "
+        "legacy report). A high value means auto_reject_pct is too aggressive — relevant "
+        "threads are being discarded on rank alone.",
+    )
+    false_reject_sample_size: int = Field(
+        default=0,
+        description="How many auto-rejected threads the backstop sampled to estimate "
+        "false_reject_rate. 0 ⇒ backstop not run.",
+    )
+    dedup_merge_rate: float | None = Field(
+        default=None,
+        description="Fraction of synthesis units collapsed by embed_group near-dup merging "
+        "(1 - groups/units). Surfaces breadth-collapse: a high rate means the dedup cosine "
+        "threshold is folding many comments into few groups, shrinking distinct-author/breadth "
+        "counts → demand magnitude. None ⇒ synthesis dedup hasn't run for this report.",
+    )
     similarity_percentiles: dict[str, float] = Field(default_factory=dict)
     hybrid_percentiles: dict[str, float] = Field(
         default_factory=dict,
