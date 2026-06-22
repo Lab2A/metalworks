@@ -396,3 +396,39 @@ def test_render_neutralizes_dangerous_url() -> None:
     html_out = render_site_html(site, report)
     assert "javascript:" not in html_out  # neutralized to "#"
     assert 'href="#"' in html_out
+
+
+# ── design-system styling (additive: no system → unstyled, unchanged) ──────────
+
+
+def test_render_site_styling_is_additive() -> None:
+    from metalworks.contract.design import DesignChoice, DesignSystem
+
+    site = MarketingSite(site_id="site-1", report_id="rpt-1", sections=[])
+
+    plain = render_site_html(site)
+    assert "<style>" not in plain  # additive: the no-system output is unstyled HTML
+
+    system = DesignSystem(
+        report_id="rpt-1",
+        brand_name="Cadence",
+        memorable_thing="the focus app that whispers",
+        grounding_tier="web",
+        aesthetic="editorial monochrome, dark-first",
+        choices=[
+            DesignChoice(
+                dimension="typography",
+                decision="Fraunces display + Geist body",
+                stance="risk",
+                rationale="r",
+            ),
+            DesignChoice(
+                dimension="color", decision="accent #C2410C", stance="safe", rationale="r"
+            ),
+        ],
+        generated_at=datetime(2026, 2, 1, tzinfo=UTC),
+    )
+    styled = render_site_html(site, None, system)
+    assert "<style>" in styled
+    assert "Fraunces" in styled and "#C2410C" in styled  # brand font + accent applied
+    assert "#0E0E0E" in styled  # dark mode inferred from the aesthetic

@@ -88,7 +88,7 @@ Options:
 - `research refresh` / `versions` — optional `REPORT_ID` (id or prefix, any version of the report; defaults to latest); refresh updates from the lineage head and takes `--out, -o PATH`.
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
 - `research position` / `landscape` / `surface` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
-- `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON.
+- `research site` — `REPORT_ID` argument; `--out, -o PATH` for the rendered `index.html`; `--json PATH` for the `MarketingSite` JSON; `--styled` also builds the design system and styles the site like the brand.
 - `research design` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for `DESIGN.md` + `preview.html`; `--max-teardown N` competitor sites to teardown (`0` = all).
 - `research logo` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for the SVGs + `picker.html`; `--count, -n` how many options (design angles).
 

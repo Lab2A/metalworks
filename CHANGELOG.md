@@ -40,6 +40,11 @@ contracts may change in any release.
   **unsafe** one (a `<script>` / event handler / `<foreignObject>` in model-authored markup) — is
   dropped, never inlined. `LogoOption` / `LogoSet` contracts; on all four surfaces: `mw.logo()`,
   `metalworks research logo`, the `logo_generate` MCP tool, and the `/logo` skill.
+- **The marketing site can now look like the brand.** `render_site_html` takes an optional
+  `DesignSystem` and inlines a brand stylesheet derived from it (fonts, accent, light/dark mode);
+  `mw.render_site(site, research, design=…)`, `metalworks research site --styled`, and the
+  `site_render` MCP tool's `styled=true` build the design and apply it. **Strictly additive** — with no
+  design system the site renders exactly the unstyled structural HTML as before.
 
 ## [0.0.5] - 2026-06-18
 

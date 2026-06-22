@@ -2144,6 +2144,10 @@ def research_site(
     json_out: Annotated[
         Path | None, typer.Option("--json", help="Write the MarketingSite JSON here.")
     ] = None,
+    styled: Annotated[
+        bool,
+        typer.Option("--styled", help="Also build the design system and style the site."),
+    ] = False,
 ) -> None:
     """Build a grounded marketing site from a stored report (verbatim, cited copy)."""
     from metalworks.research import build_marketing_site, render_site_html
@@ -2163,15 +2167,21 @@ def research_site(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
     console.print(f"[bold]Building site[/bold] for report {report_id}...")
+    design = None
     try:
         site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
+        if styled:
+            from metalworks.research import build_design_system
+
+            design = build_design_system(deps, report)
     finally:
         reader.close()
     if json_out is not None:
         json_out.write_text(site.model_dump_json(indent=2), encoding="utf-8")
     if out is not None:
-        out.write_text(render_site_html(site, report), encoding="utf-8")
-        console.print(f"[green]Wrote site[/green] {out}")
+        out.write_text(render_site_html(site, report, design), encoding="utf-8")
+        suffix = " [dim](styled)[/dim]" if design else ""
+        console.print(f"[green]Wrote site[/green] {out}{suffix}")
     if site.partial:
         console.print(f"  [yellow]partial:[/yellow] {site.caveat}")
     for s in site.sections:

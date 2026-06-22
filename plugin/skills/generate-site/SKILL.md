@@ -54,6 +54,7 @@ report already verified, and a section with no backing quote does not ship.
   a louder-but-narrower cluster.
 - Never invent a testimonial, a stat, or a guarantee. If the evidence doesn't
   say it, the site doesn't say it.
-- This skill only drafts grounded copy + a bare `index.html`. It does not design,
-  theme, or deploy — hand the render to `design-html` / `clique-feel` for the
-  visual pass against the design system.
+- This skill drafts grounded copy + an `index.html`. By default the HTML is
+  unstyled structure; pass `styled` to `site_render` (or run `/design` first) to
+  inline a brand stylesheet from the design system so the site looks like the
+  brand. It does not deploy.
