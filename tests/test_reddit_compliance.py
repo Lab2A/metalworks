@@ -105,3 +105,22 @@ def test_post_first_person_verb_warn_not_block() -> None:
         v.code == "no_first_person_verb" and v.severity == "warn" for v in corporate.violations
     )
     assert corporate.pass_ is True  # warns don't block
+
+
+def test_ai_tell_list_has_single_definition() -> None:
+    # The reply AI-tell denylist lives in exactly one place: reddit.stylebook.
+    # Both the linter (compliance) and the generator prompt import it, so the
+    # two can't drift. Guard against a second hand-rolled copy reappearing.
+    import metalworks.discovery.prompts as prompts
+    import metalworks.reddit.compliance as compliance
+    from metalworks.reddit import stylebook
+
+    # The linter uses the shared compiled regex — same object, not a copy.
+    assert compliance._AI_TELL_REGEX is stylebook.AI_TELL_REGEX  # noqa: SLF001
+
+    # The generator prompt is built from the shared examples, and names them.
+    for phrase in stylebook.AI_TELL_EXAMPLES:
+        assert phrase in prompts._AI_TELLS_PROMPT  # noqa: SLF001
+
+    # No module other than stylebook defines its own AI-tell phrase list.
+    assert not hasattr(compliance, "_AI_TELLS")

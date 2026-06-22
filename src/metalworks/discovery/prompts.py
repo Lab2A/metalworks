@@ -19,6 +19,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from metalworks.contract import DiscoveryContext, Persona, RedditPost
+from metalworks.reddit.stylebook import AI_TELL_EXAMPLES
+
+# Comma-joined AI-tell examples for the generate prompt. Sourced from the same
+# `reddit.stylebook` list the linter's denylist uses, so the generator is told
+# to avoid exactly the family the gate checks — one list, no drift.
+_AI_TELLS_PROMPT = ", ".join(f"'{p}'" for p in AI_TELL_EXAMPLES)
 
 # ── Filter (cheap model) ───────────────────────────────────────────────────
 
@@ -161,7 +167,8 @@ _GENERATE_SYSTEM = (
     "You are an expert at writing Reddit comments that match a specific brand voice "
     "and add net-new information beyond what the asker already knows. You match the "
     "voice samples exactly — capitalization, punctuation, openers, hedging language. "
-    "You write Reddit-native, not marketing-native. You never say 'great question', "
+    "You write Reddit-native, not marketing-native. You never reach for AI-tell "
+    f"openers or filler (e.g. {_AI_TELLS_PROMPT}, or any phrasing in that family), "
     "never use exclamation marks unless the samples do, never hedge before answering. "
     "If your reply mentions a product, you only do it when it's genuinely the best "
     "answer — and you disclose affiliation in the same sentence. You output a single "
@@ -319,7 +326,7 @@ def _build_generate_user(
         "- Never paraphrase the post. Never give generic advice "
         "('it depends', 'consider your needs')."
     )
-    parts.append("- Never use 'great question', 'happy to help', or other AI-tells.")
+    parts.append(f"- Never use AI-tells ({_AI_TELLS_PROMPT}) or any phrasing in that family.")
     parts.append(f"- Tone: {tone_instruction}")
     parts.append("- Disclose affiliation in the same sentence if you mention a product.")
     parts.append("")
