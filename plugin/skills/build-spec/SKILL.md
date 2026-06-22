@@ -1,6 +1,6 @@
 ---
 name: build-spec
-description: Turn a finished demand report into an evidence-grounded build harness for a coding agent — a BuildSpec (core features each mapped to a real demand cluster and carrying that cluster's verbatim quotes, ICP personas from the audience segments, pricing tiers copied through from the report's price evidence) plus a scaffolded repo (CLAUDE.md cite-or-die rule, docs/SPEC.md, a frozen docs/EVIDENCE.md quote table, a build-pack of skills, and the metalworks MCP wiring). Use after a demand report exists and the user asks "what should I build", "spec the product", "scaffold the app", "turn this into a build", "give me a build plan", or wants to hand the validated demand to a coding agent. metalworks specs and scaffolds — it does NOT write product code. No un-grounded feature survives.
+description: Turn a finished demand report into an evidence-grounded build harness for a coding agent — a BuildSpec (core features each mapped to a real demand cluster and carrying that cluster's verbatim quotes, the product surface to build on — sdk/web/mobile/cli/... — auto-picked with a one-line rationale or pinned by you, a feature-grounded screen skeleton, ICP personas from the audience segments, pricing tiers copied through from the report's price evidence) plus a scaffolded repo (CLAUDE.md cite-or-die rule, docs/SPEC.md, a frozen docs/EVIDENCE.md quote table, a build-pack of skills, and the metalworks MCP wiring). Use after a demand report exists and the user asks "what should I build", "spec the product", "scaffold the app", "what surface should this be", "what screens do I need", "turn this into a build", "give me a build plan", or wants to hand the validated demand to a coding agent. metalworks specs and scaffolds — it does NOT write product code. No un-grounded feature survives.
 ---
 
 You are turning one finished demand report into a build the user's OWN coding
@@ -15,10 +15,12 @@ validated demand.
    `/demand-report` first — the build spec needs a finished report to ground in.
 
 2. Generate the spec. On the CLI this is one command that also writes the
-   harness: `metalworks build init <report_id> --dest ./build --surface web
+   harness: `metalworks build init <report_id> --dest ./build --surface auto
    --base <stack-hint>`. Via MCP, call the `build_spec` tool with the `report_id`
    (optionally `surface` and `stack`) to get the `BuildSpec` JSON without writing
-   files. It needs a chat + embedding key (Tier 2).
+   files. It needs a chat + embedding key (Tier 2). Leave `--surface auto` (the
+   default) to let the spec pick the surface and explain why; pin it (e.g.
+   `--surface cli`) when the user already knows the build shape.
 
 3. Walk the spec honestly:
    - **Features** — each one maps to a numbered demand cluster and carries that
@@ -30,6 +32,13 @@ validated demand.
    - **Pricing tiers** — copied through from the report's price evidence, never
      recomputed. If the report had no price signal, there are no tiers — say so;
      don't invent a price.
+   - **Surface + screens** — the surface (sdk/web/mobile/cli/...) is chosen
+     alongside the features (with a one-line `surface_rationale`) unless the user
+     pinned it, and the screen skeleton is sketched AFTER the features so each
+     screen maps to real `feature_id`s. Walk the screens: **validated** (a backing
+     voice via the feature), **hypothesis** (no voice yet), or **scaffolding** (an
+     auth/settings shell every product needs — not a demand bet). Decisions trace
+     to voices; the visual layer is out of scope — that is `/design`.
    - If the spec is `partial` (no feature grounded), surface the caveat plainly:
      this is a stub, not a buildable plan. Do not paper over it.
 

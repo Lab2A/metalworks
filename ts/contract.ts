@@ -626,40 +626,6 @@ export interface PositioningBrief {
   caveat?: string | null;
 }
 
-export interface RubricDimension {
-  /** The fixed rubric dimension. */
-  name: "where_are_the_users" | "technical_sophistication" | "usage_frequency" | "realtime_or_hardware" | "distribution";
-  /** What the evidence says for this dimension (LLM-phrased). */
-  finding: string;
-  /** Refs backing the finding. Empty iff is_assumption is True. */
-  evidence_refs?: EvidenceRef[];
-  /** True when no evidence backs this dimension — a stated guess. */
-  is_assumption?: boolean;
-}
-
-export interface TradeOff {
-  /** The trade-off, one clause. */
-  text: string;
-  evidence_refs?: EvidenceRef[];
-}
-
-export interface SurfaceRecommendation {
-  report_id: string;
-  /** The recommended surface to build. */
-  chosen: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
-  /** The second-best surface. */
-  runner_up?: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop" | null;
-  /** Why this surface, in one short paragraph (LLM-phrased). */
-  rationale: string;
-  rubric?: RubricDimension[];
-  trade_offs?: TradeOff[];
-  /** Service-assigned from grounded rubric coverage. */
-  confidence?: SignalStrength;
-  generated_at: string;
-  partial?: boolean;
-  caveat?: string | null;
-}
-
 export interface Screen {
   /** Screen name. */
   name: string;
@@ -667,21 +633,16 @@ export interface Screen {
   purpose: string;
   /** The single primary action on this screen. */
   primary_action: string;
+  /** Ids of the BuildSpec features this screen serves (real, not invented). */
+  feature_ids?: string[];
   /** True when this screen directly serves the positioning wedge. */
   serves_wedge?: boolean;
+  /** True for shell screens (auth/settings) — needed by every product, not a demand hypothesis. */
+  scaffolding?: boolean;
   /** Voices asking for this screen. Empty → an unvalidated hypothesis. */
   evidence_refs?: EvidenceRef[];
   /** True iff at least one evidence_ref backs the screen. */
   validated?: boolean;
-}
-
-export interface UxSkeleton {
-  report_id: string;
-  surface: "sdk" | "web" | "mobile" | "cli" | "browser_extension" | "api" | "desktop";
-  screens?: Screen[];
-  generated_at: string;
-  partial?: boolean;
-  caveat?: string | null;
 }
 
 export interface DesignBrief {
@@ -910,8 +871,12 @@ export interface BuildSpec {
   stack: string;
   /** Core features, ordered as the build order: strongest validated demand first (by ``FeatureSpec.source_cluster_rank``). features[0] is the spine — build it first. */
   features?: FeatureSpec[];
+  /** One line on why this surface, set when the surface was chosen automatically (``surface='auto'``). None when the surface was pinned by the caller. */
+  surface_rationale?: string | null;
   personas?: BuildPersona[];
   pricing_tiers?: PricingTier[];
+  /** The build's UX skeleton, sketched AFTER the features so each screen maps to real ``feature_id``s. Shell screens (auth/settings) are flagged ``scaffolding``. */
+  screens?: Screen[];
   partial?: boolean;
   caveat?: string | null;
 }

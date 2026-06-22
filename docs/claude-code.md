@@ -63,14 +63,13 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 
 ### Design
 
-- **`/surface-and-ux`** — picks the surface to build (web, mobile, CLI, SDK, …) with a cited rubric (`surface_recommend`), then sketches 3–5 screens (`ux_skeleton_build`), each marked validated or hypothesis. Text and structure only — no mockups.
 - **`/design`** — a grounded-but-directional design system: an aesthetic direction + a SAFE/RISK choice per dimension (`design_from_report`), read from a real browser teardown of competitor sites where available. Records its `grounding_tier` (renderer / web / model_knowledge) so the look is never overstated; writes a `DESIGN.md`. Authors a system, not pixels.
 - **`/logo`** — the mark submodule: diverse, company-grade SVG logo options (`logo_generate`), one per design angle, drawn under the brand's design system. Offered, never auto-selected; an unsafe or empty SVG is dropped, never inlined.
 - **`/design-review`** — a deterministic audit of a *rendered* page's actual computed styles (fonts, heading scale, colors) against design hard-rules + the design system (`design_review`). The model writes nothing; needs the browser renderer.
 
 ### Build
 
-- **`/build-spec`** — a feature spec mapped to real demand (`build_spec`), then a scaffolded repo: `CLAUDE.md` with a cite-or-die rule, `docs/SPEC.md`, a frozen `docs/EVIDENCE.md` quote table, a `PostToolUse` lint hook, and `.mcp.json` wiring back to metalworks. metalworks specs and scaffolds; your agent builds. Ungrounded features are dropped before scaffolding.
+- **`/build-spec`** — a feature spec mapped to real demand (`build_spec`), the surface to build it on (auto-picked with a one-line rationale, or pinned) and a feature-grounded screen skeleton, then a scaffolded repo: `CLAUDE.md` with a cite-or-die rule, `docs/SPEC.md`, a frozen `docs/EVIDENCE.md` quote table, a `PostToolUse` lint hook, and `.mcp.json` wiring back to metalworks. metalworks specs and scaffolds; your agent builds. Ungrounded features are dropped before scaffolding.
 
 ### Launch
 

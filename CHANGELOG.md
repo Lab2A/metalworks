@@ -62,6 +62,20 @@ contracts may change in any release.
   `mw.design_review()`, `metalworks research design-review`, the `design_review` MCP tool, and the
   `/design-review` skill. Needs a script-capable browser renderer (Playwright).
 
+### Changed
+
+- **The build spec now owns the surface decision and the screen skeleton.** `build_spec_from_report`
+  gains `surface: SurfaceKind | "auto" = "auto"`: with `"auto"` (the new default) the *same*
+  feature-mapping LLM call also returns the chosen surface + a one-line rationale (no extra call —
+  it already has the query, wedge, and pains in scope); a pinned surface (e.g. `"cli"`) is honored
+  and skips the pick. Screens are then sketched **after** the features exist, so each maps to real
+  `feature_id`s (the old standalone skeleton was generated blind to the features it was meant to
+  serve); shell screens (auth/settings) are flagged `scaffolding`, not demand hypotheses. **Contract
+  (additive):** `BuildSpec` grows `surface_rationale: str | None` and `screens: list[Screen]`, and
+  `Screen` grows `feature_ids` + `scaffolding`; old payloads still validate. `SPEC.md` renders a
+  `## Screens` section and the surface rationale next to the grounded build order; `metalworks build
+  init` / the `build_spec` MCP tool default to `--surface auto`.
+
 ### Removed
 
 - **Retired `/generate-site` (the grounded marketing-site generator).** It optimized provenance, not
@@ -73,6 +87,16 @@ contracts may change in any release.
   `/generate-site` skill, plus the core `research/site.py`. **Contract:** the `MarketingSite` and
   `SiteSection` models are removed from `metalworks.contract` (and from the generated `ts/contract.ts`).
   `DesignSystem` and `/design-review` are unaffected; `/content-plan` (the separate content pillar) stays.
+- **Retired the standalone `/surface-and-ux` pillar (folded into `/build-spec`).** Its outputs were
+  orphaned — nothing downstream read them, and the UX skeleton was generated blind to the chosen
+  features. The surface decision and the (now feature-grounded) screens are owned by the build spec
+  (see **Changed**). Removed across all four surfaces + the registry: the `mw.surface()` / `mw.ux()`
+  facade methods, the `metalworks research surface` CLI command, the `surface_recommend` and
+  `ux_skeleton_build` MCP tools (+ their `_TOOL_WRAPPERS` registration), and the `/surface-and-ux`
+  skill, plus the core `research/surface.py`. **Contract:** the now-unproduced `SurfaceRecommendation`,
+  `UxSkeleton`, `RubricDimension`, and `TradeOff` models are removed from `metalworks.contract` (and
+  from the generated `ts/contract.ts`); `Screen` and `SurfaceKind` are kept (the build spec uses them).
+  The `docs/design` "Surface & screens" page is folded into `docs/build-spec`.
 
 ## [0.0.5] - 2026-06-18
 

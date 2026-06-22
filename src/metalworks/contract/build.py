@@ -24,7 +24,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from metalworks.contract.evidence import EvidenceRef
-from metalworks.contract.surface import SurfaceKind
+from metalworks.contract.surface import Screen, SurfaceKind
 
 
 class FeatureSpec(BaseModel):
@@ -85,7 +85,21 @@ class BuildSpec(BaseModel):
             "(by ``FeatureSpec.source_cluster_rank``). features[0] is the spine — build it first."
         ),
     )
+    surface_rationale: str | None = Field(
+        default=None,
+        description=(
+            "One line on why this surface, set when the surface was chosen automatically "
+            "(``surface='auto'``). None when the surface was pinned by the caller."
+        ),
+    )
     personas: list[BuildPersona] = Field(default_factory=list[BuildPersona])
     pricing_tiers: list[PricingTier] = Field(default_factory=list[PricingTier])
+    screens: list[Screen] = Field(
+        default_factory=list[Screen],
+        description=(
+            "The build's UX skeleton, sketched AFTER the features so each screen maps to real "
+            "``feature_id``s. Shell screens (auth/settings) are flagged ``scaffolding``."
+        ),
+    )
     partial: bool = Field(default=False)
     caveat: str | None = Field(default=None)

@@ -73,10 +73,10 @@ Each one is generated from the report and links its claims back to the same quot
   unmet needs in the report.
 - **`CompetitorMap`** — the rivals to beat, each `gap` tied to a real complaint someone
   posted.
-- **`SurfaceRecommendation` / `UxSkeleton`** — what to build (web, mobile, CLI…) and the
-  3-5 screens you need.
-- **`BuildSpec`** — a feature list where every feature maps to a real need; anything that
-  can't be tied to a quote is dropped.
+- **`BuildSpec`** — a feature list where every feature maps to a real need (anything that
+  can't be tied to a quote is dropped), plus the surface to build on (web, mobile, CLI… —
+  chosen with a one-line rationale, or pinned) and the `Screen`s you need, each mapped to
+  real features.
 - **`LaunchAsset` / `ChannelPlan` / `ContentPlan`** — launch drafts and a human-run plan,
   each line backed by a quote. metalworks never posts.
 - **`Landscape` / `ExistingSolution`** — the full "what exists today": the `CompetitorMap` plus

@@ -118,18 +118,6 @@ async def validate_from_idea(
     return tools.validate_from_idea(idea, max_iterations, store_path)
 
 
-async def surface_recommend(report_id: str, store_path: str | None = None) -> dict[str, Any]:
-    """TIER 2. Recommend a product surface for a stored report (chat + embedding keys, sync)."""
-    return tools.surface_recommend(report_id, store_path)
-
-
-async def ux_skeleton_build(
-    report_id: str, surface: str, store_path: str | None = None
-) -> dict[str, Any]:
-    """TIER 2. Build a UX skeleton for a stored report on the given surface (chat + embeddings)."""
-    return tools.ux_skeleton_build(report_id, surface, store_path)
-
-
 async def design_from_report(
     report_id: str, name: str | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -167,9 +155,10 @@ async def content_plan_from_report(report_id: str, store_path: str | None = None
 
 
 async def build_spec(
-    report_id: str, surface: str = "web", stack: str = "empty", store_path: str | None = None
+    report_id: str, surface: str = "auto", stack: str = "empty", store_path: str | None = None
 ) -> dict[str, Any]:
-    """TIER 2. Derive an evidence-grounded BuildSpec for a stored report (chat + embedding keys)."""
+    """TIER 2. Derive an evidence-grounded BuildSpec for a stored report; surface='auto'
+    picks the surface + sketches feature-grounded screens (chat + embedding keys)."""
     return tools.build_spec(report_id, surface, stack, store_path)
 
 
@@ -237,8 +226,6 @@ _TOOL_WRAPPERS = (
     ideate_from_report,
     assess_from_report,
     validate_from_idea,
-    surface_recommend,
-    ux_skeleton_build,
     design_from_report,
     logo_generate,
     design_review,

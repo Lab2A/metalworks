@@ -23,7 +23,6 @@ from metalworks.research.launch import build_launch_assets, plan_channels
 from metalworks.research.logo import build_logo_set, render_logo_picker_html
 from metalworks.research.marketing import content_plan_from_report
 from metalworks.research.pipeline import run_research
-from metalworks.research.surface import build_ux_skeleton, decide_surface
 from metalworks.research.synthesis import build_positioning_brief
 from metalworks.research.validate import validate
 
@@ -41,9 +40,7 @@ __all__ = [
     "build_launch_assets",
     "build_logo_set",
     "build_positioning_brief",
-    "build_ux_skeleton",
     "content_plan_from_report",
-    "decide_surface",
     "ideate_from_idea",
     "ideate_from_report",
     "plan_channels",

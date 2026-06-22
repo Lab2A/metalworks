@@ -22,6 +22,8 @@ from metalworks.build import scaffold
 from metalworks.build.spec import (
     _BuildPhrasing,
     _FeatureDraft,
+    _ScreenDraft,
+    _ScreenPhrasing,
     build_spec_from_report,
 )
 from metalworks.contract import (
@@ -129,6 +131,37 @@ def _draft(fid: str, rank: int) -> _FeatureDraft:
     )
 
 
+def _scripted_with_screens(
+    *,
+    features: list[_FeatureDraft],
+    screens: list[_ScreenDraft],
+    chosen_surface: str = "cli",
+    surface_rationale: str = "the audience lives in the terminal",
+) -> FakeChatModel:
+    """Script BOTH the feature/surface call and the post-feature screens call."""
+    chat = FakeChatModel()
+    chat.script(
+        _BuildPhrasing,
+        _BuildPhrasing(
+            features=features,
+            chosen_surface=chosen_surface,  # type: ignore[arg-type]
+            surface_rationale=surface_rationale,
+        ),
+    )
+    chat.script(_ScreenPhrasing, _ScreenPhrasing(screens=screens))
+    return chat
+
+
+def _screen(name: str, feature_ids: list[str], *, scaffolding: bool = False) -> _ScreenDraft:
+    return _ScreenDraft(
+        name=name,
+        purpose=f"the {name} screen",
+        primary_action="do the thing",
+        feature_ids=feature_ids,
+        scaffolding=scaffolding,
+    )
+
+
 # ── feature grounding (the honesty gate) ─────────────────────────────────────
 
 
@@ -209,6 +242,103 @@ def test_infra_error_propagates_not_silently_partial() -> None:
 
     with pytest.raises(RuntimeError, match="vertex down"):
         build_spec_from_report(_deps(_BoomChat()), _report())
+
+
+# ── surface pick + feature-grounded screens (the folded-in pillar) ───────────
+
+
+def test_auto_surface_returns_surface_rationale_and_grounded_screens() -> None:
+    report = _report()  # rank-1 (2 quotes) + rank-2 (1 quote)
+    chat = _scripted_with_screens(
+        features=[_draft("fade", 1), _draft("track", 2)],
+        screens=[
+            _screen("Fade", ["fade"]),
+            _screen("Track", ["track"]),
+            _screen("Settings", [], scaffolding=True),
+        ],
+        chosen_surface="web",
+        surface_rationale="consumers want a browsable routine",
+    )
+    spec = build_spec_from_report(_deps(chat), report, surface="auto")
+    # Surface + a one-line rationale come back from the SAME feature call.
+    assert spec.surface == "web"
+    assert spec.surface_rationale == "consumers want a browsable routine"
+    # ≥1 screen per grounded feature (each feature is referenced by some screen).
+    served = {fid for s in spec.screens for fid in s.feature_ids}
+    assert {f.feature_id for f in spec.features} <= served
+
+
+def test_screens_reference_real_feature_ids_only() -> None:
+    # The LLM maps a screen to a feature id that does NOT exist — it must be dropped,
+    # proving screens are grounded in the real feature list, not blind.
+    report = _report()
+    chat = _scripted_with_screens(
+        features=[_draft("fade", 1)],
+        screens=[_screen("Ghost", ["fade", "does-not-exist"])],
+    )
+    spec = build_spec_from_report(_deps(chat), report, surface="auto")
+    real_ids = {f.feature_id for f in spec.features}
+    for s in spec.screens:
+        for fid in s.feature_ids:
+            assert fid in real_ids, "a screen must only reference real feature ids"
+    ghost = next(s for s in spec.screens if s.name == "Ghost")
+    assert ghost.feature_ids == ["fade"]  # the invented id was stripped
+
+
+def test_screen_validated_when_its_feature_carries_evidence() -> None:
+    report = _report()
+    chat = _scripted_with_screens(
+        features=[_draft("fade", 1)],
+        screens=[_screen("Fade", ["fade"]), _screen("Settings", [], scaffolding=True)],
+    )
+    spec = build_spec_from_report(_deps(chat), report, surface="auto")
+    evidence_ids = {e.id for e in report.evidence}
+    fade = next(s for s in spec.screens if s.name == "Fade")
+    settings = next(s for s in spec.screens if s.name == "Settings")
+    assert fade.validated is True
+    assert fade.evidence_refs
+    assert all(r.evidence_id in evidence_ids for r in fade.evidence_refs)
+    # A shell screen carries no feature → scaffolding, not a hypothesis.
+    assert settings.scaffolding is True
+    assert settings.validated is False
+    assert settings.feature_ids == []
+
+
+def test_pinned_surface_is_honored_and_skips_the_pick() -> None:
+    # Pinning a surface must use it verbatim and NOT set a rationale (no auto-pick).
+    report = _report()
+    chat = _scripted_with_screens(
+        features=[_draft("fade", 1)],
+        screens=[_screen("Fade", ["fade"])],
+        chosen_surface="web",  # the LLM "would" pick web — but we pinned cli.
+        surface_rationale="ignored because pinned",
+    )
+    spec = build_spec_from_report(_deps(chat), report, surface="cli")
+    assert spec.surface == "cli"
+    assert spec.surface_rationale is None
+
+
+def test_screens_render_into_spec_md(tmp_path: Path) -> None:
+    report = _report()
+    chat = _scripted_with_screens(
+        features=[_draft("fade", 1)],
+        screens=[_screen("Fade", ["fade"]), _screen("Settings", [], scaffolding=True)],
+    )
+    spec = build_spec_from_report(_deps(chat), report, surface="auto")
+    scaffold(spec, report, tmp_path)
+    spec_md = (tmp_path / "docs/SPEC.md").read_text(encoding="utf-8")
+    assert "## Screens" in spec_md
+    assert "Fade" in spec_md and "validated" in spec_md
+    assert "scaffolding" in spec_md  # the shell screen is flagged, not a hypothesis
+
+
+def test_screens_degrade_to_empty_on_screen_call_failure() -> None:
+    # Only the feature call is scripted → the screens call raises → no screens,
+    # but the rest of the spec still ships (a screens failure is not "thin demand").
+    report = _report()
+    spec = build_spec_from_report(_deps(_scripted([_draft("fade", 1)])), report, surface="auto")
+    assert spec.features  # features survived
+    assert spec.screens == []
 
 
 # ── personas + pricing (copy-through) ────────────────────────────────────────

@@ -119,12 +119,8 @@ from metalworks.contract.research import (
 )
 from metalworks.contract.surface import (
     DesignBrief,
-    RubricDimension,
     Screen,
     SurfaceKind,
-    SurfaceRecommendation,
-    TradeOff,
-    UxSkeleton,
 )
 from metalworks.contract.validate import (
     DecisionLogEntry,
@@ -187,14 +183,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "PositioningBrief",
     "PriceHypothesis",
     "WedgeClaim",
-    # Design stage (Pillar C) — the grounded surface decision + UX skeleton.
+    # Surface + screens — product-shape primitives the build spec owns.
     "DesignBrief",
-    "RubricDimension",
     "Screen",
     "SurfaceKind",
-    "SurfaceRecommendation",
-    "TradeOff",
-    "UxSkeleton",
     # Design system (visual) — the grounded-but-directional look (SAFE/RISK + grounding tier).
     "DesignChoice",
     "DesignDimension",

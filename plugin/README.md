@@ -1,8 +1,8 @@
 # metalworks plugin for Claude Code
 
 Reddit demand research and engagement, inside Claude Code. The plugin bundles
-the metalworks MCP server and seventeen skills: the five engagement skills below,
-nine grounded pillars that build on a finished demand report, and three
+the metalworks MCP server and sixteen skills: the five engagement skills below,
+eight grounded pillars that build on a finished demand report, and three
 validation-loop skills (`/ideate`, `/go-no-go`, `/validate`).
 
 ## Install
@@ -49,8 +49,6 @@ Reddit quote by permalink:
 - **/market-landscape** — the full "what exists today": direct, adjacent, and
   status-quo rivals (each gap backed by a cited complaint, each tagged with the
   clusters it competes for) plus a scan of real shipped products with traction.
-- **/surface-and-ux** — what surface to build (sdk / web / mobile / cli / ...) and
-  a 3-5 screen UX skeleton, each decision traced to a customer voice.
 - **/design** — a grounded-but-directional design system: an aesthetic direction +
   a SAFE/RISK choice per dimension, read from a real browser teardown of competitor
   sites where available, honest about its grounding tier. Writes a `DESIGN.md`.
@@ -65,8 +63,10 @@ Reddit quote by permalink:
 - **/content-plan** — a deterministic, zero-key content/SEO plan: one page per
   demand cluster with real stat anchors and the actual permalinks to cite.
 - **/build-spec** — an evidence-grounded build harness for a coding agent: core
-  features each mapped to a real demand cluster, plus a scaffolded repo with a
-  cite-or-die rule and a frozen quote table. metalworks specs it; you build it.
+  features each mapped to a real demand cluster, the product surface to build it on
+  (auto-picked + explained, or pinned) and a feature-grounded screen skeleton, plus
+  a scaffolded repo with a cite-or-die rule and a frozen quote table. metalworks
+  specs it; you build it.
 
 The validation loop wraps the front of the arc:
 

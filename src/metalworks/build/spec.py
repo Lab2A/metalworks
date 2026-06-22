@@ -12,11 +12,20 @@ dropped (no-cite-no-feature) — the LLM cannot smuggle in an un-grounded featur
 Personas are derived from the report's segments (each tied to the top demand
 cluster's voice); pricing tiers are copied through from the report's price
 evidence, never recomputed.
+
+The build spec also OWNS the product shape (this used to be a separate, orphaned
+pillar). With ``surface="auto"`` the SAME feature-mapping call also returns the
+chosen surface + a one-line rationale (no extra call — it already has the query,
+wedge, and pains in scope); a pinned surface skips the pick. Screens are then
+sketched AFTER the features exist, so each :class:`~metalworks.contract.surface.Screen`
+maps to real ``feature_id``s (the old skeleton was blind to the features it was
+meant to serve). Shell screens (auth/settings) are flagged as scaffolding, not
+demand hypotheses.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +38,7 @@ from metalworks.contract import (
     InsightCluster,
     PositioningBrief,
     PricingTier,
+    Screen,
 )
 from metalworks.contract.surface import SurfaceKind
 
@@ -37,8 +47,11 @@ if TYPE_CHECKING:
 
 _MAX_FEATURES = 8
 _MAX_PERSONAS = 3
+_MAX_SCREENS = 6
 _QUOTES_PER_FEATURE = 2
+_QUOTES_PER_SCREEN = 1
 _MAX_TOKENS = 2048
+_DEFAULT_SURFACE: SurfaceKind = "web"
 # Sort key for a feature whose source-cluster rank is missing/malformed (≤ 0):
 # push it to the end of the build order rather than ahead of rank-1 demand.
 _RANK_LAST = 10_000
@@ -56,6 +69,31 @@ class _FeatureDraft(BaseModel):
 
 class _BuildPhrasing(BaseModel):
     features: list[_FeatureDraft] = Field(default_factory=list[_FeatureDraft])
+    # Only consulted when surface="auto"; pinned callers ignore these two.
+    chosen_surface: SurfaceKind = Field(
+        default=_DEFAULT_SURFACE, description="The surface to build (used iff surface='auto')."
+    )
+    surface_rationale: str = Field(
+        default="", description="One line on why that surface (used iff surface='auto')."
+    )
+
+
+class _ScreenDraft(BaseModel):
+    name: str = Field(description="Screen name.")
+    purpose: str = Field(description="What this screen is for, one line.")
+    primary_action: str = Field(description="The single primary action on this screen.")
+    feature_ids: list[str] = Field(
+        default_factory=list[str],
+        description="feature_id(s) from the list below that this screen serves. [] for shells.",
+    )
+    serves_wedge: bool = Field(default=False)
+    scaffolding: bool = Field(
+        default=False, description="True for shell screens (auth/settings) every product needs."
+    )
+
+
+class _ScreenPhrasing(BaseModel):
+    screens: list[_ScreenDraft] = Field(default_factory=list[_ScreenDraft])
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -186,6 +224,71 @@ def _ground_features(report: DemandReport, drafts: list[_FeatureDraft]) -> list[
     return out[:_MAX_FEATURES]
 
 
+def _build_screens(
+    deps: ResearchDeps,
+    report: DemandReport,
+    surface: SurfaceKind,
+    wedge: str,
+    features: list[FeatureSpec],
+) -> list[Screen]:
+    """Sketch screens AFTER the features exist, so each maps to real feature ids.
+
+    One LLM call that sees the grounded feature list; the service then keeps only
+    the ``feature_ids`` that resolve to a real feature (the LLM cannot map a screen
+    to a feature that does not exist), inherits that feature's evidence as the
+    screen's grounding, and marks ``validated`` accordingly. Shell screens
+    (auth/settings) carry no feature and ship ``scaffolding=True`` — needed by every
+    product, not a demand hypothesis. An infra failure degrades to no screens (the
+    rest of the spec still ships), never propagating as a fake "partial demand".
+    """
+    if not features:
+        return []
+    by_id = {f.feature_id: f for f in features}
+    feature_lines = "\n".join(f"- {f.feature_id}: {f.title}" for f in features)
+    system = (
+        "You sketch the 3-5 core screens (plus any auth/settings shells) for the chosen product "
+        "surface. Each screen has a name, a one-line purpose, and a single primary_action, and "
+        "lists the feature_id(s) BELOW that it serves — use only ids from the list, never invent "
+        "one. A shell screen (sign-in, settings) serves no feature: leave feature_ids empty and "
+        "set scaffolding=true. Mark serves_wedge when the screen directly delivers the wedge. "
+        "Text and structure only — no visual design."
+    )
+    user = (
+        f"Surface: {surface}\nPositioning wedge: {wedge}\n\n"
+        f"Features to build (the screens must cover these):\n{feature_lines}\n\nSketch the screens."
+    )
+    try:
+        phrasing = deps.chat.complete_structured(
+            system=system,
+            user=user,
+            output_model=_ScreenPhrasing,
+            max_tokens=_MAX_TOKENS,
+            temperature=0.3,
+        )
+    except Exception:
+        return []
+    screens: list[Screen] = []
+    for s in phrasing.screens[:_MAX_SCREENS]:
+        # Keep only ids that resolve to a real feature — drops any the LLM invented.
+        valid_ids = [fid for fid in s.feature_ids if fid in by_id]
+        refs: list[EvidenceRef] = []
+        for fid in valid_ids:
+            refs.extend(by_id[fid].evidence[:_QUOTES_PER_SCREEN])
+        screens.append(
+            Screen(
+                name=s.name.strip(),
+                purpose=s.purpose.strip(),
+                primary_action=s.primary_action.strip(),
+                feature_ids=valid_ids,
+                serves_wedge=s.serves_wedge,
+                scaffolding=s.scaffolding and not valid_ids,
+                evidence_refs=refs,
+                validated=bool(refs),
+            )
+        )
+    return screens
+
+
 # ── public entry ─────────────────────────────────────────────────────────────
 
 
@@ -193,11 +296,18 @@ def build_spec_from_report(
     deps: ResearchDeps,
     report: DemandReport,
     positioning: PositioningBrief | None = None,
-    surface: SurfaceKind = "web",
+    surface: SurfaceKind | Literal["auto"] = "auto",
     *,
     stack: str = "empty",
 ) -> BuildSpec:
-    """Derive an evidence-grounded :class:`BuildSpec` from a finished report."""
+    """Derive an evidence-grounded :class:`BuildSpec` from a finished report.
+
+    ``surface="auto"`` (the default) lets the feature-mapping call also pick the
+    surface + a one-line rationale; pinning ``surface`` (e.g. ``"cli"``) honors it
+    and skips the pick. Screens are sketched after the features so each maps to a
+    real ``feature_id``.
+    """
+    auto_surface = surface == "auto"
     wedge = (
         positioning.wedge.unique_attribute
         if positioning is not None and positioning.wedge is not None
@@ -206,15 +316,25 @@ def build_spec_from_report(
     pains = "\n".join(
         f"- [cluster {c.rank}] {c.claim}" for c in report.ranked_clusters[:_MAX_FEATURES]
     )
+    surface_kinds = ", ".join(get_args(SurfaceKind))
+    surface_instruction = (
+        "Also choose the ONE product surface that best fits where these users are and how "
+        f"technical they are — one of: {surface_kinds} — and set chosen_surface + a one-line "
+        "surface_rationale grounded in the demand below."
+        if auto_surface
+        else f"The surface is fixed to '{surface}'; build the features for that surface."
+    )
     system = (
         "You turn validated consumer demand into a SHORT product feature list for a founder to "
         "build. Each feature must derive from ONE of the numbered demand clusters below — set "
         "source_cluster_rank to that cluster's number. Do not invent features with no cluster "
-        f"behind them; a feature with no real cluster will be discarded. Keep it to the core "
-        f"features that deliver the positioning wedge (at most {_MAX_FEATURES})."
+        "behind them; a feature with no real cluster will be discarded. Keep it to the core "
+        f"features that deliver the positioning wedge (at most {_MAX_FEATURES}). "
+        f"{surface_instruction}"
     )
+    pinned = "auto (you choose)" if auto_surface else surface
     user = (
-        f"Product idea: {report.query}\nSurface: {surface}\nPositioning wedge: {wedge}\n\n"
+        f"Product idea: {report.query}\nSurface: {pinned}\nPositioning wedge: {wedge}\n\n"
         f"Validated demand clusters:\n{pains}\n\nList the core features."
     )
     # No try/except: an infra error (404/auth/network) must propagate so the
@@ -230,6 +350,15 @@ def build_spec_from_report(
     )
     features = _ground_features(report, phrasing.features)
 
+    if auto_surface:
+        chosen_surface: SurfaceKind = phrasing.chosen_surface
+        surface_rationale = phrasing.surface_rationale.strip() or None
+    else:
+        chosen_surface = surface
+        surface_rationale = None
+
+    screens = _build_screens(deps, report, chosen_surface, wedge, features)
+
     personas = _personas(report)
     pricing = _pricing_tiers(report)
     partial = not features
@@ -242,11 +371,13 @@ def build_spec_from_report(
     return BuildSpec(
         spec_id=f"spec:{report.report_id}",
         report_id=report.report_id,
-        surface=surface,
+        surface=chosen_surface,
         stack=stack,
+        surface_rationale=surface_rationale,
         features=features,
         personas=personas,
         pricing_tiers=pricing,
+        screens=screens,
         partial=partial,
         caveat=caveat,
     )

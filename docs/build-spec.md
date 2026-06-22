@@ -27,10 +27,15 @@ mw = Metalworks()
 research = mw.research("an affordable, jitter-free focus supplement for developers")
 positioning = mw.positioning(research)
 
-# 1. Spec the build from a finished report (+ positioning + surface):
-spec = mw.build_spec(research, positioning, surface="web", stack="next-shipfast")
+# 1. Spec the build from a finished report (+ positioning):
+#    surface="auto" (default) lets the spec pick the surface + explain why;
+#    pin it (surface="cli") when you already know the build shape.
+spec = mw.build_spec(research, positioning, stack="next-shipfast")
+print(spec.surface, "—", spec.surface_rationale)   # the chosen surface + why
 for feature in spec.features:
     print(feature.title, "—", feature.rationale)   # each tied to real demand
+for screen in spec.screens:
+    print(screen.name, "→", screen.feature_ids)     # each mapped to real features
 
 # 2. Scaffold the project your coding agent builds inside:
 paths = mw.scaffold(spec, research, "./build", base="next-shipfast")
@@ -38,7 +43,8 @@ paths = mw.scaffold(spec, research, "./build", base="next-shipfast")
 
 ```bash CLI
 # report-id comes from `metalworks research list`
-metalworks build init <report-id> --dest ./build --surface web --base next-shipfast
+# --surface auto (the default) lets the spec pick + explain the surface
+metalworks build init <report-id> --dest ./build --surface auto --base next-shipfast
 ```
 
 </CodeGroup>
@@ -46,21 +52,25 @@ metalworks build init <report-id> --dest ./build --surface web --base next-shipf
 | Flag | Default | What it does |
 | --- | --- | --- |
 | `--dest` / `-d` | `./build` | Directory to scaffold the project into. |
-| `--surface` | `web` | Target: `web` · `mobile` · `cli` · `api` · `sdk` · `browser_extension` · `desktop`. |
+| `--surface` | `auto` | `auto` lets the spec pick + explain, or pin one: `web` · `mobile` · `cli` · `api` · `sdk` · `browser_extension` · `desktop`. |
 | `--base` | `empty` | Stack **hint** recorded in the spec (e.g. `next-shipfast`). Not vendored boilerplate. |
 
 ## What you give it / what you get back
 
 **You give it:** a finished `Research` bundle (the report on `.demand`), your positioning, and a
-target surface. The `report` argument to the CLI is a stored report id or prefix (`metalworks
-research list`), a path to a `report.json`, or — omitted entirely — your latest run.
+target surface (`"auto"` to let the spec choose). The `report` argument to the CLI is a stored
+report id or prefix (`metalworks research list`), a path to a `report.json`, or — omitted entirely
+— your latest run.
 
-**You get back:** a `BuildSpec` — three parts, each line tied to a real quote:
+**You get back:** a `BuildSpec` — each line tied to a real quote:
 
 ```python
-spec.features        # list[FeatureSpec]  — each maps to a demand cluster, carries its quotes
-spec.personas        # list[BuildPersona] — the ICP, from the report's audience segments
-spec.pricing_tiers   # list[PricingTier]  — copied from the report's price evidence
+spec.surface             # SurfaceKind — the surface to build (chosen or pinned)
+spec.surface_rationale   # one line on why that surface (set only when surface="auto")
+spec.features            # list[FeatureSpec]  — each maps to a demand cluster, carries its quotes
+spec.screens             # list[Screen] — the UX skeleton, each mapped to real feature_ids
+spec.personas            # list[BuildPersona] — the ICP, from the report's audience segments
+spec.pricing_tiers       # list[PricingTier]  — copied from the report's price evidence
 spec.partial, spec.caveat   # honesty signal when the grounding is thin
 ```
 
@@ -74,6 +84,15 @@ The grounding rules are what make the spec safe to build from:
   the cluster behind them (`source_cluster_rank`, 1 = strongest). `features[0]` is the spine — the
   feature to build first — and `SPEC.md` renders them as a numbered build order. The sequence is a
   deterministic read of real demand, not a model's guess at importance.
+- **Surface.** With `surface="auto"` the same model call that maps features also picks the surface
+  (`sdk` / `web` / `mobile` / `cli` / ...) and returns a one-line `surface_rationale`, grounded in
+  who asked and how technical they are — no generic web-app default, no second model call. Pin a
+  surface and the spec honors it and skips the pick (no rationale).
+- **Screens.** The UX skeleton is sketched **after** the features exist, so each screen maps to real
+  `feature_id`s (the old standalone skeleton was blind to what got built). A screen inherits its
+  feature's evidence: it ships `validated` when a real voice backs it, an unvalidated hypothesis
+  otherwise. Shell screens (auth/settings) are flagged `scaffolding` — needed by every product, not
+  a demand bet.
 - **Personas.** Derived from the report's audience segments, each tied to a real voice.
 - **Pricing.** Tiers are copied straight from the report's price evidence (`Starter` at the low
   end of observed willingness to pay, `Pro` at the high end). No price signal → no tiers.
@@ -84,7 +103,7 @@ Then `scaffold` writes the project — pure deterministic templating, no model, 
 build/
   CLAUDE.md                        the build rules + how to build, for your agent
   docs/
-    SPEC.md                        features / personas / pricing, each backed by a quote
+    SPEC.md                        surface / features / screens / personas / pricing, each backed by a quote
     EVIDENCE.md                    FROZEN quote + permalink table — the ground truth
   .claude/
     skills/                        scaffold-startup, spec-from-report, the citation rule

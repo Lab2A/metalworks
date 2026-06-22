@@ -60,7 +60,6 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research versions REPORT_ID` | List a report's versions, oldest → newest. | zero-key |
 | `metalworks research diff REPORT_A REPORT_B` | Show the diff between two stored report versions. | chat key |
 | `metalworks research position REPORT_ID` | Derive grounded positioning from a stored report (one LLM call). | chat key |
-| `metalworks research surface REPORT_ID` | Recommend a product surface + UX skeleton for a stored report (grounded). | chat key |
 | `metalworks research design REPORT_ID` | Author a grounded-but-directional design system (SAFE/RISK choices + `DESIGN.md`) from a stored report; a real competitor teardown when a browser is installed. | chat key |
 | `metalworks research logo REPORT_ID` | Generate diverse logo options (SVGs + a picker) drawn under the report's design system. | chat key |
 | `metalworks research design-review URL` | Deterministically audit a rendered page's computed styles vs design hard-rules (and, with `--report`, a design system). Needs the browser. | none (chat with `--report`) |
@@ -129,7 +128,7 @@ Scaffold an evidence-grounded build harness from a report (see the
 `report.json`. Options:
 
 - `--dest, -d PATH` — directory to scaffold into (default `./build`).
-- `--surface TEXT` — target surface: `web` | `mobile` | `cli` | `api` | `sdk` | `browser_extension` | `desktop` (default `web`).
+- `--surface TEXT` — `auto` (default) lets the spec pick the surface + explain why, or pin one: `web` | `mobile` | `cli` | `api` | `sdk` | `browser_extension` | `desktop`.
 - `--base TEXT` — stack hint recorded in the spec, e.g. `next-shipfast` (default `empty`).
 
 ## reddit

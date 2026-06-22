@@ -98,7 +98,6 @@ from metalworks.contract import (  # noqa: E402
     Research,
     ResearchBrief,
     ResolvedCitation,
-    RubricDimension,
     RunSummary,
     Screen,
     SegmentChoice,
@@ -108,11 +107,8 @@ from metalworks.contract import (  # noqa: E402
     StrengthClaim,
     StyleFinding,
     SubredditIntel,
-    SurfaceRecommendation,
     TargetSubreddit,
-    TradeOff,
     TriageThresholds,
-    UxSkeleton,
     ValidationResult,
     WebFinding,
     WedgeClaim,
@@ -174,12 +170,8 @@ MODELS: list[type[BaseModel]] = [
     WedgeClaim,
     PriceHypothesis,
     PositioningBrief,
-    # surface / UX (Pillar C)
-    RubricDimension,
-    TradeOff,
-    SurfaceRecommendation,
+    # surface + screens — product-shape primitives the build spec owns
     Screen,
-    UxSkeleton,
     DesignBrief,
     # design system (visual) — directional grounding, SAFE/RISK, grounding tier
     LandscapeSignal,

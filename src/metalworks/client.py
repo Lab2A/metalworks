@@ -15,7 +15,7 @@ top level — every such symbol is imported inside the method that needs it, so
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -45,8 +45,6 @@ if TYPE_CHECKING:
         ResearchBrief,
         SubredditIntel,
         SurfaceKind,
-        SurfaceRecommendation,
-        UxSkeleton,
         ValidationResult,
     )
     from metalworks.discovery.prompts import FilterDecision, ReplyGenerationV2
@@ -412,25 +410,6 @@ class Metalworks:
 
         return _validate(self.deps, idea, max_iterations=max_iterations)
 
-    def surface(
-        self, research: Research | DemandReport, positioning: PositioningBrief
-    ) -> SurfaceRecommendation:
-        """Pillar C — the grounded surface recommendation (sdk/web/mobile/...)."""
-        from metalworks.research import decide_surface
-
-        return decide_surface(self.deps, _demand(research), positioning)
-
-    def ux(
-        self,
-        research: Research | DemandReport,
-        positioning: PositioningBrief,
-        surface: SurfaceKind,
-    ) -> UxSkeleton:
-        """Pillar C — a 3-5 screen UX skeleton for the chosen ``surface``."""
-        from metalworks.research import build_ux_skeleton
-
-        return build_ux_skeleton(self.deps, _demand(research), positioning, surface)
-
     def design(
         self,
         research: Research | DemandReport,
@@ -492,11 +471,14 @@ class Metalworks:
         self,
         research: Research | DemandReport,
         positioning: PositioningBrief | None = None,
-        surface: SurfaceKind = "web",
+        surface: SurfaceKind | Literal["auto"] = "auto",
         *,
         stack: str = "empty",
     ) -> BuildSpec:
-        """Pillar D — an evidence-grounded :class:`BuildSpec` for a coding agent."""
+        """Pillar D — an evidence-grounded :class:`BuildSpec` for a coding agent.
+
+        ``surface="auto"`` (default) lets the spec pick the surface + rationale; pin
+        a surface (e.g. ``"cli"``) to honor it and skip the pick."""
         from metalworks.build import build_spec_from_report
 
         return build_spec_from_report(
