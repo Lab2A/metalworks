@@ -56,8 +56,6 @@ public functions you can wire into your own flow.
   each with an exploitable gap backed by a real complaint.
 - `decide_surface(deps, report, positioning)` / `build_ux_skeleton(...)` — a
   surface recommendation and a 3-5 screen UX skeleton.
-- `build_marketing_site(deps, report, positioning=None)` / `render_site_html(site, report)`
-  — a marketing site (every line a verbatim quote) + self-contained `index.html`.
 - `build_spec_from_report(deps, report, positioning=None, surface="web")` /
   `scaffold(spec, report, dest)` (`metalworks.build`) — a `BuildSpec` (each
   feature mapped to a real demand cluster) + a project scaffold for your own
@@ -69,7 +67,7 @@ public functions you can wire into your own flow.
 
 These are also on the `Metalworks` facade —
 `mw.positioning(research)`, `mw.landscape(...)` (the competitive map + existing solutions),
-`mw.surface(...)` / `mw.ux(...)`, `mw.site(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
+`mw.surface(...)` / `mw.ux(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
 `mw.launch(...)` / `mw.channel_plan(...)`, `mw.content_plan(...)` — which thread
 the one resolved `ResearchDeps` for you. See the [walkthrough](/docs/walkthrough).
 

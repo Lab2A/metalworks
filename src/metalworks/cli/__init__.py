@@ -582,7 +582,7 @@ def start() -> None:
 
     The same flow you get by running bare `metalworks`. Walks you through one idea
     end to end with the GO/PIVOT/NO-GO call in your hands at each round, and offers
-    positioning / site / scaffold once an idea earns a GO.
+    positioning / scaffold once an idea earns a GO.
     """
     _guided_session()
 
@@ -593,7 +593,6 @@ def _next_steps_menu(report_id: str) -> None:
 
     actions: list[tuple[str, Any]] = [
         ("Draft positioning", lambda: research_position(report_id=report_id)),
-        ("Generate marketing site", lambda: research_site(report_id=report_id)),
         ("Scaffold build harness", lambda: build_init(report=report_id)),
         ("Done", None),
     ]
@@ -776,7 +775,6 @@ def _runs_menu() -> None:
         ("Assess (GO / PIVOT / NO-GO)", lambda: research_assess(report_id=rid)),
         ("Landscape", lambda: research_landscape(report_id=rid)),
         ("Positioning", lambda: research_position(report_id=rid)),
-        ("Marketing site", lambda: research_site(report_id=rid)),
         ("Scaffold build harness", lambda: build_init(report=rid)),
         ("Back", None),
     ]
@@ -2130,62 +2128,6 @@ def research_surface(
         out.write_text(rec.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"[green]Wrote surface recommendation[/green] {out}")
     _print_surface(rec, skeleton)
-
-
-@research_app.command("site", rich_help_panel="Pillars & build")
-def research_site(
-    report_id: Annotated[
-        str | None,
-        typer.Argument(help="Report id or prefix; defaults to your latest run."),
-    ] = None,
-    out: Annotated[
-        Path | None, typer.Option("--out", "-o", help="Write the rendered index.html here.")
-    ] = None,
-    json_out: Annotated[
-        Path | None, typer.Option("--json", help="Write the MarketingSite JSON here.")
-    ] = None,
-    styled: Annotated[
-        bool,
-        typer.Option("--styled", help="Also build the design system and style the site."),
-    ] = False,
-) -> None:
-    """Build a grounded marketing site from a stored report (verbatim, cited copy)."""
-    from metalworks.research import build_marketing_site, render_site_html
-    from metalworks.research.arctic import ArcticReader
-    from metalworks.research.deps import ResearchDeps
-    from metalworks.research.synthesis import build_positioning_brief
-
-    chat = _resolve_chat_or_exit()
-    store = config.default_store()
-    report_id = _resolve_report_id(store, report_id)
-    report = store.get_report(report_id)
-    if report is None:
-        err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
-        raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
-    deps = ResearchDeps(
-        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
-    )
-    console.print(f"[bold]Building site[/bold] for report {report_id}...")
-    design = None
-    try:
-        site = build_marketing_site(deps, report, build_positioning_brief(deps, report))
-        if styled:
-            from metalworks.research import build_design_system
-
-            design = build_design_system(deps, report)
-    finally:
-        reader.close()
-    if json_out is not None:
-        json_out.write_text(site.model_dump_json(indent=2), encoding="utf-8")
-    if out is not None:
-        out.write_text(render_site_html(site, report, design), encoding="utf-8")
-        suffix = " [dim](styled)[/dim]" if design else ""
-        console.print(f"[green]Wrote site[/green] {out}{suffix}")
-    if site.partial:
-        console.print(f"  [yellow]partial:[/yellow] {site.caveat}")
-    for s in site.sections:
-        console.print(f"  [bold]{s.role}[/bold] [{s.provenance}]: {s.copy[:70]}")
 
 
 @research_app.command("design", rich_help_panel="Pillars & build")

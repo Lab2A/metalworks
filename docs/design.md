@@ -76,6 +76,6 @@ confident "the users are here" on a loosely related comment.
 
 ## Next
 
-You know what to build. Now write the site, then turn it into a build plan:
-→ [Marketing site](/docs/marketing-site) · [Build spec](/docs/build-spec) ·
+You know what to build. Now turn it into a build plan:
+→ [Build spec](/docs/build-spec) ·
 [the full walkthrough](/docs/walkthrough) · [why you can trust the output](/docs/how-it-works)

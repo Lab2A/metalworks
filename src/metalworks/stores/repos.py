@@ -224,8 +224,8 @@ class InboxRepo(Protocol):
 class StoredArtifact(BaseModel):
     """A persisted Tier-2 pillar output + its provenance stamp.
 
-    The artifact itself is any contract model (PositioningBrief, MarketingSite,
-    ContentPlan, …) serialized into ``payload_json``. The stamp — ``report_id`` +
+    The artifact itself is any contract model (PositioningBrief, ContentPlan,
+    …) serialized into ``payload_json``. The stamp — ``report_id`` +
     ``generated_at`` — is what makes staleness detectable: when research re-runs
     and mints a new ``report_id``, a snapshot whose ``report_id`` no longer matches
     the project's latest run is flagged stale (per Decision §9.1). ``parse`` rebuilds

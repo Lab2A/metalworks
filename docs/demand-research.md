@@ -127,4 +127,4 @@ You have the report. Decide whether it's worth building with the
 [validation loop](/docs/validation-loop) (GO / PIVOT / NO-GO), or turn it into what you need to launch:
 → [Validation loop](/docs/validation-loop) · [Positioning](/docs/positioning) ·
 [Competitors](/docs/competitors) · [Surface & screens](/docs/design) ·
-[Marketing site](/docs/marketing-site) · [the full walkthrough](/docs/walkthrough)
+[the full walkthrough](/docs/walkthrough)

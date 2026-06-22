@@ -130,13 +130,6 @@ async def ux_skeleton_build(
     return tools.ux_skeleton_build(report_id, surface, store_path)
 
 
-async def site_render(
-    report_id: str, store_path: str | None = None, styled: bool = False
-) -> dict[str, Any]:
-    """TIER 2. Build a grounded marketing site; styled=True styles it like the brand (chat+emb)."""
-    return tools.site_render(report_id, store_path, styled)
-
-
 async def design_from_report(
     report_id: str, name: str | None = None, store_path: str | None = None
 ) -> dict[str, Any]:
@@ -246,7 +239,6 @@ _TOOL_WRAPPERS = (
     validate_from_idea,
     surface_recommend,
     ux_skeleton_build,
-    site_render,
     design_from_report,
     logo_generate,
     design_review,

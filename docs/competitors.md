@@ -85,4 +85,4 @@ Hunt token; without one, that half is empty and the competitor map still holds.
 You know the landscape. Decide whether it's worth building with the
 [validation loop](/docs/validation-loop), or move to what to build:
 → [Validation loop](/docs/validation-loop) · [Surface & screens](/docs/design) ·
-[Marketing site](/docs/marketing-site) · [why you can trust the output](/docs/how-it-works)
+[why you can trust the output](/docs/how-it-works)

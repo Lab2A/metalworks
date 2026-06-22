@@ -75,8 +75,6 @@ Each one is generated from the report and links its claims back to the same quot
   posted.
 - **`SurfaceRecommendation` / `UxSkeleton`** — what to build (web, mobile, CLI…) and the
   3-5 screens you need.
-- **`MarketingSite`** — marketing copy where each section is a verbatim quote with a link
-  back to the thread, not AI prose.
 - **`BuildSpec`** — a feature list where every feature maps to a real need; anything that
   can't be tied to a quote is dropped.
 - **`LaunchAsset` / `ChannelPlan` / `ContentPlan`** — launch drafts and a human-run plan,

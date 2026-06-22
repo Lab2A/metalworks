@@ -194,20 +194,14 @@ print(result.outcome, "in", result.iterations, "round(s)")
 ```python
 def surface(self, research, positioning: PositioningBrief) -> SurfaceRecommendation: ...
 def ux(self, research, positioning: PositioningBrief, surface: SurfaceKind) -> UxSkeleton: ...
-def site(self, research, positioning: PositioningBrief | None = None) -> MarketingSite: ...
-def render_site(self, site: MarketingSite, research=None) -> str: ...
 ```
 
 `surface` picks `sdk`/`web`/`mobile`/`cli`/… with a cited rubric; `ux` sketches 3–5 screens,
-each flagged validated (evidence-backed) or hypothesis. `site` builds marketing copy where
-every load-bearing line is a verbatim quote; `render_site` turns it into a self-contained
-`index.html` string.
+each flagged validated (evidence-backed) or hypothesis.
 
 ```python
 surface = mw.surface(research, pos)
 ux = mw.ux(research, pos, surface.chosen)
-site = mw.site(research, pos)
-open("index.html", "w").write(mw.render_site(site, research))
 ```
 
 ### Build stage

@@ -69,28 +69,22 @@ for rival in land.competitor_map.competitors:
 Your positioning is built from the unmet needs in the report; each competitor gap is a real
 complaint someone posted. → [Positioning](/docs/positioning) · [Competitors](/docs/competitors)
 
-## 3. Decide what to build, and write the site
+## 3. Decide what to build
 
 <CodeGroup>
 
 ```text Claude Code
 /surface-and-ux
-/generate-site
 ```
 
 ```python Python
 surface = mw.surface(research, positioning)      # web? mobile? CLI? — and why
 ux = mw.ux(research, positioning, surface.chosen)  # the 3-5 screens you need
-
-site = mw.site(research, positioning)            # marketing copy, every line a real quote
-html = mw.render_site(site, research)            # a self-contained index.html
-open("index.html", "w").write(html)
 ```
 
 </CodeGroup>
 
-The marketing copy isn't AI prose — each section is a verbatim quote from a real user, with
-a link back to the thread. → [Surface & screens](/docs/design) · [Marketing site](/docs/marketing-site)
+→ [Surface & screens](/docs/design)
 
 ## 4. Turn it into a build plan
 

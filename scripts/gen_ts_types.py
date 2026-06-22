@@ -81,7 +81,6 @@ from metalworks.contract import (  # noqa: E402
     LintViolation,
     LogoOption,
     LogoSet,
-    MarketingSite,
     MarketSizing,
     Opportunity,
     Persona,
@@ -104,7 +103,6 @@ from metalworks.contract import (  # noqa: E402
     Screen,
     SegmentChoice,
     SignalStrength,
-    SiteSection,
     SlotPlan,
     SourceMapEntry,
     StrengthClaim,
@@ -193,9 +191,6 @@ MODELS: list[type[BaseModel]] = [
     # logo (the mark submodule)
     LogoOption,
     LogoSet,
-    # site (Pillar E)
-    SiteSection,
-    MarketingSite,
     # launch (Pillar F)
     ClaimCitation,
     LaunchAsset,

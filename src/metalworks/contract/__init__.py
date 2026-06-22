@@ -117,10 +117,6 @@ from metalworks.contract.research import (
     TriageThresholds,
     WebFinding,
 )
-from metalworks.contract.site import (
-    MarketingSite,
-    SiteSection,
-)
 from metalworks.contract.surface import (
     DesignBrief,
     RubricDimension,
@@ -212,9 +208,6 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Logo (the mark submodule of the design system) — authored SVG options.
     "LogoOption",
     "LogoSet",
-    # Site stage (Pillar E) — the grounded marketing site + its sections.
-    "MarketingSite",
-    "SiteSection",
     # Launch stage (Pillar F) — channel-native cited assets + human-executed plan.
     "ChannelPlan",
     "ChannelStep",
