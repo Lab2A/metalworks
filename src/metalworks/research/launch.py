@@ -46,6 +46,7 @@ from metalworks.contract.launch import (
     LaunchAsset,
 )
 from metalworks.reddit import heuristic_check
+from metalworks.research.grounding import verbatim_match
 
 if TYPE_CHECKING:
     from metalworks.contract.positioning import PositioningBrief
@@ -59,10 +60,6 @@ _NEGATIVE_VERDICT = ("thin signal", "no demand", "insufficient", "not enough", "
 
 # Minimum distinct authors on at least one cluster for a launch to be defensible.
 _MIN_DISTINCT_AUTHORS = 2
-
-# A supporting quote fragment must be substantive — a 1-2 word substring is a
-# real slice of a quote but doesn't ground the claim (no-cite-no-claim).
-_MIN_SUPPORT_WORDS = 4
 
 # Human-friendly framing per surface, fed to the LLM and to the channel plan.
 _SURFACE_BRIEF: dict[str, str] = {
@@ -145,18 +142,11 @@ def _all_quotes(report: DemandReport) -> list[ResolvedCitation]:
 def _supporting_quote(report: DemandReport, supporting_quote: str) -> ResolvedCitation | None:
     """The report quote whose text contains the LLM's supporting_quote, or None.
 
-    Exact-substring match (the verbatim gate): the LLM's claimed support must be
-    a literal slice of a real, verified quote — not a paraphrase.
+    The verbatim gate: the LLM's claimed support must be a literal slice of a
+    real, verified quote — not a paraphrase. Punctuation/whitespace is normalized
+    before the substring check (see :func:`verbatim_match`).
     """
-    needle = supporting_quote.strip()
-    # A 1-2 word substring ("users") is a real slice of a quote but doesn't
-    # ground the surrounding claim — require a substantive fragment.
-    if not needle or len(needle.split()) < _MIN_SUPPORT_WORDS:
-        return None
-    for q in _all_quotes(report):
-        if needle in q.text:
-            return q
-    return None
+    return verbatim_match(supporting_quote, _all_quotes(report))
 
 
 def _ground_claims(
