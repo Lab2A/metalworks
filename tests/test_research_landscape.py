@@ -161,9 +161,17 @@ def test_ungrounded_enumeration_marks_partial() -> None:
 
 def test_gap_matched_to_quote_attaches_evidence_and_severity() -> None:
     # A gap whose text equals a real complaint → FakeEmbedding cosine 1.0 → match.
+    # Severity is banded RELATIVE to the report's demand-cluster author counts
+    # (option b): 25 tops [25, 8, 3], so it's the top-third → HIGH.
     complaint = "it is gritty and pills under makeup"
     q = _quote(complaint, "https://r/1")
-    report = _report(clusters=[_cluster(1, quotes=[q], distinct_authors=25)])
+    report = _report(
+        clusters=[
+            _cluster(1, quotes=[q], distinct_authors=25),
+            _cluster(2, quotes=[_quote("c2", "https://r/2")], distinct_authors=8),
+            _cluster(3, quotes=[_quote("c3", "https://r/3")], distinct_authors=3),
+        ]
+    )
     cand = _CompetitorCand(name="The Ordinary", kind="direct", one_liner="cheap actives")
     harvest = _Harvest(strengths=["cheap"], gaps=[complaint, "lovely packaging"])
     cmap = run_competitor_map(_deps(_chat(competitors=[cand], harvest=harvest)), report)
@@ -174,8 +182,36 @@ def test_gap_matched_to_quote_attaches_evidence_and_severity() -> None:
     assert gap.claim == complaint
     assert gap.evidence.kind == "quote"
     assert gap.evidence.evidence_id == q.id
-    assert gap.severity == SignalStrength.HIGH  # 25 distinct authors → HIGH (service-assigned)
+    assert gap.severity == SignalStrength.HIGH  # tops the report's clusters → HIGH
     assert comp.strengths[0].claim == "cheap"
+
+
+def test_gap_severity_is_relative_to_report_clusters() -> None:
+    # Option b: the SAME absolute complaint count yields a DIFFERENT severity
+    # depending on the report's demand-cluster distribution. 10 authors is HIGH when
+    # it tops the report and LOW when it sits at the report's floor.
+    complaint = "it is gritty and pills under makeup"
+    cand = _CompetitorCand(name="X", kind="direct", one_liner="y")
+    harvest = _Harvest(gaps=[complaint])
+
+    top = _report(
+        clusters=[
+            _cluster(1, quotes=[_quote(complaint, "https://r/1")], distinct_authors=10),
+            _cluster(2, quotes=[_quote("c2", "https://r/2")], distinct_authors=4),
+            _cluster(3, quotes=[_quote("c3", "https://r/3")], distinct_authors=2),
+        ]
+    )
+    floor = _report(
+        clusters=[
+            _cluster(1, quotes=[_quote(complaint, "https://r/1")], distinct_authors=10),
+            _cluster(2, quotes=[_quote("c2", "https://r/2")], distinct_authors=40),
+            _cluster(3, quotes=[_quote("c3", "https://r/3")], distinct_authors=20),
+        ]
+    )
+    sev_top = run_competitor_map(_deps(_chat(competitors=[cand], harvest=harvest)), top)
+    sev_floor = run_competitor_map(_deps(_chat(competitors=[cand], harvest=harvest)), floor)
+    assert sev_top.competitors[0].gaps[0].severity == SignalStrength.HIGH
+    assert sev_floor.competitors[0].gaps[0].severity == SignalStrength.LOW
 
 
 def test_unmatched_gaps_are_dropped() -> None:
@@ -201,9 +237,15 @@ def test_gap_matched_to_web_finding() -> None:
 
 
 def test_severity_low_for_thin_complaint() -> None:
+    # A complaint at the bottom of the report's clusters → LOW severity.
     complaint = "minor niche gripe"
-    cluster = _cluster(1, quotes=[_quote(complaint, "https://r/1")], distinct_authors=2)
-    report = _report(clusters=[cluster])
+    report = _report(
+        clusters=[
+            _cluster(1, quotes=[_quote(complaint, "https://r/1")], distinct_authors=2),
+            _cluster(2, quotes=[_quote("c2", "https://r/2")], distinct_authors=30),
+            _cluster(3, quotes=[_quote("c3", "https://r/3")], distinct_authors=15),
+        ]
+    )
     cand = _CompetitorCand(name="X", kind="direct", one_liner="y")
     cmap = run_competitor_map(
         _deps(_chat(competitors=[cand], harvest=_Harvest(gaps=[complaint]))), report

@@ -27,23 +27,13 @@ from metalworks.contract import (
     InsightCluster,
     SignalStrength,
 )
+from metalworks.research.synthesis.demand import relative_band
 
 if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
 
 MAX_SEGMENTS = 4
 LLM_RETRIES = 3
-_HIGH_AUTHORS = 20
-_MEDIUM_AUTHORS = 5
-
-
-def _seg_signal(n: int) -> SignalStrength:
-    """Confidence chip from a segment's distinct-author breadth (service-assigned)."""
-    if n >= _HIGH_AUTHORS:
-        return SignalStrength.HIGH
-    if n >= _MEDIUM_AUTHORS:
-        return SignalStrength.MEDIUM
-    return SignalStrength.LOW
 
 
 class _SegmentProposal(BaseModel):
@@ -103,11 +93,17 @@ def build_segments(
                 preferences=[p.strip() for p in prop.preferences if (p or "").strip()][:6],
                 demand_score=round(demand, 4),
                 distinct_author_count=len(authors),
-                signal=_seg_signal(len(authors)),
+                # Provisional — re-banded relative to ALL segments below, once the
+                # report's full segment distribution is known.
+                signal=SignalStrength.LOW,
                 evidence=[EvidenceRef(kind="cluster", cluster_rank=clusters[i].rank) for i in idxs],
             )
         )
         seg_authors.append(authors)
+
+    # Confidence is RELATIVE: band each segment's author count against the author
+    # counts ACROSS this report's segments (top third → HIGH), not a fixed cutoff.
+    seg_population = [s.distinct_author_count for s in segments]
 
     # Overlap pass (the anti-fake-fork guard): author-set Jaccard vs every other
     # segment, keyed by id. Near 1.0 ⇒ not a distinct audience; the surface suppresses it.
@@ -120,7 +116,14 @@ def build_segments(
             a, b = seg_authors[i], seg_authors[j]
             union = a | b
             overlap[other.id] = round(len(a & b) / len(union), 4) if union else 0.0
-        enriched.append(seg.model_copy(update={"overlap": overlap}))
+        enriched.append(
+            seg.model_copy(
+                update={
+                    "overlap": overlap,
+                    "signal": relative_band(seg.distinct_author_count, seg_population),
+                }
+            )
+        )
 
     enriched.sort(key=lambda s: s.demand_score, reverse=True)
     return enriched

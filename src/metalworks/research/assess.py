@@ -10,8 +10,10 @@ prevalence and its standing among the report's other forks (see
 **per fork** (``fork_verdicts``) and synthesized into the three-lane top-line:
 any fork GOes -> GO; real demand in a crowded space -> PIVOT to the under-served
 fork; else NO_GO. Saturation is the supply count (competitors + existing
-solutions), space-level for now. Anti-confirmation is enforced in code: a
-``partial`` landscape can never yield a hard GO.
+solutions); each fork's GO gate uses its OWN per-fork saturation (a fork in an
+open niche can GO inside a crowded space), while the report-level gap reports the
+space-wide value. Anti-confirmation is enforced in code: a ``partial`` landscape
+can never yield a hard GO.
 """
 
 from __future__ import annotations
@@ -57,8 +59,9 @@ class _Verdict:
 def _saturation(landscape: Landscape, policy: AssessPolicy) -> SignalStrength:
     """How crowded the supply is, from what we actually found — named competitors
     plus empirically-pulled existing solutions. HIGH-severity gaps are openings, so
-    their presence holds saturation down even when supply is large. (Space-level for
-    now; per-fork saturation is a v2 — see ForkVerdict.landscape_saturation.)"""
+    their presence holds saturation down even when supply is large. Space-level — the
+    report's headline saturation; the GO gate uses per-fork saturation
+    (see ``_fork_saturation`` / ForkVerdict.landscape_saturation)."""
     cm = landscape.competitor_map
     supply = len(landscape.existing_solutions) + len(cm.competitors)
     openings = any(g.severity == SignalStrength.HIGH for c in cm.competitors for g in c.gaps)
@@ -75,12 +78,12 @@ def _fork_saturation(
     policy: AssessPolicy,
     fallback: SignalStrength,
 ) -> SignalStrength:
-    """ADVISORY saturation for ONE fork — supply (competitors + existing solutions) whose addressed
-    clusters intersect this fork's clusters. Pure ints in, so the scorer never imports landscape
-    types. Falls back to the global value when this fork has no cluster tags, or when nothing in the
-    landscape is tagged at all (can't distinguish forks → don't pretend to). status_quo is the
-    do-nothing baseline, never counted as supply. NOTE: advisory only — it does NOT gate the verdict
-    this release (the GO test stays on global saturation); see the autoplan review (UC-1)."""
+    """Saturation for ONE fork — supply (competitors + existing solutions) whose addressed clusters
+    intersect this fork's clusters. This GATES the fork's GO decision. Pure ints in, so the scorer
+    never imports landscape types. Falls back to the global value when this fork has no cluster
+    tags, or when nothing in the landscape is tagged at all (can't distinguish forks → don't pretend
+    to), which makes gating on it strictly better than gating on global, never worse. status_quo is
+    the do-nothing baseline, never counted as supply."""
     if not fork_clusters:
         return fallback
     cm = landscape.competitor_map
@@ -110,11 +113,12 @@ def _score_forks(
 ) -> tuple[list[ForkVerdict], dict[str, str], SignalStrength]:
     """A GO/NO-GO verdict per candidate wedge AND segment, with relative demand.
 
-    A fork GOes iff its (relative, self-calibrating) demand clears MEDIUM and the space is open
-    (global saturation LOW, and grounding isn't partial). Each fork ALSO carries its own
-    ``landscape_saturation`` — the **advisory** per-fork value (which wedge the supply competes
-    for); shown, not gated on, this release. Returns the verdicts, the self-calibration notes (keyed
-    by fork id), and the global saturation the gate uses.
+    A fork GOes iff its (relative, self-calibrating) demand clears MEDIUM and ITS OWN slice of the
+    space is open (the fork's ``landscape_saturation`` is LOW, and grounding isn't partial). Gating
+    on per-fork saturation lets a fork in an open niche GO even when the whole space is crowded;
+    ``_fork_saturation`` falls back to the global value when it can't distinguish the fork, so this
+    is strictly better, never worse. Returns the verdicts, the self-calibration notes (keyed by fork
+    id), and the global saturation (still used for the report-level ``gap.landscape_saturation``).
     """
     global_sat = _saturation(landscape, policy)
     forks: list[ForkVerdict] = []
@@ -128,7 +132,8 @@ def _score_forks(
             wedge_breadths,
             policy=policy,
         )
-        go = demand.meets_medium(band) and global_sat == SignalStrength.LOW and not partial
+        fork_sat = _fork_saturation(set(w.cluster_ranks), landscape, policy, global_sat)
+        go = demand.meets_medium(band) and fork_sat == SignalStrength.LOW and not partial
         forks.append(
             ForkVerdict(
                 kind="wedge",
@@ -136,9 +141,7 @@ def _score_forks(
                 label=w.label,
                 decision=Decision.GO if go else Decision.NO_GO,
                 demand_strength=band,
-                landscape_saturation=_fork_saturation(
-                    set(w.cluster_ranks), landscape, policy, global_sat
-                ),
+                landscape_saturation=fork_sat,
                 demand_prevalence=prev,
                 demand_percentile=pct,
                 confidence=conf,
@@ -155,7 +158,8 @@ def _score_forks(
             seg_authors,
             policy=policy,
         )
-        go = demand.meets_medium(band) and global_sat == SignalStrength.LOW and not partial
+        fork_sat = _fork_saturation(_segment_clusters(s), landscape, policy, global_sat)
+        go = demand.meets_medium(band) and fork_sat == SignalStrength.LOW and not partial
         forks.append(
             ForkVerdict(
                 kind="segment",
@@ -163,9 +167,7 @@ def _score_forks(
                 label=s.name,
                 decision=Decision.GO if go else Decision.NO_GO,
                 demand_strength=band,
-                landscape_saturation=_fork_saturation(
-                    _segment_clusters(s), landscape, policy, global_sat
-                ),
+                landscape_saturation=fork_sat,
                 demand_prevalence=prev,
                 demand_percentile=pct,
                 confidence=conf,
@@ -179,8 +181,8 @@ def _score_forks(
 def _decide(report: DemandReport, landscape: Landscape, policy: AssessPolicy) -> _Verdict:
     """The pure verdict: score every fork, then synthesize the three-lane report decision.
 
-    The GO/NO-GO gate + the report-level ``gap.landscape_saturation`` use the GLOBAL saturation;
-    each fork's own ``landscape_saturation`` is advisory (per-fork), shown but not gated (UC-1).
+    Each fork's GO gate uses ITS OWN ``landscape_saturation`` (per-fork); the report-level
+    ``gap.landscape_saturation`` still reports the GLOBAL saturation of the space.
     """
     partial = landscape.partial
     forks, refs, saturation = _score_forks(report, landscape, partial, policy)

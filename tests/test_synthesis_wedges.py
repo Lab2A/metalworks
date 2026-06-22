@@ -126,9 +126,33 @@ def test_build_segments_carries_signal_evidence_and_overlap() -> None:
     segs = build_segments(_deps(chat), clusters, cluster_authors, AudienceProfile())
     assert {s.name for s in segs} == {"A", "B"}
     a = next(s for s in segs if s.name == "A")
-    # evidence points at the segment's cluster; signal is computed from breadth
+    # evidence points at the segment's cluster; signal is banded RELATIVE to the
+    # report's segments — A and B both have 3 distinct authors, a tied population
+    # [3, 3], so each scores midrank 0.5 → MEDIUM (not an absolute cutoff).
     assert a.evidence[0].kind == "cluster" and a.evidence[0].cluster_rank == 1
-    assert a.signal == SignalStrength.LOW  # 3 distinct authors → LOW band
+    assert a.signal == SignalStrength.MEDIUM
     # overlap: shared {x} = 1, union {x,y,z,p,q} = 5, so 1/5 = 0.2, keyed by B's id
     b = next(s for s in segs if s.name == "B")
     assert a.overlap[b.id] == 0.2
+
+
+def test_segment_signal_is_relative_to_the_report_segments() -> None:
+    # The SAME segment author count bands differently depending on the report's
+    # segment distribution: a 3-author segment is HIGH when it tops the report and
+    # LOW when it's the report's floor — the confidence chip is relative, not a cutoff.
+    clusters = [_cluster(1, "c1"), _cluster(2, "c2"), _cluster(3, "c3")]
+    plan = _SegmentPlan(
+        segments=[
+            _SegmentProposal(name="big", cluster_ranks=[1]),
+            _SegmentProposal(name="mid", cluster_ranks=[2]),
+            _SegmentProposal(name="small", cluster_ranks=[3]),
+        ]
+    )
+    chat = FakeChatModel()
+    chat.script(_SegmentPlan, plan)
+    # Author-set SIZES are what band: big=4, mid=2, small=1 distinct authors.
+    cluster_authors = [{"a", "b", "c", "d"}, {"e", "f"}, {"g"}]
+    segs = build_segments(_deps(chat), clusters, cluster_authors, AudienceProfile())
+    by = {s.name: s for s in segs}
+    assert by["big"].signal == SignalStrength.HIGH  # tops [4, 2, 1]
+    assert by["small"].signal == SignalStrength.LOW  # floor of [4, 2, 1]

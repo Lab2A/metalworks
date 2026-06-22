@@ -41,6 +41,7 @@ from metalworks.contract import (
 )
 from metalworks.contract.landscape import ExistingSolution, Landscape
 from metalworks.errors import GroundingUnavailable
+from metalworks.research.synthesis.demand import relative_band
 from metalworks.research.web import parse_numbered_findings
 
 if TYPE_CHECKING:
@@ -54,8 +55,6 @@ _MAX_COMPETITORS = 6
 _MAX_GAPS_PER = 3
 _MAX_STATUS_QUO_GAPS = 3
 _MATCH_THRESHOLD = 0.55  # cosine floor for a gap↔complaint match
-_HIGH_AUTHORS = 20
-_MEDIUM_AUTHORS = 5
 _MAX_TOKENS = 2048
 
 
@@ -96,12 +95,18 @@ class _Harvest(BaseModel):
 # ── severity (service-assigned) ──────────────────────────────────────────────
 
 
-def _severity_from_authors(n: int) -> SignalStrength:
-    if n >= _HIGH_AUTHORS:
-        return SignalStrength.HIGH
-    if n >= _MEDIUM_AUTHORS:
-        return SignalStrength.MEDIUM
-    return SignalStrength.LOW
+def _cluster_author_population(report: DemandReport) -> list[int]:
+    """The report's demand-cluster distinct-author counts — the reference scale gap
+    severity bands against (decision: option b). A gap is HIGH-severity when as many
+    people complain about it as back the *strongest demand cluster*, tying competitor
+    weakness to your own demand scale (the point of a wedge)."""
+    return [c.distinct_author_count for c in report.ranked_clusters]
+
+
+def _severity_from_authors(n: int, population: list[int]) -> SignalStrength:
+    """Band a complaint's distinct-author count RELATIVE to the report's demand
+    clusters via the shared :func:`relative_band` — not an absolute author cutoff."""
+    return relative_band(n, population)
 
 
 # ── stage 1: enumerate ───────────────────────────────────────────────────────
@@ -347,6 +352,7 @@ def _match_gaps(
     evidence_texts: dict[str, str],
     quote_cluster: dict[str, InsightCluster],
     web_ids: set[str],
+    cluster_population: list[int],
 ) -> dict[int, tuple[EvidenceRef, SignalStrength]]:
     """Cosine-match each gap (by list index) to its best evidence id; drop misses."""
     if not gap_texts or not evidence_texts:
@@ -367,7 +373,9 @@ def _match_gaps(
             continue
         ev_id, _score = top[0]
         if ev_id in quote_cluster:
-            sev = _severity_from_authors(quote_cluster[ev_id].distinct_author_count)
+            sev = _severity_from_authors(
+                quote_cluster[ev_id].distinct_author_count, cluster_population
+            )
             matched[gi] = (EvidenceRef(evidence_id=ev_id, kind="quote"), sev)
         elif ev_id in web_ids:
             matched[gi] = (EvidenceRef(evidence_id=ev_id, kind="web"), SignalStrength.MEDIUM)
@@ -379,6 +387,7 @@ def _match_gaps(
 
 def _status_quo(report: DemandReport) -> Competitor:
     gaps: list[GapClaim] = []
+    population = _cluster_author_population(report)
     ranked = sorted(report.ranked_clusters, key=lambda c: c.demand_score, reverse=True)
     for c in ranked:
         if not c.quotes or len(gaps) >= _MAX_STATUS_QUO_GAPS:
@@ -387,7 +396,7 @@ def _status_quo(report: DemandReport) -> Competitor:
             GapClaim(
                 gap_index=len(gaps) + 1,
                 claim=f"Living with it: {c.claim}",
-                severity=_severity_from_authors(c.distinct_author_count),
+                severity=_severity_from_authors(c.distinct_author_count, population),
                 evidence=EvidenceRef(evidence_id=c.quotes[0].id, kind="quote"),
             )
         )
@@ -416,12 +425,15 @@ def run_competitor_map(deps: ResearchDeps, report: DemandReport) -> CompetitorMa
     cands = _merge_candidates(web_cands, corpus_cands)
     evidence_texts, quote_cluster, web_ids = _evidence_index(report)
     web_clusters = _web_id_to_clusters(report)
+    cluster_population = _cluster_author_population(report)
 
     competitors: list[Competitor] = []
     for ci, cand in enumerate(cands, start=1):
         harvest = _harvest(deps, report, cand)
         gap_texts = [g for g in harvest.gaps if g.strip()][:_MAX_GAPS_PER]
-        matched = _match_gaps(deps, gap_texts, evidence_texts, quote_cluster, web_ids)
+        matched = _match_gaps(
+            deps, gap_texts, evidence_texts, quote_cluster, web_ids, cluster_population
+        )
         gaps: list[GapClaim] = []
         # addresses_clusters = the clusters this rival competes for: mention clusters (corpus)
         # plus quote-matched gap clusters plus web-matched gap clusters (via cross_references).

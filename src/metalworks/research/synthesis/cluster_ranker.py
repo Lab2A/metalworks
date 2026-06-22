@@ -25,14 +25,13 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, Field
 
 from metalworks.contract import InsightCluster, ResolvedCitation, SignalStrength
+from metalworks.research.synthesis.demand import relative_band
 from metalworks.research.types import LoadedComment
 
 if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
 
 # ── tuning knobs (module-level so an eval can sweep) ─────────────────────────
-SIGNAL_HIGH_AUTHORS = 15
-SIGNAL_MEDIUM_AUTHORS = 5
 AUTHOR_WEIGHT = 10.0
 MAX_QUOTES_PER_CLUSTER = 3
 
@@ -67,15 +66,18 @@ class _SynthesisOutput(BaseModel):
 
 
 # ── pure helpers ─────────────────────────────────────────────────────────────
-def signal_from_breadth(breadth: int) -> SignalStrength:
-    """Confidence chip from breadth (distinct authors + domains). For an
-    all-authored cluster breadth == distinct authors, so the Reddit chip is
-    unchanged."""
-    if breadth >= SIGNAL_HIGH_AUTHORS:
-        return SignalStrength.HIGH
-    if breadth >= SIGNAL_MEDIUM_AUTHORS:
-        return SignalStrength.MEDIUM
-    return SignalStrength.LOW
+def signal_from_breadth(breadth: int, population: list[int]) -> SignalStrength:
+    """Confidence chip for a cluster — its breadth banded RELATIVE to this report's
+    clusters (``population`` = the breadth counts of every cluster in the report),
+    via the shared :func:`~metalworks.research.synthesis.demand.relative_band`.
+
+    HIGH means top-third *of this report*, not an absolute author cutoff — so the
+    badge tracks the same "demand is relative" thesis the demand verdict uses, and
+    a 12-author cluster can be HIGH in a thin report yet LOW in a broad one.
+    ``population`` must include ``breadth``. For an all-authored cluster breadth ==
+    distinct authors, so the Reddit chip stays a distinct-author band.
+    """
+    return relative_band(breadth, population)
 
 
 # Back-compat alias — breadth == author count for all-authored clusters.
@@ -255,7 +257,9 @@ def _build_cluster(
         breadth_count=breadth,
         breadth_unit=breadth_unit,
         mention_count=len(members),
-        signal=signal_from_breadth(breadth),
+        # Provisional — re-banded relative to ALL clusters' breadths in build_clusters
+        # once the full report population is known (the badge is relative, not absolute).
+        signal=SignalStrength.LOW,
         quotes=quotes,
     )
     return cluster, distinct_authors, [m.subreddit for m in members], member_comment_indices
@@ -286,12 +290,16 @@ def build_clusters(
             built.append(result)
 
     built.sort(key=lambda it: it[0].demand_score, reverse=True)
+    # Badge is RELATIVE: band each cluster's breadth against the distribution of ALL
+    # clusters in THIS report (top third → HIGH), not a fixed absolute cutoff.
+    population = [c.breadth_count for (c, *_rest) in built]
     clusters: list[InsightCluster] = []
     authors: list[set[str]] = []
     subs: list[list[str]] = []
     member_indices: list[list[int]] = []
     for i, (c, a, s, mi) in enumerate(built, start=1):
         c.rank = i
+        c.signal = signal_from_breadth(c.breadth_count, population)
         clusters.append(c)
         authors.append(a)
         subs.append(s)

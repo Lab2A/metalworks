@@ -50,12 +50,26 @@ class AssessPolicy(BaseModel):
         default=0.05, description="A fork reaching <5% of the crowd is not a real slice."
     )
     # Self-calibrating band cuts — midrank percentiles of the PEER-fork distribution.
-    # 0.66 so a 3-fork run reads cleanly as one HIGH / one MEDIUM / one LOW
-    # (distinct top-of-3 midrank is 5/6 ≈ 0.83) AND a tied pair at the top both
-    # clear it (a top tie of two scores 2/3 ≈ 0.667).
+    # 0.33 / 0.66 is the thirds split: top third HIGH, middle third MEDIUM, bottom
+    # third LOW. Chosen empirically, not toy-fit. A sensitivity sweep over the fork
+    # distributions real runs produce (2-6 forks; distinct, top-tied, bottom-tied,
+    # one-dominant, flat) shows 0.33/0.66 is the widest pair that holds two
+    # invariants at once:
+    #   1. A top TIE stays HIGH. A 3-fork run whose two strongest forks tie scores
+    #      each of them 2/3 ≈ 0.667 (1 below + half of two ties), so both clear the
+    #      cut and the report reads "Strong" — matching the distinct shape [60,30,10].
+    #      Raising high to ≥0.70 demotes that tie to MEDIUM (a real, equally-broad
+    #      pair silently reading "Moderate"), the exact bug midrank exists to avoid.
+    #   2. A 3-fork distinct run reads cleanly as one HIGH / one MEDIUM / one LOW
+    #      (midranks 5/6, 1/2, 1/6), and 4-5-fork runs split ~top-third / mid / bottom
+    #      rather than over-promoting (0.30/0.60 makes half a 4-fork run HIGH).
+    # Surfaced + overridable here; these are dimensionless percentiles, not counts.
     high_percentile: float = 0.66
     medium_percentile: float = 0.33
-    # Degenerate <2-fork fallback ONLY (surfaced + overridable; no longer hidden).
+    # COARSE can't-be-relative path: the degenerate <2-fork fallback ONLY. With
+    # fewer than two peer forks there is no distribution to calibrate against, so
+    # these absolute author counts stand in. They are NOT a real band (a relative
+    # run never touches them) — they exist only so a lone fork still gets a label.
     whole_report_strong: int = 100
     whole_report_moderate: int = 25
     # Saturation supply cuts (moved out of assess.py module constants).
@@ -93,6 +107,36 @@ def percentile_rank(value: int, population: list[int]) -> float:
     below = sum(1 for x in population if x < value)
     ties = sum(1 for x in population if x == value)
     return (below + 0.5 * ties) / len(population)
+
+
+def relative_band(
+    value: int,
+    population: list[int],
+    *,
+    cuts: tuple[float, float] = (DEFAULT_POLICY.medium_percentile, DEFAULT_POLICY.high_percentile),
+) -> SignalStrength:
+    """Band one author count against its reference population — the shared
+    "how-wanted-relative-to-its-peers" primitive.
+
+    ``value``'s midrank percentile among ``population`` is bucketed by ``cuts``
+    ``(medium, high)``: ``>= high`` → HIGH, ``>= medium`` → MEDIUM, else LOW. This
+    is the generalization of :func:`strength`'s percentile bands (same midrank,
+    same defaults), so every consumer that asks "is this count strong *for this
+    report*" gets one answer instead of its own absolute cutoff. ``population``
+    should include ``value`` (the consumer passes its full peer set, e.g. all
+    clusters' author counts). An empty population scores 0.0 → LOW.
+
+    ``cuts`` defaults to the policy percentiles so the badge, segment confidence,
+    and gap severity all track the same dimensionless thresholds the demand
+    verdict uses.
+    """
+    medium_cut, high_cut = cuts
+    pct = percentile_rank(value, population)
+    if pct >= high_cut:
+        return SignalStrength.HIGH
+    if pct >= medium_cut:
+        return SignalStrength.MEDIUM
+    return SignalStrength.LOW
 
 
 def rank(band: SignalStrength) -> int:

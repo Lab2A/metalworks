@@ -271,10 +271,16 @@ def test_cluster_ranker_demand_score_weights_authors() -> None:
     assert cluster_ranker.compute_demand_score(50, 2) > cluster_ranker.compute_demand_score(1, 200)
 
 
-def test_cluster_ranker_signal_thresholds() -> None:
-    assert cluster_ranker.signal_from_author_count(15) == SignalStrength.HIGH
-    assert cluster_ranker.signal_from_author_count(5) == SignalStrength.MEDIUM
-    assert cluster_ranker.signal_from_author_count(4) == SignalStrength.LOW
+def test_cluster_ranker_signal_is_relative_not_absolute() -> None:
+    # The badge bands a cluster's breadth against ALL clusters in the report, not a
+    # fixed cutoff: the SAME absolute count (10) is HIGH when it tops the report and
+    # LOW when it sits at the bottom — proving the band is relative.
+    broad = [10, 5, 2]  # 10 tops this report
+    thin = [40, 20, 10]  # 10 is the floor of this report
+    assert cluster_ranker.signal_from_breadth(10, broad) == SignalStrength.HIGH
+    assert cluster_ranker.signal_from_breadth(10, thin) == SignalStrength.LOW
+    # The shared back-compat alias resolves to the same relative helper.
+    assert cluster_ranker.signal_from_author_count(10, broad) == SignalStrength.HIGH
 
 
 def test_cluster_ranker_raises_after_retries() -> None:
