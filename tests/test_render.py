@@ -6,6 +6,9 @@ behind ``-m browser``. Everything except the ``browser``-marked test is offline.
 from __future__ import annotations
 
 import base64
+import importlib.util
+import sys
+import types
 from typing import Any
 
 import pytest
@@ -18,6 +21,11 @@ from metalworks.errors import (
 from metalworks.render import RenderedPage
 from metalworks.render.fake import FakeRenderer
 from metalworks.testing import check_page_renderer
+
+_HAS_PLAYWRIGHT = importlib.util.find_spec("playwright") is not None
+_requires_playwright = pytest.mark.skipif(
+    not _HAS_PLAYWRIGHT, reason="playwright not installed (bare extras)"
+)
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -64,12 +72,14 @@ def test_fake_renderer_style_audit() -> None:
 def _firecrawl(
     monkeypatch: pytest.MonkeyPatch, *, post_json: dict[str, Any], get_content: bytes = b""
 ):
-    """Build a FirecrawlRenderer with the extra-gate bypassed and httpx mocked."""
+    """Build a FirecrawlRenderer with the extra-gate satisfied and httpx mocked.
+
+    Register a dummy ``firecrawl`` in ``sys.modules`` so the adapter's import gate
+    passes without the real package — and WITHOUT patching ``importlib`` globally
+    (that would break monkeypatch's own dotted-path resolution on newer pytest).
+    """
+    monkeypatch.setitem(sys.modules, "firecrawl", types.ModuleType("firecrawl"))
     monkeypatch.setenv("FIRECRAWL_API_KEY", "test-key")
-    monkeypatch.setattr(
-        "metalworks.render.adapters.firecrawl.importlib.import_module",
-        lambda name: object(),
-    )
     from metalworks.render.adapters.firecrawl import FirecrawlRenderer
 
     renderer = FirecrawlRenderer()
@@ -125,6 +135,7 @@ def test_firecrawl_no_style_audit(monkeypatch: pytest.MonkeyPatch) -> None:
 # ── PlaywrightRenderer error paths (no real browser) ──────────────────────────
 
 
+@_requires_playwright
 def test_playwright_missing_chromium(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("metalworks.render.adapters.playwright.chromium_present", lambda: False)
     from metalworks.render.adapters.playwright import PlaywrightRenderer
@@ -155,6 +166,7 @@ def test_resolve_renderer_none(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resolve_renderer() is None
 
 
+@_requires_playwright
 def test_resolve_renderer_prefers_playwright(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("metalworks.render.chromium_present", lambda: True)
     monkeypatch.setattr("metalworks.render.adapters.playwright.chromium_present", lambda: True)
@@ -166,11 +178,8 @@ def test_resolve_renderer_prefers_playwright(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_resolve_renderer_falls_back_to_firecrawl(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("metalworks.render.chromium_present", lambda: False)
+    monkeypatch.setitem(sys.modules, "firecrawl", types.ModuleType("firecrawl"))
     monkeypatch.setenv("FIRECRAWL_API_KEY", "k")
-    monkeypatch.setattr(
-        "metalworks.render.adapters.firecrawl.importlib.import_module",
-        lambda name: object(),
-    )
     from metalworks.config import resolve_renderer
     from metalworks.render.adapters.firecrawl import FirecrawlRenderer
 
