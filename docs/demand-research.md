@@ -29,7 +29,7 @@ research = mw.research(
 )
 report = research.demand                # .research() returns a bundle; the report is .demand
 
-print(report.verdict)                   # is there real demand? a one-line go / no-go
+print(report.demand_summary)            # how strong is the demand? a one-line summary
 for c in report.ranked_clusters:
     print(c.distinct_author_count, "people:", c.claim)
     for q in c.quotes:                  # the real comments behind the claim
@@ -58,7 +58,7 @@ report on `research.demand`:
 
 | Field | What it is |
 | --- | --- |
-| `report.verdict` | A one-line go / no-go summary. |
+| `report.demand_summary` | A one-line demand-strength summary (the go/no-go is `assess`'s job). |
 | `report.ranked_clusters` | The real needs people voiced, ranked by how many different people raised each — not by how viral one post was. Each cluster has a `claim`, a `distinct_author_count`, and its `quotes`. |
 | `report.web_findings` | Supporting facts pulled from the web, each carrying its real source URL. |
 | `report.partial`, `report.caveat` | Set when part of the run came up short (see below). |

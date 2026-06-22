@@ -311,14 +311,13 @@ def test_cluster_ranker_raises_after_retries() -> None:
 def test_market_sizing_deterministic() -> None:
     m = market.build_market_sizing(40)
     assert m.reddit_floor == 40
-    assert m.addressable_market == 4000  # 40 x 100 default multiplier
+    assert not hasattr(m, "addressable_market")  # dropped — the x100 assumption is gone
     assert m.penetration == {"conservative": 0.01, "expected": 0.03, "good": 0.06}
 
 
 def test_market_sizing_zero_authors() -> None:
     m = market.build_market_sizing(0)
     assert m.reddit_floor == 0
-    assert m.addressable_market == 0
 
 
 def test_verdict_formats_the_given_strength_label() -> None:
@@ -339,10 +338,11 @@ def test_verdict_includes_market_and_price() -> None:
     out = verdict.derive_verdict(
         strength_label="Strong demand",
         total_distinct_authors=120,
-        market=MarketSizing(reddit_floor=120, addressable_market=12000, penetration={}),
+        market=MarketSizing(reddit_floor=120, penetration={}),
         price=PriceFinding(low=10.0, high=25.0, currency="USD"),
     )
-    assert "12,000 addressable" in out
+    assert "120 reachable on Reddit" in out
+    assert "addressable" not in out  # the x100 addressable clause is dropped
     assert "willingness to pay ~USD 10" in out
 
 
@@ -356,7 +356,7 @@ def test_synthesize_no_comments_returns_empty_shape() -> None:
     assert out.ranked_clusters == []
     assert out.total_distinct_authors == 0
     assert out.n_synthesized == 0
-    assert out.verdict is not None
+    assert out.demand_summary is not None
     assert isinstance(out.slot_plan, SlotPlan)
 
 

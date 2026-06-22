@@ -49,7 +49,7 @@ def _research() -> Research:
         total_distinct_authors=9,
         ranked_clusters=[cluster],
         generated_at=now,
-        verdict="Go — clear unmet demand.",
+        demand_summary="Go — clear unmet demand.",
     )
     return Research(demand=report)
 
@@ -78,7 +78,7 @@ def test_write_run_persists_files_and_updates_manifest(tmp_path: Path) -> None:
 def test_markdown_links_claims_to_real_permalinks() -> None:
     md = render_run_markdown(_research())
     assert "# Research — demand for a focus supplement?" in md
-    assert "**Verdict:** Go" in md
+    assert "**Demand summary:** Go" in md
     assert "People want a clean-label focus supplement" in md
     # the representative quote links back to its source thread
     assert "https://reddit.com/r/Supplements/comments/x/c/" in md

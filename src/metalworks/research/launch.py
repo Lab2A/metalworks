@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 # The launch surfaces this pillar drafts, in execution order.
 DEFAULT_SURFACES: tuple[str, ...] = ("product_hunt", "show_hn", "x_thread")
 
-# Verdict substrings that mean "don't launch" — a no-go signal from the report.
+# Demand-summary substrings that mean "don't launch" — a no-go signal from the report.
 _NEGATIVE_VERDICT = ("thin signal", "no demand", "insufficient", "not enough", "no-go", "no go")
 
 # Minimum distinct authors on at least one cluster for a launch to be defensible.
@@ -117,16 +117,16 @@ class _AssetPhrasing(BaseModel):
 
 
 def _is_no_go(report: DemandReport) -> bool:
-    """True when the report says don't launch (negative verdict or thin evidence).
+    """True when the report says don't launch (negative demand summary or thin evidence).
 
-    Only the DEMAND-strength segment of the verdict is judged — the leading part
-    before the first ``;``. The verdict appends market/price caveats (e.g.
+    Only the DEMAND-strength segment of the summary is judged — the leading part
+    before the first ``;``. The demand summary appends market/price caveats (e.g.
     ``"not enough price signal to recommend a price"``) whose wording collides
     with the negative-demand phrases; a strong-demand report with thin PRICE
     signal is still launch-worthy, so those caveats must not be read as no-go.
     """
-    verdict = (report.verdict or "").lower()
-    demand_segment = verdict.split(";", 1)[0]
+    demand_summary = (report.demand_summary or "").lower()
+    demand_segment = demand_summary.split(";", 1)[0]
     if demand_segment and any(signal in demand_segment for signal in _NEGATIVE_VERDICT):
         return True
     return not any(c.distinct_author_count >= _MIN_DISTINCT_AUTHORS for c in report.ranked_clusters)

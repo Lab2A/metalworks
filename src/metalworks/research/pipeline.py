@@ -348,7 +348,7 @@ def run_research(
         caveat=caveat,
         created_by="library",
         generated_at=deps.clock(),
-        verdict=synthesis_out.verdict,
+        demand_summary=synthesis_out.demand_summary,
         slot_plan=synthesis_out.slot_plan,
         audience_profile=synthesis_out.audience_profile,
         segments=synthesis_out.segments,

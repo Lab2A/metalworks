@@ -64,6 +64,16 @@ contracts may change in any release.
 
 ### Changed
 
+- **Renamed `DemandReport.verdict` → `demand_summary`.** The field is a demand-strength *summary*
+  ("Strong demand — 130 distinct voices; ~130 reachable on Reddit"), not the authoritative
+  go/no-go — that remains `assess`'s `Decision` (GO / PIVOT / NO_GO). Because the summary carries no
+  saturation/competitive context it can read more bullish than the actual call, and the shared name
+  invited readers to treat it as the verdict; the rename keeps the two distinct. No logic change —
+  `derive_verdict` is a pure formatter and owns no thresholds. **Contract break (below 1.0):** the
+  field is renamed on `DemandReport` (and in the generated `ts/contract.ts` + schema); the launch
+  refusal gate, run-markdown renderer, and SDK docs read the new name. The `assess` `Decision` /
+  `ForkVerdict` are untouched.
+
 - **The build spec now owns the surface decision and the screen skeleton.** `build_spec_from_report`
   gains `surface: SurfaceKind | "auto" = "auto"`: with `"auto"` (the new default) the *same*
   feature-mapping LLM call also returns the chosen surface + a one-line rationale (no extra call —
@@ -77,6 +87,16 @@ contracts may change in any release.
   init` / the `build_spec` MCP tool default to `--surface auto`.
 
 ### Removed
+
+- **Dropped `MarketSizing.addressable_market` (a `reddit_floor × 100` assumption printed as a number).**
+  The 100× reach multiplier ("posters are ~1% of the population") was an editable assumption whose
+  honesty lived only in a docstring the user never saw, so the report effectively printed a fabricated
+  TAM next to real counts. `MarketSizing` now ships only what's honest: `reddit_floor` (a real distinct-
+  author count) and `penetration` (already-labeled scenario bands). `synthesis/market.py` drops
+  `DEFAULT_REACH_MULTIPLIER`, the `reach_multiplier` param, and the multiply (keeps `DEFAULT_PENETRATION`);
+  `derive_verdict` no longer appends the "~N addressable" clause (keeps "~N reachable on Reddit").
+  **Contract break (below 1.0):** the field is removed from `MarketSizing` and the generated
+  `ts/contract.ts` + schema.
 
 - **Retired `/generate-site` (the grounded marketing-site generator).** It optimized provenance, not
   conversion — forcing the hero to be a raw forum quote, stripping every number and superlative from

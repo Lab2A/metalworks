@@ -177,7 +177,7 @@ class SynthesisOutput:
     """Everything the synthesis subtree produces for the report."""
 
     ranked_clusters: list[InsightCluster]
-    verdict: str
+    demand_summary: str
     slot_plan: SlotPlan | None
     audience_profile: AudienceProfile | None
     segments: list[AudienceSegment]

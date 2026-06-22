@@ -183,7 +183,6 @@ export interface SourceMapEntry {
 
 export interface MarketSizing {
   reddit_floor: number;
-  addressable_market: number;
   penetration: Record<string, number>;
 }
 
@@ -314,7 +313,7 @@ export interface DemandReport {
   /** 'library' | 'cli' | 'mcp' | 'ui' | 'agent'. */
   created_by?: string;
   generated_at: string;
-  verdict?: string | null;
+  demand_summary?: string | null;
   slot_plan?: SlotPlan | null;
   audience_profile?: AudienceProfile | null;
   segments?: SegmentChoice[];
