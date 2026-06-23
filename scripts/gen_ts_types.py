@@ -41,6 +41,7 @@ from metalworks.contract import (  # noqa: E402
     BuildSpec,
     CandidateWedge,
     Channel,
+    ChannelStrategy,
     ChannelSurfaceType,
     CitationRef,
     ClaimCitation,
@@ -188,6 +189,7 @@ MODELS: list[type[BaseModel]] = [
     # audience-derived channel model.
     ClaimCitation,
     Channel,
+    ChannelStrategy,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

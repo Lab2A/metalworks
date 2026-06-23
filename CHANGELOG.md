@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Distribution channel strategy (D2) — entity→channel routing, test→focus.** A new
+  `distribution strategy` surface routes a finished demand report's *real named entities +
+  signals* into the structured channel space and emits a small set of **channel experiments**
+  (not a ranked portfolio). The communities/permalinks that ground a community channel are pulled
+  DETERMINISTICALLY from the report's verified quotes — the LLM only classifies the product/ICP
+  archetype, writes the one-line ICP, and surfaces platforms/media the audience explicitly named;
+  it never invents grounding. Every `Channel` sets all five placement axes, carries a cheap `test`
+  + a `success_threshold` (test→focus: most products have ONE channel that works — test cheaply,
+  concentrate on the winner), pairs amplifiers (marketplaces/loops) with the spark that ignites
+  them, and traces its `routing_signal` to a real corpus entity (the no-fabrication rule). The
+  assembled `ChannelStrategy` carries a `focusing_rule` + a `funnel_note` that flags an
+  all-top-of-funnel plan as a conversion leak. Available on all four surfaces:
+  `mw.channel_strategy(...)`, `metalworks distribution strategy <report-id>`, the
+  `distribution_strategy` MCP tool (tool count 27 → 28), and the `distribution-strategy` skill.
+  Additive contract: the new `ChannelStrategy` model. (#100)
+
 - **Evidence-gating observability + a recall backstop.** The cosine/percentile thresholds that
   decide which evidence reaches synthesis are now visible and measured, not blind. The previously
   un-surfaced cutoffs are config fields with documented defaults: the embed-group near-dup cosine

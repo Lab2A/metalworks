@@ -39,6 +39,7 @@ from metalworks.contract.design import (
 )
 from metalworks.contract.distribution import (
     Channel,
+    ChannelStrategy,
     ChannelSurfaceType,
     ClaimCitation,
     ProductType,
@@ -200,6 +201,7 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Pillar F (Launch) + Pillar G (Content/SEO). Rebuilt over D1+; carries the
     # salvaged no-cite-no-claim primitive for now.
     "Channel",
+    "ChannelStrategy",
     "ChannelSurfaceType",
     "ClaimCitation",
     "ProductType",

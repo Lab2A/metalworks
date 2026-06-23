@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from metalworks.contract import (
         Assessment,
         BuildSpec,
+        ChannelStrategy,
         DemandReport,
         DesignReview,
         DesignSystem,
@@ -360,6 +361,20 @@ class Metalworks:
         from metalworks.research import build_positioning_brief
 
         return build_positioning_brief(self.deps, _demand(research))
+
+    def channel_strategy(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+    ) -> ChannelStrategy:
+        """Distribution (D2) — route the report's named entities + signals into the
+        structured channel space as **test→focus** channel experiments (not a ranked
+        portfolio). Selection is deterministic where it can be; the LLM classifies the
+        product type / writes the ICP line; every channel's ``routing_signal`` traces to a
+        real corpus entity. Pass the ``positioning`` brief to bias the classification."""
+        from metalworks.research import build_channel_strategy
+
+        return build_channel_strategy(self.deps, _demand(research), positioning)
 
     def landscape(self, research: Research | DemandReport) -> Landscape:
         """Pillar A — the full 'what exists today': direct / adjacent / status-quo rivals

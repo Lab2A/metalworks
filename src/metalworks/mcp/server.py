@@ -91,6 +91,11 @@ async def positioning_from_report(report_id: str, store_path: str | None = None)
     return tools.positioning_from_report(report_id, store_path)
 
 
+async def distribution_strategy(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Route a stored report's signals into test→focus channel experiments (chat key)."""
+    return tools.distribution_strategy(report_id, store_path)
+
+
 async def landscape_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Map the full landscape — competitors + existing solutions + do-nothing cost."""
     return tools.landscape_from_report(report_id, store_path)
@@ -214,6 +219,7 @@ _TOOL_WRAPPERS = (
     research_get_report,
     research_plan_brief,
     positioning_from_report,
+    distribution_strategy,
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,
