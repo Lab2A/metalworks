@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "metalworks",
-  "description": "Go from a startup idea to launch, grounded in what people actually want. Research real demand across Reddit, Hacker News, and the web, then get positioning, a design system, a build spec, and launch copy — every claim backed by a real quote. A Python library, CLI, MCP server, and Claude Code plugin.",
+  "description": "Go from a startup idea to distribution, grounded in what people actually want. Research real demand across Reddit, Hacker News, and the web, then get positioning, a design system, a build spec, and a grounded distribution plan — every claim backed by a real quote. A Python library, CLI, MCP server, and Claude Code plugin.",
   "colors": {
     "primary": "#111111",
     "light": "#f5f5f5",

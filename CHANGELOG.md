@@ -110,7 +110,7 @@ contracts may change in any release.
   `report.evidence` and its `stat_anchors` carry the cluster's real distinct-author / mention
   counts; a brief whose evidence doesn't resolve is DROPPED. Available on all four surfaces:
   `mw.geo(...)`, `metalworks distribution geo <report-id>`, the `distribution_geo` MCP tool (tool
-  count 28 → 29), and the `distribution-geo` skill. Drafting only — nothing posts. Additive
+  count 30 → 31), and the `distribution-geo` skill. Drafting only — nothing posts. Additive
   contract: the new `ParticipationTarget`, `CitabilityProbe`, `AnswerBrief`, and `GeoPlan` models.
   (#104)
 - **Data-as-marketing data report (D5) — the on-brand flagship asset.** A new `distribution
@@ -126,7 +126,7 @@ contracts may change in any release.
   analyzed, distinct-author counting, the corpus date range) — the survey-fabrication base rate is
   the trap, so rigor IS the credibility. Available on all four surfaces: `mw.data_asset(...)`,
   `metalworks distribution data-report <report-id> --kind complaint_index`, the
-  `distribution_data_report` MCP tool (tool count 28 → 29), and the `distribution-data-report`
+  `distribution_data_report` MCP tool (tool count 29 → 30), and the `distribution-data-report`
   skill. Additive contract: the new `DataReportAsset` + `DataReportItem` models. (#103)
 - **Channel-shaped distribution assets (D4) — relaxed grounding, platform invariants, offer/CTA.**
   A new `distribution assets` surface drafts channel-SHAPED, drafting-only launch copy off a
@@ -298,6 +298,22 @@ contracts may change in any release.
   `UxSkeleton`, `RubricDimension`, and `TradeOff` models are removed from `metalworks.contract` (and
   from the generated `ts/contract.ts`); `Screen` and `SurfaceKind` are kept (the build spec uses them).
   The `docs/design` "Surface & screens" page is folded into `docs/build-spec`.
+- **Retired the standalone Launch + Content/SEO pillars (replaced by Distribution).** The Launch
+  pillar (channel-native launch assets + a human-executed channel plan) and the Content/SEO pillar
+  (a deterministic per-cluster content plan) are subsumed by the Distribution pillar's grounded
+  channel strategy, channel-shaped assets, the corpus-derived data report, the GEO / LLM-citability
+  stream, and the pushes-and-streams plan. Removed across all four surfaces (parallel to the
+  `/generate-site` + `/surface-and-ux` retirements above): the `launch_assets_build` /
+  `channel_plan_build` / `content_plan_from_report` MCP tools (+ their `_TOOL_WRAPPERS`
+  registration), the `mw.launch()` / `mw.channel_plan()` / `mw.content_plan()` facade methods, the
+  `metalworks research launch` / `metalworks research content-plan` CLI commands, and the
+  `/launch-kit` + `/content-plan` skills, plus the core `research/marketing.py`. **Contract:** the
+  now-unproduced `LaunchAsset`, `ChannelPlan`, `ContentPlan`, and `MarketingSite` models are removed
+  from `metalworks.contract` (and from the generated `ts/contract.ts`); the live Distribution models
+  (`ChannelStrategy` / `Channel`, `ChannelAsset` / `AssetPart`, `DataReportAsset` / `DataReportItem`,
+  `GeoPlan` and friends, `DistributionPlan` / `Push` / `Stream`, `ChannelMetric` / `ChannelResult`,
+  `LoopRequirement` / `ConversionSurfaceRequirement`, `ParticipationReply`) replace them. The
+  `/docs/launch` + `/docs/content-seo` pages redirect to `/docs/distribution`.
 
 ### Fixed
 

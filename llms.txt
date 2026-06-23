@@ -36,7 +36,7 @@ no key). So Anthropic/OpenRouter/local chat all work standalone.
   `build_channel_strategy` (Distribution — routes the report's real named entities/signals
   into test→focus channel experiments). All on the `Metalworks` facade
   (`mw.positioning/competitors/build_spec/scaffold/channel_strategy`),
-  the CLI `metalworks research position|competitor-map` + `metalworks distribution strategy`
+  the CLI `metalworks research position|landscape` + `metalworks distribution strategy`
   + `metalworks build init`, and the matching synchronous MCP tools.
 - `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
   `draft_reply` building blocks.

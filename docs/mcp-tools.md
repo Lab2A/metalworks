@@ -16,8 +16,7 @@ source of truth for its tier.
 
 - **Tier 1 — zero-key.** Data and deterministic tools: Reddit search/intel
   (`[reddit]` extra, no API key), the Arctic corpus readers (`[arctic]` extra),
-  local-store readers, the offline compliance check, and the two deterministic
-  report projections (`channel_plan_build`, `content_plan_from_report`). No
+  local-store readers, and the offline compliance check. No
   provider key needed.
 - **Tier 2 — key-gated.** Anything that calls a model: planning, the
   report-derived tools, the research job pattern, reply drafting, discovery, and
@@ -39,8 +38,6 @@ source of truth for its tier.
 | `corpus_stats` | Counts of persisted runs/reports in the local store (offline). | `store_path` |
 | `research_list_runs` | List runs (including in-flight) from the local store. | `store_path`, `limit` (50) |
 | `research_get_report` | Fetch a finished report from the local store by id. | `report_id`, `store_path` |
-| `channel_plan_build` | Deterministic, human-executed launch channel plan for a stored report. Every step is `requires_human` + `posting_gated`; no LLM. | `report_id`, `store_path` |
-| `content_plan_from_report` | Project a stored report into a deterministic content/SEO plan — pure, no LLM, no embeddings. | `report_id`, `store_path` |
 
 ## Tier 2 — key-gated
 
@@ -64,7 +61,6 @@ source of truth for its tier.
 | `design_from_report` | Author a grounded-but-directional design system (+ preview HTML) — SAFE/RISK choices read from a real competitor teardown where available; records the `grounding_tier`. `taste` picks the director preset (`editorial` default / `brutalist` / `warm-minimal` / `technical`) (chat key). | `report_id`, `name`, `taste`, `store_path` |
 | `logo_generate` | Generate diverse logo options (+ a self-contained picker) drawn under the design system; the model authors each SVG, an unsafe/empty one is dropped. `taste` picks the preset the mark draws under (chat key). | `report_id`, `name`, `taste`, `store_path` |
 | `design_review` | Deterministically audit a rendered page's computed styles (fonts, heading scale, colors) against design hard-rules and (with a report) its design system. Needs a script-capable browser renderer. | `url`, `report_id`, `store_path` |
-| `launch_assets_build` | Draft grounded, channel-native launch assets — one LLM call per surface; `[]` on a no-go report. Drafting only (chat key). | `report_id`, `store_path` |
 | `build_spec` | Derive an evidence-grounded `BuildSpec` — each feature maps to a real demand cluster with quotes (un-grounded features dropped); `surface="auto"` also picks the surface + a rationale and sketches feature-grounded screens. Returns the spec; does **not** write files (that is the `metalworks build init` CLI) (chat + embedding keys). | `report_id`, `surface` (`auto`), `stack` (`empty`), `store_path` |
 | `research_start` | Start the pipeline as a background job and return a `run_id` immediately (chat + embedding keys). | `brief`, `months`, `store_path` |
 | `research_status` | Status of a background research job. | `run_id`, `store_path` |

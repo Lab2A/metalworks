@@ -1,15 +1,15 @@
 ---
 title: "Claude Code plugin"
-description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 31 tools and a hard posting gate."
+description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, plan distribution and draft Reddit replies — backed by an MCP server with 35 tools and a hard posting gate."
 ---
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
 `/demand-report can I sell a focus supplement to developers?` and you get the same grounded
 report the library produces — every claim linked to a real quote you can open — right in your chat,
-then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
+then keep going (`/position-wedge`, `/build-spec`, `/distribution-strategy`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls
-one or more of its 31 tools. The commands chain through a stored demand report, exactly like the
+one or more of its 35 tools. The commands chain through a stored demand report, exactly like the
 [CLI](/docs/cli) — see [Projects & memory](/docs/projects) for how that state persists.
 
 ## Install
@@ -36,9 +36,9 @@ key is in your environment (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API
 present wins). A few tools also need an embeddings key.
 
 The tools fall into four tiers by what they need: **zero-key** data tools (Reddit + corpus
-reads, compliance lint, content plan), **chat-key** synthesis tools (demand research,
-positioning, launch assets, discovery), **chat + embeddings** tools (competitor map, build
-spec — which now folds in surface + screens), and the **gated** posting tool (a Reddit reply,
+reads, compliance lint, the corpus-derived data report), **chat-key** synthesis tools (demand
+research, positioning, distribution assets, discovery), **chat + embeddings** tools (competitor
+map, build spec — which now folds in surface + screens), and the **gated** posting tool (a Reddit reply,
 behind an env opt-in). The [MCP tools reference](/docs/mcp-tools) is the canonical list — every
 tool, its tier, and its key requirement, in one table.
 
@@ -71,13 +71,21 @@ Frame an idea, weigh demand against what already exists, get an honest build/don
 
 - **`/build-spec`** — a feature spec mapped to real demand (`build_spec`), the surface to build it on (auto-picked with a one-line rationale, or pinned) and a feature-grounded screen skeleton, then a scaffolded repo: `CLAUDE.md` with a cite-or-die rule, `docs/SPEC.md`, a frozen `docs/EVIDENCE.md` quote table, a `PostToolUse` lint hook, and `.mcp.json` wiring back to metalworks. metalworks specs and scaffolds; your agent builds. Ungrounded features are dropped before scaffolding.
 
-### Launch
+### Distribution
 
-- **`/launch-kit`** — Product Hunt / Show HN / X drafts (`launch_assets_build`), each claim carrying a permalink and exact text span, plus a human-executed channel plan (`channel_plan_build`). **It never posts** — every channel step is `requires_human`. If the report is a no-go, it returns nothing and says so.
+Plan where this product gets distributed and draft the channel-native assets — all grounded in the report, all drafting-only. See [Distribution](/docs/distribution) and [GEO / LLM-citability](/docs/distribution-geo).
+
+- **`/distribution-strategy`** — route the report's real named entities + signals into **test→focus** channel experiments (`distribution_strategy`); every channel's `routing_signal` traces to a real corpus entity. Not a ranked portfolio — a set of experiments to test, then concentrate on the winner.
+- **`/distribution-requirements`** — the distribution → build requirements (`distribution_requirements`): the embedded loops + the conversion surface distribution designs INTO the product, emitted as concrete build requirements. Feed it to `/build-spec`.
+- **`/distribution-assets`** — channel-SHAPED, drafting-only assets per channel (`distribution_assets`): Product Hunt tagline + maker comment, Show HN title + first comment, an X thread, a LinkedIn carousel. Demand claims are grounded; hooks are free. **It never posts.**
+- **`/distribution-data-report`** — a corpus-derived **data report** (`distribution_data_report`): a deterministic ranking of the report's clusters (complaint index / feature ranking / State of X) carrying REAL counts, real permalinks, and a verbatim quote per row. Zero-key; the numbers are copied, never invented.
+- **`/distribution-geo`** — the GEO / LLM-citability stream (`distribution_geo`): participation targets (real threads from the report's permalinks), citability probes, and answer-first answer briefs. **Drafting only.**
+- **`/distribution-engage`** — the participation/execution arm (`distribution_engage`): draft a disclosed, founder-voiced reply for one GEO participation target, run the compliance gate, hand it to you to post. **Posting is human-gated.**
+- **`/distribution-plan`** — sequence the channels into a campaign (`distribution_plan`): **pushes** (spike channels at deterministic playbook timings) + **streams** (compounding channels run continuously), pre-launch warming → push week → 30-day post step. **Planning only.**
+- **`/distribution-measure`** — close the loop (`distribution_measure`): the per-channel success metric + the instrumentation to wire BEFORE the push, read deterministically by surface type, then re-rank the next push on real results. **Planning only.**
 
 ### Grow
 
-- **`/content-plan`** — a deterministic, zero-key content/SEO plan (`content_plan_from_report`): one page per demand cluster, FAQ blocks built from your brief's must-address questions, real distinct-author/mention counts as stat anchors, and a list of permalinks to cite.
 - **`/find-threads <product>`** — live Reddit threads worth a genuine reply (`reddit_search_posts`), ranked by honest fit. Discovery only — it doesn't draft or post.
 - **`/draft-reply <thread>`** — reads the thread and rules (`reddit_get_post_comments`, `reddit_subreddit_rules`), drafts a reply in your voice (`generate_reply`), and runs it through the compliance gate (`compliance_lint`) until it passes. It stops there. Posting happens only on your explicit instruction, and only if the gate is satisfied.
 - **`/subreddit-intel <r/name>`** — a practical brief on a community (rules that bite, tone, what gets removed) before you participate (`reddit_subreddit_info`). Reconnaissance only.

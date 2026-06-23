@@ -45,8 +45,8 @@ Inspect and set the chat/fast/embedding models.
 ## research
 
 Plan and run demand-research reports, then derive everything else from them. The
-report-grounded commands (`position`, `landscape`, `design`, `launch`,
-`content-plan`, `assess`, `refresh`, `versions`) take a **report id** —
+report-grounded commands (`position`, `landscape`, `design`,
+`assess`, `refresh`, `versions`) take a **report id** —
 but it's **optional**: omit it to use your latest run, or pass a unique **prefix**
 instead of the full id. No more copy/pasting UUIDs between steps. (`research --help`
 groups these by *Core flow* / *Pillars & build* / *History*.)
@@ -63,8 +63,6 @@ groups these by *Core flow* / *Pillars & build* / *History*.)
 | `metalworks research design REPORT_ID` | Author a grounded-but-directional design system (SAFE/RISK choices + `DESIGN.md`) from a stored report; a real competitor teardown when a browser is installed. | chat key |
 | `metalworks research logo REPORT_ID` | Generate diverse logo options (SVGs + a picker) drawn under the report's design system. | chat key |
 | `metalworks research design-review URL` | Deterministically audit a rendered page's computed styles vs design hard-rules (and, with `--report`, a design system). Needs the browser. | none (chat with `--report`) |
-| `metalworks research launch REPORT_ID` | Draft grounded, channel-native launch assets + a human-run channel plan. **Never posts.** | chat key |
-| `metalworks research content-plan REPORT_ID` | Project a stored report into a deterministic content/SEO plan. **No LLM.** | zero-key |
 
 The **[validation loop](/docs/validation-loop)** — frame an idea, then decide if it's worth building:
 
@@ -86,7 +84,7 @@ Options:
 - `research list` — `--limit INT` (max runs to show, default 20).
 - `research refresh` / `versions` — optional `REPORT_ID` (id or prefix, any version of the report; defaults to latest); refresh updates from the lineage head and takes `--out, -o PATH`.
 - `research diff` — `REPORT_A REPORT_B` arguments (earlier, later; both required).
-- `research position` / `landscape` / `launch` / `content-plan` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
+- `research position` / `landscape` — optional `REPORT_ID` (id or prefix; defaults to latest); `--out, -o PATH` to write the artifact JSON.
 - `research design` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for `DESIGN.md` + `preview.html`; `--max-teardown N` competitor sites to teardown (`0` = all).
 - `research logo` — `REPORT_ID` argument; `--name` brand name; `--out, -o DIR` for the SVGs + `picker.html`; `--count, -n` how many options (design angles).
 - `research design-review` — `URL` argument; `--report REPORT_ID` to also grade against that report's design system; `--json PATH` for the `DesignReview` JSON.
@@ -139,6 +137,8 @@ Plan where this product gets distributed, off a stored report (see
 | Command | Description | Keys |
 | --- | --- | --- |
 | `metalworks distribution strategy [REPORT]` | Route the report's named entities + signals into **test→focus** channel experiments; every channel traces to a real corpus entity. | chat key |
+| `metalworks distribution assets [REPORT]` | Draft channel-shaped, drafting-only distribution assets per channel — each claim-bearing line carries a real permalink and exact text span. **Never posts.** | chat key |
+| `metalworks distribution data-report [REPORT] --kind ...` | Project a stored report into a corpus-derived data report — a deterministic ranking of its clusters with **real** counts, real permalinks, and a verbatim quote per row. `--kind`: `complaint_index` \| `feature_ranking` \| `state_of`. **No LLM.** | zero-key |
 | `metalworks distribution geo [REPORT]` | The GEO / LLM-citability stream — participation targets (real threads from the report's permalinks), citability probes, and answer-first answer briefs (grounded; evidence resolves, ungrounded dropped). Drafting only. | chat key |
 | `metalworks distribution engage [REPORT] --permalink URL --why "…"` | Distribution's **participation/execution arm** (D9) — draft a DISCLOSED, founder-voiced, compliance-gated reply for one GEO participation target (a real thread). Reuses the Reddit reply machinery + the single voice system's no-upvote / native-first / no-AI-tell invariants. Posting stays gated — a human posts via `metalworks reddit post`. Drafting only. | chat key |
 | `metalworks distribution requirements [REPORT]` | The distribution → build requirements (D3) — embedded-loop build requirements (loop kind → concrete things to build, grounded in the channel) + the conversion-surface destination the channels point at. Feeds the build spec. | chat key |
