@@ -227,6 +227,7 @@ paths = mw.scaffold(spec, research, Path("./my-startup"))
 ```python
 def channel_strategy(self, research, positioning=None) -> ChannelStrategy: ...
 def distribution_plan(self, research, positioning=None) -> DistributionPlan: ...
+def channel_metrics(self, research, positioning=None) -> list[ChannelMetric]: ...
 def geo(self, research) -> GeoPlan: ...
 ```
 
@@ -236,10 +237,14 @@ sequences those channels into a campaign (D7): **pushes** (the `spike`-cadence c
 concentrated launch moments, their `timing` READ from a deterministic playbook table — Product Hunt
 12:01am PT Tue/Wed, Show HN Tue-Thu 8-10am, … — never invented hours; one all-day-attention channel
 per day, never Product Hunt + a big HN push the same day; pre-launch warming → push week → a 30-day
-post step) + **streams** (the `compounding`-cadence channels run continuously). `geo` is the GEO /
-LLM-citability stream (D6): **participation targets** (real threads to engage, from the report's
-permalinks), **citability probes** (conversational queries to test you're cited, from the cluster
-claims), and answer-first **answer briefs** (grounded — each `evidence_refs` resolves against
+post step) + **streams** (the `compounding`-cadence channels run continuously). `channel_metrics`
+closes the loop (D8): one `ChannelMetric` per channel — its `success_metric` (what "worked") + its
+`instrumentation` (how to track it), read deterministically by `surface_type`; record a
+`ChannelResult` per channel after the push and pass them as `prior_results` to
+`build_channel_strategy` / `plan_distribution` to re-rank the next push (winners rise). `geo` is the
+GEO / LLM-citability stream (D6): **participation targets** (real threads to engage, from the
+report's permalinks), **citability probes** (conversational queries to test you're cited, from the
+cluster claims), and answer-first **answer briefs** (grounded — each `evidence_refs` resolves against
 `report.evidence`, `stat_anchors` carry the cluster's real counts, ungrounded answers dropped).
 All are **drafting only** — nothing posts.
 

@@ -44,6 +44,8 @@ from metalworks.contract import (  # noqa: E402
     CandidateWedge,
     Channel,
     ChannelAsset,
+    ChannelMetric,
+    ChannelResult,
     ChannelStrategy,
     ChannelSurfaceType,
     CitabilityProbe,
@@ -219,6 +221,9 @@ MODELS: list[type[BaseModel]] = [
     Push,
     Stream,
     DistributionPlan,
+    # closed-loop measurement (D8) — per-channel metric + instrumentation, ingest results
+    ChannelMetric,
+    ChannelResult,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

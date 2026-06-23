@@ -296,3 +296,67 @@ metalworks distribution plan <report-id>
 It is **pure + deterministic** — no LLM, no network — over the already-selected channels. Every
 push is `requires_human=True` and `posting_gated=True`: metalworks plans + drafts the sequence, a
 human executes each moment. **DRAFTING + PLANNING ONLY — nothing here posts.**
+
+## Closed-loop measurement — the loop that makes Distribution learn
+
+Everything above PLANS; nothing learns. The loop closes here: **plan → (human executes) → record
+results → re-rank the next push.** Distribution without "did it work + re-rank" is the theater the
+research warned about — attribution murky, partnerships measured in logos. metalworks can't watch
+live traffic, but in its lane it does the two things it *can* do deterministically: define the
+metric + the instrumentation, and ingest the results to re-rank.
+
+`mw.channel_metrics(research)` emits one `ChannelMetric` per selected channel — its `success_metric`
+(what "worked" means) and its `instrumentation` (exactly how to track it), read from a fixed table
+keyed by the channel's `surface_type` (never an invented KPI):
+
+| Surface | Success metric | How to instrument |
+| --- | --- | --- |
+| launch platform | top-N + attributed signups in 7d | UTM-tag the launch link; count signups whose first touch carries it |
+| marketplace | installs + WAU | the listing's install count + an in-product weekly-active event |
+| community | qualified replies + click-through | count genuine "how do I try this" replies; UTM the link |
+| answer-engine GEO | citation appearances | run the citability probes against the engines; count citations |
+| embedded loop | signups per N shared outputs (K) | UTM + badge every shared output; divide signups by outputs |
+
+This is the **falsifiable disposition** applied to distribution: name the metric and the instrument
+*before* the push, so the outcome is measurable. After the push the human records a `ChannelResult`
+(`channel_name`, `metric`, `value`, `period` like `"first 7d"`) for each channel.
+
+Feeding those results back is what re-ranks the next push. `rerank_from_results(channels, results)`
+is pure + deterministic: it sums each channel's recorded `value`s and re-orders the channels so the
+ones that actually performed lead (and the dead ones fall) — measured channels first (by descending
+score), unmeasured channels after, each group keeping its original order so the result is
+reproducible. With no results it is a **no-op** (same channels, same order), so the default path is
+unchanged. The re-rank is wired straight into selection + sequencing:
+`select_channels(..., prior_results=...)` and `plan_distribution(..., prior_results=...)` apply it
+when the prior push's results are passed.
+
+<CodeGroup>
+
+```text Claude Code
+/distribution-measure
+```
+
+```python Python
+metrics = mw.channel_metrics(research)         # routes the strategy internally
+for m in metrics:
+    print(m.channel_name, "→", m.success_metric)
+    print("  instrument:", m.instrumentation)
+
+# after the push, record what happened, then re-rank the next push:
+from metalworks.contract import ChannelResult
+from metalworks.research import build_channel_strategy, plan_distribution
+
+results = [ChannelResult(channel_name="show_hn", metric="attributed signups in 7d",
+                         value=42.0, period="first 7d")]
+strategy = build_channel_strategy(mw.deps, report, prior_results=results)   # winners rise
+plan = plan_distribution(report, strategy.channels, prior_results=results)
+```
+
+```bash CLI
+metalworks distribution measure <report-id>
+```
+
+</CodeGroup>
+
+The metric + instrumentation are deterministic; the human measures and records — metalworks never
+watches traffic for you. **PLANNING ONLY — it defines what to measure; nothing here posts.**

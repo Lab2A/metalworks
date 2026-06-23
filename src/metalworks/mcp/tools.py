@@ -520,6 +520,36 @@ def distribution_plan(report_id: str, store_path: str | None = None) -> ToolResu
 
 
 @guard
+def distribution_measure(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Close the distribution loop (D8) — emit the per-channel success
+    metric + the instrumentation to wire BEFORE the push. Routes the stored report into its
+    channel strategy, then for each selected channel reads DETERMINISTICALLY (keyed by
+    surface_type) what 'worked' means (launch platform → top-N + attributed signups; marketplace
+    → installs + WAU; community → qualified replies + click-through; answer-engine GEO → citation
+    appearances) and how to track it (a UTM tag, an attributed-signup query, a citation check).
+    The human records ChannelResults against these and feeds them back so the next push re-ranks
+    on evidence. Needs a chat-model key (the channel-strategy classify call)."""
+    from metalworks import config
+    from metalworks.research import build_channel_strategy, channel_metrics
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    strategy = build_channel_strategy(deps, report)
+    metrics = channel_metrics(strategy.channels)
+    return {"metrics": [m.model_dump(mode="json") for m in metrics]}
+
+
+@guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
     the competitor map PLUS an empirical existing-solutions scan (real shipped

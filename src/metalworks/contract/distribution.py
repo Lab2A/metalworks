@@ -629,3 +629,56 @@ class DistributionPlan(BaseModel):
         default_factory=list[Stream],
         description="The compounding channels that run continuously.",
     )
+
+
+# ── Closed-loop measurement — metric + instrumentation, ingest results (D8) ───
+
+
+class ChannelMetric(BaseModel):
+    """The success metric + instrumentation guidance for one distribution channel.
+
+    Everything else in the pillar PLANS; this is where it learns. metalworks
+    can't watch live traffic, so in its lane it defines — DETERMINISTICALLY, from a
+    table keyed by ``surface_type`` — what "worked" means for a channel
+    (``success_metric``, e.g. "attributed signups in 7d") and exactly how to track
+    it (``instrumentation``, e.g. a UTM tag, an attributed-signup query). It is the
+    falsifiable disposition applied to distribution: name the metric + the
+    instrument BEFORE the push, so the human can record a real
+    :class:`ChannelResult` against it afterward and the next push re-ranks on
+    evidence, not vibes. Emitted one-per-channel; no LLM, no network.
+    """
+
+    channel_name: str = Field(description="The channel this metric is for (matches Channel.name).")
+    surface_type: ChannelSurfaceType = Field(
+        description="The channel's surface type — which keyed the metric + instrumentation."
+    )
+    success_metric: str = Field(
+        description="What 'worked' means for this channel, e.g. 'attributed signups in 7d'."
+    )
+    instrumentation: str = Field(
+        description="How to track the metric — a UTM tag, an attributed-signup query, a citation "
+        "check, etc. Concrete enough that a human can wire it before the push."
+    )
+
+
+class ChannelResult(BaseModel):
+    """One recorded outcome for a channel — the human's measurement, fed back in.
+
+    The human executes a push, instruments it per the channel's
+    :class:`ChannelMetric`, and records the number here: the ``metric`` measured,
+    its ``value``, and the ``period`` it covers (e.g. "first 7d"). A list of these
+    is the input to :func:`~metalworks.research.distribution.measure.rerank_from_results`
+    (and, through it, ``select_channels(..., prior_results=...)`` /
+    ``plan_distribution(..., prior_results=...)``) — the channels that actually
+    performed rise for the next push, the dead ones fall. This is how
+    "long-running / repeatable" becomes real rather than launch theater.
+    """
+
+    channel_name: str = Field(description="The channel this result is for (matches Channel.name).")
+    metric: str = Field(
+        description="The metric that was measured (mirrors the channel's success_metric)."
+    )
+    value: float = Field(
+        description="The measured value — higher is better (e.g. attributed signups, installs)."
+    )
+    period: str = Field(description="The window the value covers, e.g. 'first 7d'.")

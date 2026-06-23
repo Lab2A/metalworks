@@ -2800,6 +2800,61 @@ def distribution_plan(
     _print_distribution_plan(plan)
 
 
+def _print_channel_metrics(metrics: list[Any]) -> None:
+    console.print("\n[bold]Channel metrics[/bold] (D8) — wire these BEFORE the push")
+    if not metrics:
+        console.print("  [dim]No channels selected — nothing to instrument yet.[/dim]")
+        return
+    for m in metrics:
+        console.print(f"\n  [bold]{m.channel_name}[/bold] ([dim]{m.surface_type}[/dim])")
+        console.print(f"    success: [bold]{m.success_metric}[/bold]")
+        console.print(f"    [dim]instrument: {m.instrumentation}[/dim]")
+
+
+@distribution_app.command("measure")
+def distribution_measure(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the channel metrics JSON here.")
+    ] = None,
+) -> None:
+    """Emit the per-channel success metric + instrumentation to wire BEFORE the push (D8)."""
+    from metalworks.research import build_channel_strategy, channel_metrics
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Channel metrics[/bold] report {report_id}...")
+    try:
+        strategy = build_channel_strategy(deps, report)
+        metrics = channel_metrics(strategy.channels)
+    finally:
+        reader.close()
+    if out is not None:
+        import json
+
+        payload = [m.model_dump(mode="json") for m in metrics]
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote channel metrics[/green] {out}")
+    _print_channel_metrics(list(metrics))
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
