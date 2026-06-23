@@ -2475,6 +2475,68 @@ def distribution_strategy(
     _print_channel_strategy(strategy)
 
 
+def _print_channel_assets(assets: list[object]) -> None:
+    if not assets:
+        console.print("[yellow]No assets drafted.[/yellow]")
+        return
+    for a in assets:
+        console.print(
+            f"\n[bold]{getattr(a, 'channel_name', '')}[/bold] "
+            f"([dim]{getattr(a, 'surface_type', '')}, {getattr(a, 'funnel_stage', '')}[/dim])"
+        )
+        for part in getattr(a, "parts", []):
+            console.print(f"  [dim]{part.role}:[/dim] {part.text}")
+        offer = getattr(a, "offer", "")
+        if offer:
+            console.print(f"  [bold]offer:[/bold] {offer}")
+        cites = getattr(a, "claim_citations", [])
+        console.print(f"  [dim]grounded demand claims:[/dim] {len(cites)}")
+
+
+@distribution_app.command("assets")
+def distribution_assets(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the channel assets JSON here.")
+    ] = None,
+) -> None:
+    """Draft channel-SHAPED, drafting-only distribution assets per channel (DRAFTING ONLY)."""
+    from metalworks.research import build_channel_assets, build_channel_strategy
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Distribution assets[/bold] report {report_id}...")
+    try:
+        strategy = build_channel_strategy(deps, report)
+        assets = build_channel_assets(deps, report, strategy.channels)
+    finally:
+        reader.close()
+    if out is not None:
+        import json
+
+        payload = [a.model_dump(mode="json") for a in assets]
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote {len(assets)} assets[/green] {out}")
+    _print_channel_assets(list(assets))
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
