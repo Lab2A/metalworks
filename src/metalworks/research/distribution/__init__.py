@@ -33,6 +33,11 @@ from metalworks.research.distribution.geo import (
     citability_probes,
     participation_targets,
 )
+from metalworks.research.distribution.requirements import (
+    conversion_surface_requirement,
+    distribution_requirements,
+    loop_requirements,
+)
 
 __all__ = [
     "answer_briefs",
@@ -42,7 +47,10 @@ __all__ = [
     "build_geo_plan",
     "citability_probes",
     "classify_product",
+    "conversion_surface_requirement",
+    "distribution_requirements",
     "extract_channel_signals",
+    "loop_requirements",
     "participation_targets",
     "select_channels",
 ]

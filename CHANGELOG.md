@@ -10,6 +10,26 @@ contracts may change in any release.
 
 ### Added
 
+- **Distribution → build requirements (D3) — embedded loops + the conversion surface feed
+  build-spec.** Two distribution decisions are designed INTO the product, not bolted on as
+  marketing tactics, so they are now emitted as BUILD requirements that feed the build spec.
+  `distribution_requirements(channels)` is DETERMINISTIC: for each selected `embedded_loop`
+  channel it emits a `LoopRequirement` mapping the loop kind → a fixed set of build requirements
+  (watermark ⇒ `public_share_urls` + `branded_viewer` + `badge_gating`; UGC-SEO ⇒
+  `ssr_public_pages` + `sitemap`; single-player ⇒ `solo_aha_before_invite`), grounded in the
+  channel's `routing_signal`; and it ALWAYS emits a `ConversionSurfaceRequirement` for the
+  conversion destination the channels point at (its funnel job + what it must ship) — channels
+  create attention, and attention with no surface to catch it leaks out, so the build must include
+  a place to convert. This re-opens generate-site (#67) from the right side: not cite-or-die
+  marketing copy, but "the build must include a conversion destination." `build_spec_from_report`
+  gains an additive `distribution_requirements=None` parameter; when supplied, the `BuildSpec`
+  records them on the new additive `loop_requirements` / `conversion_surface_requirements` fields.
+  Default `None` → byte-for-byte unchanged behavior. Available on all four surfaces:
+  `mw.distribution_requirements(...)`, `metalworks distribution requirements <report-id>`, the
+  `distribution_requirements` MCP tool (tool count 31 → 32), and the `distribution-requirements`
+  skill. Deterministic — no invented features. Additive contract: the new `LoopRequirement` and
+  `ConversionSurfaceRequirement` models. (#101)
+
 - **Distribution GEO / LLM-citability stream (D6) — participation targets, citability probes,
   answer-first briefs.** A new `distribution geo` surface turns a finished demand report into the
   GEO ("get cited by AI") stream. Reddit is the #1 AI-cited domain and most AI citations are Q&A

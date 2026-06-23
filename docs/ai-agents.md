@@ -32,7 +32,7 @@ the `fix` verbatim.
 
 ## MCP tools (the language-agnostic surface)
 
-Run `metalworks mcp serve` (stdio). **31 tools** are registered. The full table — every
+Run `metalworks mcp serve` (stdio). **32 tools** are registered. The full table — every
 tool, its tier, whether it needs a key, its purpose, and params — is the canonical [MCP tools
 reference](/docs/mcp-tools); read it there rather than re-deriving the list here. In short:
 

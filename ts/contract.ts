@@ -919,6 +919,26 @@ export interface ChannelAsset {
   claim_citations?: ClaimCitation[];
 }
 
+export interface LoopRequirement {
+  /** The loop mechanic this requirement set serves. */
+  loop_kind: "watermark" | "ugc_seo" | "referral" | "free_tool" | "oss" | "single_player";
+  /** Concrete things the build must ship for this loop, e.g. ['public_share_urls', 'branded_viewer', 'badge_gating'] for a watermark; ['ssr_public_pages', 'sitemap'] for UGC-SEO; ['solo_aha_before_invite'] for single_player. */
+  build_requirements: string[];
+  /** Why the build needs this, grounded in the selected channel's routing_signal. */
+  rationale: string;
+}
+
+export interface ConversionSurfaceRequirement {
+  /** The surface channels point at, e.g. 'landing_page' | 'in_product_onboarding'. */
+  destination: string;
+  /** The conversion job this destination does for the funnel (what it converts). */
+  funnel_job: string;
+  /** Concrete things the conversion destination must ship, e.g. ['above_fold_value_prop', 'single_primary_cta', 'instrumented_signup']. */
+  build_requirements: string[];
+  /** Why the build needs a conversion destination, grounded in the channel plan. */
+  rationale: string;
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;
@@ -967,6 +987,10 @@ export interface BuildSpec {
   pricing_tiers?: PricingTier[];
   /** The build's UX skeleton, sketched AFTER the features so each screen maps to real ``feature_id``s. Shell screens (auth/settings) are flagged ``scaffolding``. */
   screens?: Screen[];
+  /** Distribution-driven build requirements (D3): one entry per selected embedded-loop channel — the build face of a designed-in loop (watermark ⇒ public share-URLs + branded viewer + badge-gating; UGC-SEO ⇒ SSR pages + sitemap; …). Empty when distribution requirements weren't supplied or no loop channel was selected. */
+  loop_requirements?: LoopRequirement[];
+  /** Distribution-driven build requirements (D3): the conversion destination the channels point at (its funnel job + what it must ship) — the build must include a place to convert. Empty when distribution requirements weren't supplied. */
+  conversion_surface_requirements?: ConversionSurfaceRequirement[];
   partial?: boolean;
   caveat?: string | null;
 }

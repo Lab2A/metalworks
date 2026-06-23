@@ -385,7 +385,6 @@ def distribution_assets(report_id: str, store_path: str | None = None) -> ToolRe
 
 
 @guard
-@guard
 def distribution_data_report(
     report_id: str,
     kind: str = "complaint_index",
@@ -427,7 +426,6 @@ def distribution_data_report(
 
 
 @guard
-@guard
 def distribution_geo(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Turn a stored report into the GEO / LLM-citability stream
     (D6) — participation targets (real threads from the report's permalinks),
@@ -455,6 +453,42 @@ def distribution_geo(report_id: str, store_path: str | None = None) -> ToolResul
 
 
 @guard
+def distribution_requirements(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Emit the distribution → build requirements (D3) for a stored
+    report — the embedded loops + conversion surface distribution designs INTO the product,
+    as BUILD requirements that feed build-spec. Routes the report into its channel strategy,
+    then for each selected embedded_loop channel emits a LoopRequirement (loop kind →
+    concrete build requirements, grounded in the channel's routing_signal) and always emits a
+    ConversionSurfaceRequirement for the conversion destination. Deterministic. Needs a
+    chat-model key (the channel-strategy classify call)."""
+    from metalworks import config
+    from metalworks.research import (
+        build_channel_strategy,
+    )
+    from metalworks.research import (
+        distribution_requirements as _distribution_requirements,
+    )
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    strategy = build_channel_strategy(deps, report)
+    loops, conversion = _distribution_requirements(strategy.channels)
+    return {
+        "loop_requirements": [r.model_dump(mode="json") for r in loops],
+        "conversion_surface_requirements": [r.model_dump(mode="json") for r in conversion],
+    }
+
+
 @guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —

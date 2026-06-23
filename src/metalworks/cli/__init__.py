@@ -2670,6 +2670,72 @@ def distribution_geo(
     _print_geo_plan(plan)
 
 
+def _print_distribution_requirements(loops: list[object], conversion: list[object]) -> None:
+    console.print("\n[bold]Distribution → build requirements[/bold] (D3)")
+    if loops:
+        console.print("\n  [bold]Embedded loops[/bold]")
+        for lr in loops:
+            reqs = ", ".join(getattr(lr, "build_requirements", []))
+            console.print(f"    [bold]{getattr(lr, 'loop_kind', '')}[/bold] → {reqs}")
+            console.print(f"      [dim]{getattr(lr, 'rationale', '')}[/dim]")
+    else:
+        console.print("\n  [dim]No embedded-loop channel selected — no loop requirements.[/dim]")
+    for cr in conversion:
+        reqs = ", ".join(getattr(cr, "build_requirements", []))
+        console.print(f"\n  [bold]Conversion surface[/bold]: {getattr(cr, 'destination', '')}")
+        console.print(f"    [dim]job:[/dim] {getattr(cr, 'funnel_job', '')}")
+        console.print(f"    [dim]build:[/dim] {reqs}")
+        console.print(f"    [dim]{getattr(cr, 'rationale', '')}[/dim]")
+
+
+@distribution_app.command("requirements")
+def distribution_requirements(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the requirements JSON here.")
+    ] = None,
+) -> None:
+    """Emit the distribution → build requirements (D3): embedded loops + the conversion surface."""
+    from metalworks.research import build_channel_strategy
+    from metalworks.research import distribution_requirements as _distribution_requirements
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Distribution requirements[/bold] report {report_id}...")
+    try:
+        strategy = build_channel_strategy(deps, report)
+        loops, conversion = _distribution_requirements(strategy.channels)
+    finally:
+        reader.close()
+    if out is not None:
+        import json
+
+        payload = {
+            "loop_requirements": [lr.model_dump(mode="json") for lr in loops],
+            "conversion_surface_requirements": [cr.model_dump(mode="json") for cr in conversion],
+        }
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote requirements[/green] {out}")
+    _print_distribution_requirements(list(loops), list(conversion))
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

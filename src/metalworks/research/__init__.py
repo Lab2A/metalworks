@@ -26,6 +26,9 @@ from metalworks.research.distribution import (
     build_data_asset,
     build_geo_plan,
     citability_probes,
+    conversion_surface_requirement,
+    distribution_requirements,
+    loop_requirements,
     participation_targets,
 )
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
@@ -56,8 +59,11 @@ __all__ = [
     "build_logo_set",
     "build_positioning_brief",
     "citability_probes",
+    "conversion_surface_requirement",
+    "distribution_requirements",
     "ideate_from_idea",
     "ideate_from_report",
+    "loop_requirements",
     "participation_targets",
     "render_design_md",
     "render_design_preview_html",

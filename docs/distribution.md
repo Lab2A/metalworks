@@ -192,3 +192,56 @@ LLM only writes the title and the per-row labels; it never touches a count, a li
 
 Data reports take ~3 months to a first citation — methodology rigor is what earns it. metalworks
 generates the asset; a human decides where to publish it.
+
+## Distribution → build requirements
+
+Two distribution decisions are not marketing tactics bolted on after the fact — they are designed
+INTO the product, so they have to be emitted as **build requirements** that feed
+[the build spec](/docs/build-spec). Strategy runs *before* the build, so the build ships the loop
+machinery and the conversion destination from day one rather than discovering they're missing
+later. Notion's public-page SEO underperformed precisely because the build lacked SSR + a sitemap;
+a watermark loop is worthless without a branded public viewer and badge-gating.
+
+<CodeGroup>
+
+```text Claude Code
+/distribution-requirements
+```
+
+```python Python
+strategy = mw.channel_strategy(research)
+loops, conversion = mw.distribution_requirements(research)   # routes the strategy internally
+
+for lr in loops:
+    print(lr.loop_kind, "→", lr.build_requirements)          # e.g. watermark → public_share_urls, …
+for cr in conversion:
+    print(cr.destination, "—", cr.funnel_job)                # e.g. landing_page — convert the …
+
+# feed them into the spec so it records what distribution decided
+spec = mw.build_spec(research, distribution_requirements=(loops, conversion))
+```
+
+```bash CLI
+metalworks distribution requirements <report-id>
+```
+
+</CodeGroup>
+
+You get back two lists:
+
+- **`loop_requirements`** — one `LoopRequirement` per selected `embedded_loop` channel. Its
+  `loop_kind` (`watermark` / `ugc_seo` / `referral` / `free_tool` / `oss` / `single_player`) maps
+  DETERMINISTICALLY to a fixed set of `build_requirements` (watermark ⇒ `public_share_urls` +
+  `branded_viewer` + `badge_gating`; UGC-SEO ⇒ `ssr_public_pages` + `sitemap`; single-player ⇒
+  `solo_aha_before_invite`), and its `rationale` traces to the channel's grounded `routing_signal`
+  — never an invented feature. No embedded-loop channel selected → no loop requirements.
+- **`conversion_surface_requirements`** — always one `ConversionSurfaceRequirement`. Channels
+  create attention, and attention with no surface to catch it leaks out, so the build must include
+  a **conversion destination**: its `destination`, its `funnel_job`, and the concrete
+  `build_requirements` it must ship. This re-opens the marketing-site question from the right side
+  — not cite-or-die marketing copy, but "the build must include a place to convert, here's its job
+  per the funnel."
+
+Pass the tuple to `build_spec(..., distribution_requirements=(loops, conversion))` and the
+resulting `BuildSpec` records them on `loop_requirements` / `conversion_surface_requirements`. The
+default (no tuple passed) leaves the spec unchanged.
