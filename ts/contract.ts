@@ -827,6 +827,30 @@ export interface ChannelStrategy {
   funnel_note: string;
 }
 
+export interface AssetPart {
+  /** Which channel-shaped span this is — tagline | maker_comment | gallery_caption | title | first_comment | tweet | carousel_slide | … */
+  role: string;
+  /** The copy for this span (appears verbatim in the asset body). */
+  text: string;
+}
+
+export interface ChannelAsset {
+  /** The channel this asset is for (matches Channel.name). */
+  channel_name: string;
+  /** The channel's surface type — which shaped the parts. */
+  surface_type: ChannelSurfaceType;
+  /** Where in the funnel this asset acts (carried from the channel). */
+  funnel_stage: "awareness" | "consideration" | "conversion" | "retention";
+  /** The concatenated/back-compat copy; parts' text + claim spans index into it. */
+  body: string;
+  /** The channel-shaped spans (e.g. PH: tagline + maker_comment + captions). */
+  parts?: AssetPart[];
+  /** The per-channel CTA / conversion ask — persuasive, not grounded. Never an 'upvote us' ask. */
+  offer?: string;
+  /** Grounded DEMAND/factual claims only — each resolves against report.evidence; persuasive hooks/CTAs are free and not listed here. */
+  claim_citations?: ClaimCitation[];
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;

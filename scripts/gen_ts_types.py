@@ -35,12 +35,14 @@ sys.path.insert(0, str(_REPO / "src"))
 
 from metalworks.contract import (  # noqa: E402
     Assessment,
+    AssetPart,
     AudienceAttribute,
     AudienceProfile,
     BuildPersona,
     BuildSpec,
     CandidateWedge,
     Channel,
+    ChannelAsset,
     ChannelStrategy,
     ChannelSurfaceType,
     CitationRef,
@@ -190,6 +192,8 @@ MODELS: list[type[BaseModel]] = [
     ClaimCitation,
     Channel,
     ChannelStrategy,
+    AssetPart,
+    ChannelAsset,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

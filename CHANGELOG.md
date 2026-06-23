@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Channel-shaped distribution assets (D4) — relaxed grounding, platform invariants, offer/CTA.**
+  A new `distribution assets` surface drafts channel-SHAPED, drafting-only launch copy off a
+  finished report and its channel strategy: one `ChannelAsset` per selected channel, broken into
+  channel-native `AssetPart`s by the channel's surface (Product Hunt = tagline + authentic maker
+  comment + gallery captions; Show HN = plain title + technical first comment; X = a numbered tweet
+  thread; LinkedIn = a carousel; default = title + body). The old flat `LaunchAsset.body: str` is
+  gone — a thread isn't a string. Grounding is **relaxed** on purpose: only DEMAND/factual claims
+  are held to no-cite-no-claim (each resolves to a real Reddit quote via `verbatim_match` and emits
+  a `ClaimCitation`, unresolved ones dropped), while persuasive hooks, taglines and the per-channel
+  `offer` (the CTA) are FREE craft — over-grounding the copy was a category error. Platform
+  invariants are enforced deterministically: never an "upvote us" ask (a guard strips it),
+  native-first (no link in the hook), founder-voiced. Available on all four surfaces:
+  `mw.channel_assets(...)`, `metalworks distribution assets <report-id>`, the `distribution_assets`
+  MCP tool (tool count 28 → 29), and the `distribution-assets` skill. Additive contract: the new
+  `AssetPart` + `ChannelAsset` models. (#102)
+
 - **Distribution channel strategy (D2) — entity→channel routing, test→focus.** A new
   `distribution strategy` surface routes a finished demand report's *real named entities +
   signals* into the structured channel space and emits a small set of **channel experiments**

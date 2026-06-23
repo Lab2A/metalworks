@@ -19,6 +19,7 @@ channel experiments.
 
 from __future__ import annotations
 
+from metalworks.research.distribution.assets import build_channel_assets
 from metalworks.research.distribution.channels import (
     build_channel_strategy,
     classify_product,
@@ -27,6 +28,7 @@ from metalworks.research.distribution.channels import (
 )
 
 __all__ = [
+    "build_channel_assets",
     "build_channel_strategy",
     "classify_product",
     "extract_channel_signals",
