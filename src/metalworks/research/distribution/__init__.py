@@ -27,6 +27,7 @@ from metalworks.research.distribution.channels import (
     select_channels,
 )
 from metalworks.research.distribution.data_asset import build_data_asset
+from metalworks.research.distribution.engage import participation_reply
 from metalworks.research.distribution.geo import (
     answer_briefs,
     build_geo_plan,
@@ -54,6 +55,7 @@ __all__ = [
     "distribution_requirements",
     "extract_channel_signals",
     "loop_requirements",
+    "participation_reply",
     "participation_targets",
     "plan_distribution",
     "rerank_from_results",

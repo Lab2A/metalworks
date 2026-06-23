@@ -124,3 +124,23 @@ def test_ai_tell_list_has_single_definition() -> None:
 
     # No module other than stylebook defines its own AI-tell phrase list.
     assert not hasattr(compliance, "_AI_TELLS")
+
+
+def test_upvote_guard_has_single_definition() -> None:
+    # D9 consolidation: the no-"upvote" platform invariant lives in exactly one
+    # place — reddit.stylebook — so there is ONE voice system. The Distribution
+    # channel-assets path (D4) and the D9 participation arm both import THIS guard;
+    # guard against a second hand-rolled copy reappearing in assets.py.
+    from metalworks.reddit import stylebook
+    from metalworks.research.distribution import assets
+
+    # D4's channel assets reuse the shared guard — same object, not a copy.
+    assert assets._strip_upvote_ask is stylebook.strip_upvote_ask  # noqa: SLF001
+    # The old private regexes are gone from assets.py (no second source).
+    assert not hasattr(assets, "_UPVOTE_RE")
+    assert not hasattr(assets, "_UPVOTE_SENTENCE_RE")
+
+    # The guard strips the whole upvote-asking sentence, leaving the rest intact.
+    cleaned = stylebook.strip_upvote_ask("Useful tool. Please upvote this. Thanks.")
+    assert "upvote" not in cleaned.lower()
+    assert "Useful tool." in cleaned and "Thanks." in cleaned

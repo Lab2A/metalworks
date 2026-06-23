@@ -453,6 +453,42 @@ def distribution_geo(report_id: str, store_path: str | None = None) -> ToolResul
 
 
 @guard
+def distribution_engage(
+    report_id: str,
+    permalink: str,
+    why: str,
+    *,
+    community: str = "",
+    suggested_angle: str = "",
+    voice: str | None = None,
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat key). Distribution's participation/execution arm (D9) — the one channel
+    metalworks can OPERATE, not just plan. Takes a D6 participation target (a real thread:
+    its ``permalink`` + ``why`` + ``suggested_angle``, e.g. from distribution_geo) and drafts
+    a DISCLOSED, founder-voiced reply for that exact thread, reusing the Reddit reply machinery
+    + the single voice system's no-upvote / native-first / no-AI-tell invariants, then runs the
+    shared deterministic honesty gate (heuristic_check) over it. Returns the drafted reply, the
+    compliance verdict, and the posting-gated flags. POSTING STAYS GATED — a human posts via
+    reddit_post_comment (drafting only). Needs a chat-model key."""
+    from metalworks.contract import ParticipationTarget
+    from metalworks.research import participation_reply
+
+    report = _report_or_not_found(report_id, store_path)
+    if isinstance(report, dict):
+        return report
+    target = ParticipationTarget(
+        community=community,
+        permalink=permalink,
+        why=why,
+        suggested_angle=suggested_angle,
+    )
+    deps = _build_deps(store_path)
+    reply = participation_reply(deps, report, target, voice=voice)
+    return {"participation_reply": reply.model_dump(mode="json")}
+
+
+@guard
 def distribution_requirements(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Emit the distribution → build requirements (D3) for a stored
     report — the embedded loops + conversion surface distribution designs INTO the product,

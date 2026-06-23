@@ -41,6 +41,8 @@ if TYPE_CHECKING:
         LogoSet,
         LoopRequirement,
         Opportunity,
+        ParticipationReply,
+        ParticipationTarget,
         Persona,
         PositioningBrief,
         RedditComment,
@@ -457,6 +459,28 @@ class Metalworks:
         from metalworks.research import build_geo_plan
 
         return build_geo_plan(self.deps, _demand(research))
+
+    def distribution_engage(
+        self,
+        research: Research | DemandReport,
+        target: ParticipationTarget,
+        *,
+        voice: str | None = None,
+    ) -> ParticipationReply:
+        """Distribution (D9) — the participation/execution arm. The one channel metalworks
+        can OPERATE rather than merely plan: it takes a D6
+        :class:`~metalworks.contract.distribution.ParticipationTarget` (a real thread from the
+        report's permalinks) and drafts a **disclosed, founder-voiced reply** for that exact
+        thread, reusing the Reddit reply machinery + the single voice system's no-upvote /
+        native-first / no-AI-tell invariants, then runs the shared deterministic honesty gate
+        (``heuristic_check``) over it. The returned
+        :class:`~metalworks.contract.distribution.ParticipationReply` carries the compliance
+        verdict and references the target's thread. POSTING STAYS GATED — ``requires_human`` /
+        ``posting_gated`` are always true; a human posts via ``reddit.post`` /
+        ``reddit_post_comment``. DRAFTING ONLY — never posts."""
+        from metalworks.research import participation_reply
+
+        return participation_reply(self.deps, _demand(research), target, voice=voice)
 
     def data_asset(
         self,

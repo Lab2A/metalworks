@@ -91,6 +91,7 @@ from metalworks.contract import (  # noqa: E402
     LoopRequirement,
     MarketSizing,
     Opportunity,
+    ParticipationReply,
     ParticipationTarget,
     Persona,
     PersonaSet,
@@ -233,6 +234,9 @@ MODELS: list[type[BaseModel]] = [
     ComplianceVerdict,
     LintViolation,
     PostLintVerdict,
+    # participation/execution arm (D9) — drafted, compliance-gated reply for a target
+    # (after ComplianceVerdict, which it embeds).
+    ParticipationReply,
     RedditPost,
     RedditComment,
     SubredditIntel,

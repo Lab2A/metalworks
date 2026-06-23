@@ -54,6 +54,7 @@ from metalworks.contract.distribution import (
     DistributionPlan,
     GeoPlan,
     LoopRequirement,
+    ParticipationReply,
     ParticipationTarget,
     ProductType,
     Push,
@@ -229,6 +230,8 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "CitabilityProbe",
     "AnswerBrief",
     "GeoPlan",
+    # Participation/execution arm (D9) — drafted, compliance-gated reply for a target.
+    "ParticipationReply",
     # Distribution → build requirements (D3) — embedded loops + conversion surface.
     "LoopRequirement",
     "ConversionSurfaceRequirement",

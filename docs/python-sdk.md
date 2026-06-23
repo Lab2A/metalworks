@@ -229,6 +229,7 @@ def channel_strategy(self, research, positioning=None) -> ChannelStrategy: ...
 def distribution_plan(self, research, positioning=None) -> DistributionPlan: ...
 def channel_metrics(self, research, positioning=None) -> list[ChannelMetric]: ...
 def geo(self, research) -> GeoPlan: ...
+def distribution_engage(self, research, target, *, voice=None) -> ParticipationReply: ...
 ```
 
 `channel_strategy` routes the report's real named entities + signals into **test→focus** channel
@@ -246,7 +247,13 @@ GEO / LLM-citability stream (D6): **participation targets** (real threads to eng
 report's permalinks), **citability probes** (conversational queries to test you're cited, from the
 cluster claims), and answer-first **answer briefs** (grounded — each `evidence_refs` resolves against
 `report.evidence`, `stat_anchors` carry the cluster's real counts, ungrounded answers dropped).
-All are **drafting only** — nothing posts.
+`distribution_engage` is the **participation/execution arm** (D9) — the one channel metalworks can
+OPERATE rather than merely plan: it takes one of `geo`'s `participation_targets` (a real thread) and
+drafts a disclosed, founder-voiced reply for that exact thread, reusing the Reddit reply machinery +
+the single voice system's invariants (no upvote ask, native-first, no AI tells), then runs the shared
+honesty gate (`heuristic_check`) over it — returning a `ParticipationReply` (the draft + the compliance
+verdict + `requires_human` / `posting_gated`, both always true). All are **drafting only** — nothing
+posts; a human posts a participation reply through the gated `mw.reddit.post(...)` path.
 
 ```python
 dist = mw.distribution_plan(research)
@@ -260,6 +267,11 @@ for t in plan.participation_targets:
     print(t.community, t.permalink, "—", t.why)
 for b in plan.answer_briefs:
     print(b.question, b.stat_anchors)
+
+# the execution arm: engage one of the GEO targets (drafting only, gated)
+reply = mw.distribution_engage(research, plan.participation_targets[0])
+print(reply.compliance.pass_, reply.community)
+print(reply.draft)
 ```
 
 ### Launch & Grow stages

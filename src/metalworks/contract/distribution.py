@@ -34,6 +34,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from metalworks.contract.evidence import EvidenceRef
+from metalworks.contract.reddit import ComplianceVerdict
 
 
 class ClaimCitation(BaseModel):
@@ -459,6 +460,51 @@ class GeoPlan(BaseModel):
     answer_briefs: list[AnswerBrief] = Field(
         default_factory=list[AnswerBrief],
         description="Answer-first grounded briefs; each resolves against report.evidence.",
+    )
+
+
+class ParticipationReply(BaseModel):
+    """A drafted, compliance-gated reply for one D6 participation target — the
+    execution arm of Distribution (D9).
+
+    The GEO participation stream (:class:`ParticipationTarget`) names *which*
+    thread to engage; this is metalworks ACTUALLY engaging it — the one channel
+    metalworks can operate rather than merely plan. The Reddit engagement module
+    (``metalworks.reddit`` + the discovery reply seam) drafts a disclosed,
+    founder-voiced reply for the target's exact ``permalink``, then the shared
+    deterministic honesty gate (``heuristic_check``) runs over it: ``compliance``
+    carries the verdict, and the upvote-ask / native-first / no-AI-tell platform
+    invariants (D4's voice system) are enforced on the same text. ``draft`` is
+    that vetted text; it references the target's thread (``community`` +
+    ``permalink``) so the human reviewer can place it.
+
+    POSTING STAYS GATED. ``requires_human`` and ``posting_gated`` default true and
+    are never flipped here — this object is a *draft for review*, never a posted
+    comment. A human posts it via the triple-gated ``reddit_post_comment`` path
+    (operator opt-in + a confirm-token over this exact text + a re-run of the
+    gate). DRAFTING ONLY.
+    """
+
+    community: str = Field(
+        description="The real community the target thread lives in, e.g. 'r/SideProject'."
+    )
+    permalink: str = Field(
+        description="The target thread's verbatim permalink — the reply is for THIS thread."
+    )
+    draft: str = Field(
+        description="The disclosed, founder-voiced reply text, vetted by the compliance gate."
+    )
+    compliance: ComplianceVerdict = Field(
+        description="The deterministic honesty-gate verdict (heuristic_check) over `draft`."
+    )
+    requires_human: bool = Field(
+        default=True,
+        description="Always true — a human reviews and posts; metalworks drafts, it never posts.",
+    )
+    posting_gated: bool = Field(
+        default=True,
+        description="Always true — posting is gated behind the explicit human reddit_post_comment "
+        "path (drafting only).",
     )
 
 
