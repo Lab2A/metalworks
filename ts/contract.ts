@@ -917,6 +917,8 @@ export interface ChannelAsset {
   offer?: string;
   /** Grounded DEMAND/factual claims only — each resolves against report.evidence; persuasive hooks/CTAs are free and not listed here. */
   claim_citations?: ClaimCitation[];
+  /** The deterministic honesty-gate verdict (heuristic_check) over `body` — the same signal D9's ParticipationReply carries. A best-effort read, never a blocker; None when the check didn't run. */
+  compliance?: ComplianceVerdict | null;
 }
 
 export interface LoopRequirement {

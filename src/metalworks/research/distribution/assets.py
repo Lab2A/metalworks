@@ -43,6 +43,7 @@ from metalworks.contract import (
     ChannelAsset,
     ChannelSurfaceType,
     ClaimCitation,
+    ComplianceVerdict,
     DemandReport,
     EvidenceRef,
     ResolvedCitation,
@@ -151,11 +152,23 @@ _DEFAULT_SHAPE = _ShapeSpec(
 def _shape_for(channel: Channel) -> _ShapeSpec:
     """Pick the channel-native part shape for a channel.
 
-    LinkedIn routes to a carousel regardless of its surface_type; otherwise the
-    surface_type selects the shape, falling back to title + body.
+    Two channels are special-cased BY NAME rather than by surface_type, because
+    their native shape doesn't map 1:1 to the surface they route on:
+
+    - ``linkedin`` routes to a carousel regardless of its surface_type.
+    - ``show_hn`` is a ``launch_platform`` channel (D2), but a Show HN is NOT a
+      Product Hunt launch — it's a plain title + a technical first comment with NO
+      superlatives. Without this case it would draw the LAUNCH_PLATFORM (Product
+      Hunt) shape and the Show-HN shape (keyed to EARNED_MEDIA, which no channel
+      emits) would be unreachable.
+
+    Otherwise the surface_type selects the shape, falling back to title + body.
     """
-    if "linkedin" in channel.name.lower():
+    name = channel.name.lower()
+    if "linkedin" in name:
         return _CAROUSEL_SHAPE
+    if name == "show_hn":
+        return _SHAPES[ChannelSurfaceType.EARNED_MEDIA]
     return _SHAPES.get(channel.surface_type, _DEFAULT_SHAPE)
 
 
@@ -360,6 +373,14 @@ def _build_one_asset(
     body = "\n\n".join(p.text for p in parts)
     offer = _strip_upvote_ask(draft.offer.strip())
     citations = _ground_claims(report, body, draft.claims)
+    # Best-effort compliance signal on the assembled body, surfaced on the asset
+    # (the same ComplianceVerdict D9's ParticipationReply carries). Never a
+    # blocker — a failed verdict is informational, the asset still ships.
+    compliance: ComplianceVerdict | None = None
+    with contextlib.suppress(Exception):
+        from metalworks.reddit import heuristic_check
+
+        compliance = heuristic_check(body)
     return ChannelAsset(
         channel_name=channel.name,
         surface_type=channel.surface_type,
@@ -368,6 +389,7 @@ def _build_one_asset(
         parts=parts,
         offer=offer,
         claim_citations=citations,
+        compliance=compliance,
     )
 
 
@@ -389,17 +411,15 @@ def build_channel_assets(
     report's verbatim quotes (no-cite-no-claim, unresolved dropped) while
     persuasive hooks and the per-channel ``offer`` are free; the platform
     invariants (no upvote ask, native-first, founder voice) are enforced
-    deterministically. A channel whose draft fails or yields no usable parts is
-    skipped, never fatal. DRAFTING ONLY — never posts.
+    deterministically. Each asset also carries a best-effort ``compliance``
+    verdict (``heuristic_check`` over its body — the same signal D9's
+    ``ParticipationReply`` carries); it's informational, never a blocker. A
+    channel whose draft fails or yields no usable parts is skipped, never fatal.
+    DRAFTING ONLY — never posts.
     """
     assets: list[ChannelAsset] = []
     for channel in channels:
         asset = _build_one_asset(deps, report, positioning, channel)
         if asset is not None:
-            # Best-effort compliance signal on the assembled body; never a blocker.
-            with contextlib.suppress(Exception):
-                from metalworks.reddit import heuristic_check
-
-                heuristic_check(asset.body)
             assets.append(asset)
     return assets
