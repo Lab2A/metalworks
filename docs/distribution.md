@@ -245,3 +245,54 @@ You get back two lists:
 Pass the tuple to `build_spec(..., distribution_requirements=(loops, conversion))` and the
 resulting `BuildSpec` records them on `loop_requirements` / `conversion_surface_requirements`. The
 default (no tuple passed) leaves the spec unchanged.
+
+## The distribution plan — pushes + streams
+
+A distribution plan is not a flat list of channels with arbitrary `T+2h` spacing — that toy
+even-spacing was an LLM-invented constant masquerading as a schedule. A plan is **pushes** (the
+spike channels placed into concentrated launch moments) and **streams** (the compounding channels
+run continuously). The split falls straight out of the channel's own `cadence` axis: `spike` →
+push, `compounding` → stream — the same axis that made the old launch-vs-growth pillar split
+unnecessary.
+
+The timing of every push is **read from a deterministic playbook table**, sourced from the channel
+playbooks in the research — so it is reproducible + citable, the opposite of an invented hour:
+
+| Channel | Playbook timing |
+| --- | --- |
+| Product Hunt | Day 1, 12:01am PT (Tue/Wed) |
+| Show HN / Launch HN | Day 3-4, Tue-Thu 8-10am PT |
+| X / Twitter thread | Day 2, 9-11am PT (weekday) |
+| LinkedIn post | Day 2, 8-10am local (Tue-Thu) |
+
+The sequencer enforces the playbook's rules: at most **one all-day-attention channel per launch
+day**, and **never Product Hunt and a big HN push on the same day** — if the report selected both,
+they are staggered onto separate days. It frames the run as a campaign: a **pre-launch warming**
+step before Day 1, the staggered **push week**, and a **30-day post step** after (where the early
+channel tests resolve into a single channel to concentrate on — test→focus — and a winning push
+becomes a repeatable one). Each spark-requiring channel carries its `spark_channel` (the
+spark→flywheel edge: the push that ignites the amplifier).
+
+<CodeGroup>
+
+```text Claude Code
+/distribution-plan
+```
+
+```python Python
+dist = mw.distribution_plan(research)          # routes the strategy internally
+for p in dist.pushes:
+    print(p.timing, "—", p.channel_name, "→ sparks", p.spark_channel)
+for s in dist.streams:
+    print(s.channel_name, "—", s.cadence_note)
+```
+
+```bash CLI
+metalworks distribution plan <report-id>
+```
+
+</CodeGroup>
+
+It is **pure + deterministic** — no LLM, no network — over the already-selected channels. Every
+push is `requires_human=True` and `posting_gated=True`: metalworks plans + drafts the sequence, a
+human executes each moment. **DRAFTING + PLANNING ONLY — nothing here posts.**

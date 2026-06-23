@@ -65,6 +65,7 @@ from metalworks.contract import (  # noqa: E402
     DesignReview,
     DesignSystem,
     DiscoveryContext,
+    DistributionPlan,
     EvidenceBackedChoice,
     EvidenceRecord,
     EvidenceRef,
@@ -99,6 +100,7 @@ from metalworks.contract import (  # noqa: E402
     PriceHypothesis,
     PricingTier,
     ProductType,
+    Push,
     RedditComment,
     RedditPost,
     ReportSummary,
@@ -111,6 +113,7 @@ from metalworks.contract import (  # noqa: E402
     SignalStrength,
     SlotPlan,
     SourceMapEntry,
+    Stream,
     StrengthClaim,
     StyleFinding,
     SubredditIntel,
@@ -212,6 +215,10 @@ MODELS: list[type[BaseModel]] = [
     # distribution → build requirements (D3) — embedded loops + conversion surface
     LoopRequirement,
     ConversionSurfaceRequirement,
+    # distribution plan (D7) — pushes (sequenced moments) + streams (continuous)
+    Push,
+    Stream,
+    DistributionPlan,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

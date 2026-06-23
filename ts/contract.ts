@@ -939,6 +939,45 @@ export interface ConversionSurfaceRequirement {
   rationale: string;
 }
 
+export interface Push {
+  /** The spike channel this push fires, matching the Channel.name it came from. */
+  channel_name: string;
+  /** The channel's surface type (carried from the channel). */
+  surface_type: ChannelSurfaceType;
+  /** When to fire this push, READ from the deterministic playbook table — e.g. 'Day 1, 12:01am PT (Tue/Wed)'. Never an LLM-invented hour. */
+  timing: string;
+  /** The amplifier channel this push ignites, when it carries a spark→flywheel edge (else null). */
+  spark_channel?: string | null;
+  /** The concrete human action for this moment (what to do), e.g. 'Post the Show HN with a technical maker first comment.' */
+  action: string;
+  /** Why this push is placed here — the playbook reasoning / test→focus framing. */
+  rationale: string;
+  /** Always true — a human executes the push; metalworks plans, it does not post. */
+  requires_human?: boolean;
+  /** Always true — posting is gated behind explicit human action (drafting only). */
+  posting_gated?: boolean;
+}
+
+export interface Stream {
+  /** The compounding channel this stream runs, matching the Channel.name. */
+  channel_name: string;
+  /** The channel's surface type (carried from the channel). */
+  surface_type: ChannelSurfaceType;
+  /** How this channel runs continuously — the compounding rhythm, not a one-time moment. */
+  cadence_note: string;
+  /** Why this channel is a stream and what it compounds toward, grounded in the channel's routing signal. */
+  rationale: string;
+}
+
+export interface DistributionPlan {
+  /** The source report this plan was sequenced from. */
+  report_id: string;
+  /** The spike channels sequenced into concentrated, staggered launch moments. */
+  pushes?: Push[];
+  /** The compounding channels that run continuously. */
+  streams?: Stream[];
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;

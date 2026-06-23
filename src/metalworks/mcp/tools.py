@@ -490,6 +490,36 @@ def distribution_requirements(report_id: str, store_path: str | None = None) -> 
 
 
 @guard
+def distribution_plan(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Sequence a stored report's channels into a distribution plan (D7) —
+    pushes (spike channels placed into concentrated launch moments) + streams (compounding
+    channels run continuously). Routes the report into its channel strategy, then sequences
+    DETERMINISTICALLY from a playbook timing table (Product Hunt 12:01am PT Tue/Wed; Show HN
+    Tue-Thu 8-10am; …) — never invented hours — enforcing one all-day-attention channel per day,
+    never Product Hunt + a big HN push the same day, with pre-launch warming + a 30-day post step,
+    and pairing each spark-requiring channel with its spark. Drafting + planning only — every push
+    is human-executed. Needs a chat-model key (the channel-strategy classify call)."""
+    from metalworks import config
+    from metalworks.research import build_channel_strategy, plan_distribution
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    strategy = build_channel_strategy(deps, report)
+    plan = plan_distribution(report, strategy.channels)
+    return {"plan": plan.model_dump(mode="json")}
+
+
+@guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
     the competitor map PLUS an empirical existing-solutions scan (real shipped

@@ -10,6 +10,27 @@ contracts may change in any release.
 
 ### Added
 
+- **Distribution plan (D7) — pushes (sequenced moments) + streams (continuous), deterministically
+  sequenced.** A new `distribution plan` surface replaces the old toy even-spacing plan (`T+{i*2}h`
+  — an LLM-invented constant masquerading as a schedule). A distribution plan is now **pushes** (the
+  `spike`-cadence channels placed into concentrated launch moments) + **streams** (the
+  `compounding`-cadence channels run continuously) — the split falls straight out of the channel's
+  own `cadence` axis. `plan_distribution(report, channels, prior_results=None)` is PURE +
+  DETERMINISTIC (no LLM, no network): each push's `timing` is READ from a module-level **playbook
+  table** sourced from the research (Product Hunt → "Day 1, 12:01am PT (Tue/Wed)"; Show HN → "Day
+  3-4, Tue-Thu 8-10am PT"; an X thread → its window) — reproducible + citable, never an invented
+  hour. The sequencer enforces the playbook's rules: at most **one all-day-attention channel per
+  launch day**, and **never Product Hunt and a big HN push on the same day** (they stagger onto
+  separate days); it opens with a **pre-launch warming** step, runs the staggered **push week**, and
+  closes with a **30-day post step** (where the early channel TESTS resolve into a single channel to
+  concentrate on — test→focus — and a winning push becomes a repeatable one). Each spark-requiring
+  channel carries its `spark_channel` (the spark→flywheel edge). `prior_results` is accepted for the
+  D8 re-rank (threaded through, unused now). Available on all four surfaces:
+  `mw.distribution_plan(...)`, `metalworks distribution plan <report-id>`, the `distribution_plan`
+  MCP tool (tool count 32 → 33), and the `distribution-plan` skill. DRAFTING + PLANNING ONLY —
+  every push is `requires_human=True` + `posting_gated=True`; nothing posts. Additive contract: the
+  new `Push`, `Stream`, and `DistributionPlan` models. (#105)
+
 - **Distribution → build requirements (D3) — embedded loops + the conversion surface feed
   build-spec.** Two distribution decisions are designed INTO the product, not bolted on as
   marketing tactics, so they are now emitted as BUILD requirements that feed the build spec.

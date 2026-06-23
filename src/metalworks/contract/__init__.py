@@ -49,10 +49,13 @@ from metalworks.contract.distribution import (
     ConversionSurfaceRequirement,
     DataReportAsset,
     DataReportItem,
+    DistributionPlan,
     GeoPlan,
     LoopRequirement,
     ParticipationTarget,
     ProductType,
+    Push,
+    Stream,
 )
 from metalworks.contract.evidence import (
     EvidenceRecord,
@@ -227,6 +230,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Distribution → build requirements (D3) — embedded loops + conversion surface.
     "LoopRequirement",
     "ConversionSurfaceRequirement",
+    # Distribution plan (D7) — pushes (sequenced moments) + streams (continuous).
+    "Push",
+    "Stream",
+    "DistributionPlan",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",
