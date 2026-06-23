@@ -360,3 +360,55 @@ metalworks distribution measure <report-id>
 
 The metric + instrumentation are deterministic; the human measures and records — metalworks never
 watches traffic for you. **PLANNING ONLY — it defines what to measure; nothing here posts.**
+
+## The participation/execution arm — the one channel metalworks can OPERATE
+
+Everything above PLANS and DRAFTS. This is the one channel metalworks can actually **operate**, not
+merely plan — and it is the moat the whole Distribution thesis rests on (*metalworks knows the real
+threads*). The Reddit engagement capability (`metalworks.reddit`: OAuth, search, subreddit rules,
+rate-limiting, inbox, the `heuristic_check` compliance gate, the voice stylebook) is **re-homed here
+as Distribution's execution arm** for the community-native channel + the GEO participation stream.
+The `reddit_*` tools keep working exactly as before — this re-homing adds a frame and a wiring, it
+removes nothing.
+
+The wiring: the GEO stream (above) produces **which** threads to engage — its
+`participation_targets`, each a real `permalink` + a grounded `why` + a `suggested_angle`. The
+execution arm engages one of them: `mw.distribution_engage(research, target)` drafts a **disclosed,
+founder-voiced reply for that exact thread**, reusing the Reddit reply machinery and then running the
+deterministic honesty gate (`heuristic_check`) over the result. The platform invariants — no "upvote"
+ask, native-first, no AI tells — are the **single voice system** the channel-shaped launch assets
+(above) also enforce: one stylebook (`metalworks.reddit.stylebook`), not two.
+
+**Posting stays gated.** The returned `ParticipationReply` carries the draft, the compliance verdict,
+and `requires_human` / `posting_gated` (both always true). metalworks drafts; a **human reviews and
+posts** through the triple-gated path (`METALWORKS_ALLOW_POSTING=1` + a confirm-token over the exact
+text + a re-run of the gate). DRAFTING ONLY — nothing here posts automatically.
+
+<CodeGroup>
+
+```text Claude Code
+/distribution-engage
+```
+
+```python Python
+geo = mw.geo(research)                       # D6 — which threads to engage
+target = geo.participation_targets[0]        # a real thread, grounded `why`
+reply = mw.distribution_engage(research, target)
+print(reply.compliance.pass_, reply.community)
+print(reply.draft)                           # disclosed, founder-voiced, gated
+# a human posts it (gated) via `mw.reddit.post(...)` / the reddit_post_comment path
+```
+
+```bash CLI
+metalworks distribution engage <report-id> \
+  --permalink "https://reddit.com/r/SideProject/comments/.../x" \
+  --why "what the audience is asking there" \
+  --community r/SideProject --angle "answer first, then disclose"
+```
+
+</CodeGroup>
+
+This is distinct from `/draft-reply` (the standalone `generate_reply` tool): that drafts a reply for
+**any thread URL you paste**, report-free; the execution arm drafts for a **report-selected GEO
+target**, grounded in the demand the report measured. They share the same honesty gate
+(`heuristic_check`) and the same voice system by design — different entry points, one moat.

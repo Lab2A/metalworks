@@ -6,6 +6,17 @@ description: "Find Reddit threads worth joining and draft honest, disclosed repl
 Find real Reddit threads where your product genuinely helps, and draft honest replies in a chosen
 voice. metalworks drafts only — **you review and post; nothing is auto-posted.**
 
+<Note>
+This is metalworks' **execution arm** — the one channel it can OPERATE, not just plan. It is
+re-homed under the [Distribution](/docs/distribution) pillar as the community-native + GEO
+participation stream: the Distribution GEO stream produces *which* threads to engage
+(`participation_targets`), and `mw.distribution_engage(research, target)` /
+[`/distribution-engage`](/docs/distribution#the-participation-execution-arm-the-one-channel-metalworks-can-operate)
+drafts a disclosed reply for a report-selected target. The standalone flow on this page
+(`/draft-reply`, `mw.generate(...)`) is the report-free entry — draft a reply for **any thread URL**.
+Both share the same compliance gate and the same voice stylebook.
+</Note>
+
 A few terms used in the code below:
 
 - A **persona** (`Persona`) is a real person whose voice a reply is written in — a voice rubric plus

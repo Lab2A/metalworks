@@ -10,6 +10,31 @@ contracts may change in any release.
 
 ### Added
 
+- **Reddit engagement re-homed as Distribution's participation/execution arm (D9).** The Reddit
+  engagement module (`metalworks.reddit`: OAuth, search, subreddit rules, rate-limiting, inbox, the
+  `heuristic_check` compliance gate, the voice stylebook) + `generate_reply` is the **one channel
+  metalworks can OPERATE rather than merely plan** — the moat the Distribution thesis rests on. It is
+  re-homed under Distribution as the execution arm for the community-native + GEO participation
+  stream; the existing `reddit_*` tools keep working unchanged. A new **participation-reply
+  primitive** wires D6's targets to the engagement machinery: `participation_reply(deps, report,
+  target)` (in `research/distribution/engage.py`) takes one D6 `ParticipationTarget` (a real thread:
+  its `permalink` + `why` + `suggested_angle`) and drafts a **disclosed, founder-voiced reply for
+  that exact thread**, reusing the discovery reply seam and then running the shared deterministic
+  honesty gate (`heuristic_check`) over the result. One new contract model, `ParticipationReply`
+  (`community`, `permalink`, `draft`, `compliance`, and `requires_human` / `posting_gated` — both
+  always true). Available on all four surfaces: `mw.distribution_engage(research, target)`,
+  `metalworks distribution engage <report-id> --permalink … --why …`, the `distribution_engage` MCP
+  tool (tool count **34 → 35**), and the `distribution-engage` skill. **Voice consolidated:** the
+  no-"upvote" platform invariant (`UPVOTE_REGEX` / `strip_upvote_ask`) now lives in
+  `metalworks.reddit.stylebook` alongside the AI-tell denylist, so the channel-shaped launch assets
+  (D4) and the participation arm share ONE voice system — D4's `assets.py` imports the guard rather
+  than re-defining it. **Redundancy audit:** the standalone reply flow (`/draft-reply`,
+  `generate_reply`) is the report-free entry (draft for any pasted URL) and the participation arm is
+  the report-grounded entry (draft for a GEO-selected target); they share the same honesty gate and
+  voice system by design — complementary entries, no genuine duplication removed; `heuristic_check`
+  stays the shared gate the rest of the system leans on. **POSTING STAYS GATED** — drafting only; a
+  human posts via the triple-gated `reddit_post_comment` path.
+
 - **Closed-loop measurement (D8) — per-channel metric + instrumentation, ingest results, re-rank.**
   Everything in the Distribution pillar so far PLANS; nothing learns. D8 closes the loop: plan →
   (human executes) → record `ChannelResult`s → re-rank the next push. metalworks can't watch live

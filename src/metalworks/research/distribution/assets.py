@@ -33,7 +33,6 @@ reusable core the four surfaces call. DRAFTING ONLY — nothing here posts.
 from __future__ import annotations
 
 import contextlib
-import re
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
@@ -49,6 +48,7 @@ from metalworks.contract import (
     ResolvedCitation,
 )
 from metalworks.errors import StructuredOutputError
+from metalworks.reddit.stylebook import strip_upvote_ask
 from metalworks.research.grounding import verbatim_match
 
 if TYPE_CHECKING:
@@ -61,11 +61,11 @@ _THREAD_LEN = 4
 _CAROUSEL_LEN = 4
 _GALLERY_CAPTIONS = 2
 
-# An "upvote ask" is a platform-fatal tell on PH + HN and reads as begging
-# everywhere — never ship one. Matches "upvote", "up-vote", "up vote".
-_UPVOTE_RE = re.compile(r"\bup[\s-]?vote", re.IGNORECASE)
-# A whole sentence/line that asks for upvotes — stripped wholesale from a body.
-_UPVOTE_SENTENCE_RE = re.compile(r"[^.!?\n]*\bup[\s-]?vote[^.!?\n]*[.!?]?", re.IGNORECASE)
+# The no-"upvote" platform invariant is the ONE voice system's guard — defined in
+# `reddit.stylebook` (shared with the D9 participation/reply arm) so the
+# founder-voiced / no-upvote rule can't drift into two copies. `_strip_upvote_ask`
+# stays a module-local alias for the existing call sites.
+_strip_upvote_ask = strip_upvote_ask
 
 
 # ── Per-surface shape briefs ─────────────────────────────────────────────────
@@ -249,24 +249,8 @@ def _ground_claims(
 
 
 # ── Platform-invariant guards (deterministic) ────────────────────────────────
-
-
-def _strip_upvote_ask(text: str) -> str:
-    """Strip any 'please upvote'/'upvote us' ask from a span. Deterministic guard.
-
-    An upvote ask is platform-fatal on Product Hunt + Hacker News (both auto-detect
-    and penalize vote solicitation) and reads as begging everywhere. The model is
-    told never to write one; this backstops it. Removes the whole offending
-    sentence/line, then collapses the whitespace it leaves behind.
-    """
-    if not _UPVOTE_RE.search(text):
-        return text
-    cleaned = _UPVOTE_SENTENCE_RE.sub("", text)
-    # Collapse the gaps the removed sentence left, preserving paragraph breaks.
-    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
-    cleaned = re.sub(r"\n[ \t]+", "\n", cleaned)
-    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    return cleaned.strip()
+# `_strip_upvote_ask` is aliased to `reddit.stylebook.strip_upvote_ask` above — the
+# single voice system's no-"upvote" guard, shared with the D9 participation arm.
 
 
 def _clean_parts(drafted: list[_DraftedPart], allowed_roles: list[str]) -> list[AssetPart]:

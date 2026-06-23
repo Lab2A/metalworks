@@ -1084,6 +1084,21 @@ export interface PostLintVerdict {
   violations?: LintViolation[];
 }
 
+export interface ParticipationReply {
+  /** The real community the target thread lives in, e.g. 'r/SideProject'. */
+  community: string;
+  /** The target thread's verbatim permalink — the reply is for THIS thread. */
+  permalink: string;
+  /** The disclosed, founder-voiced reply text, vetted by the compliance gate. */
+  draft: string;
+  /** The deterministic honesty-gate verdict (heuristic_check) over `draft`. */
+  compliance: ComplianceVerdict;
+  /** Always true — a human reviews and posts; metalworks drafts, it never posts. */
+  requires_human?: boolean;
+  /** Always true — posting is gated behind the explicit human reddit_post_comment path (drafting only). */
+  posting_gated?: boolean;
+}
+
 export interface RedditPost {
   /** Reddit base36 id without the 't3_' prefix. */
   post_id: string;

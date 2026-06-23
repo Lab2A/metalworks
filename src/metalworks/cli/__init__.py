@@ -2670,6 +2670,87 @@ def distribution_geo(
     _print_geo_plan(plan)
 
 
+def _print_participation_reply(reply: object) -> None:
+    community = getattr(reply, "community", "")
+    permalink = getattr(reply, "permalink", "")
+    console.print(f"\n[bold]Participation reply[/bold] — [bold]{community}[/bold] {permalink}")
+    compliance = getattr(reply, "compliance", None)
+    passed = bool(getattr(compliance, "pass_", False))
+    label = "[green]PASS[/green]" if passed else "[red]FAIL[/red]"
+    violations = list(getattr(compliance, "violations", []) or [])
+    console.print(f"  [dim]compliance:[/dim] {label}" + (f"  {violations}" if violations else ""))
+    console.print("  [dim](drafting only — a human posts via `metalworks reddit post`)[/dim]\n")
+    console.print(getattr(reply, "draft", ""))
+
+
+@distribution_app.command("engage")
+def distribution_engage(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    permalink: Annotated[
+        str | None,
+        typer.Option("--permalink", "-p", help="The target thread's permalink (from geo)."),
+    ] = None,
+    why: Annotated[
+        str | None,
+        typer.Option("--why", help="What the audience is asking there (the target's why)."),
+    ] = None,
+    community: Annotated[
+        str, typer.Option("--community", "-c", help="The target's community, e.g. r/SideProject.")
+    ] = "",
+    angle: Annotated[
+        str, typer.Option("--angle", help="The honest, value-first angle to take.")
+    ] = "",
+    voice: Annotated[
+        str | None, typer.Option("--voice", help="A voice guideline for the reply.")
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the participation reply JSON here.")
+    ] = None,
+) -> None:
+    """Participation/execution arm (D9): draft a DISCLOSED, compliance-gated reply for one
+    GEO participation target (a real thread). DRAFTING ONLY — a human posts it (gated)."""
+    from metalworks.contract import ParticipationTarget
+    from metalworks.research import participation_reply
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    if not permalink or not why:
+        err_console.print(
+            "[red]--permalink and --why are required.[/red] "
+            "Get them from `metalworks distribution geo` (a participation target)."
+        )
+        raise typer.Exit(code=1)
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    target = ParticipationTarget(
+        community=community, permalink=permalink, why=why, suggested_angle=angle
+    )
+    console.print(f"[bold]Drafting participation reply[/bold] for {permalink}...")
+    try:
+        reply = participation_reply(deps, report, target, voice=voice)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(reply.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote participation reply[/green] {out}")
+    _print_participation_reply(reply)
+
+
 def _print_distribution_requirements(loops: list[object], conversion: list[object]) -> None:
     console.print("\n[bold]Distribution → build requirements[/bold] (D3)")
     if loops:

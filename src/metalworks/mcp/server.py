@@ -101,6 +101,29 @@ async def distribution_geo(report_id: str, store_path: str | None = None) -> dic
     return tools.distribution_geo(report_id, store_path)
 
 
+async def distribution_engage(
+    report_id: str,
+    permalink: str,
+    why: str,
+    community: str = "",
+    suggested_angle: str = "",
+    voice: str | None = None,
+    store_path: str | None = None,
+) -> dict[str, Any]:
+    """TIER 2. Distribution's participation/execution arm (D9) — draft a DISCLOSED,
+    founder-voiced, compliance-gated reply for one D6 participation target (a real thread).
+    Posting stays gated — a human posts via reddit_post_comment (drafting only) (chat key)."""
+    return tools.distribution_engage(
+        report_id,
+        permalink,
+        why,
+        community=community,
+        suggested_angle=suggested_angle,
+        voice=voice,
+        store_path=store_path,
+    )
+
+
 async def distribution_data_report(
     report_id: str, kind: str = "complaint_index", store_path: str | None = None
 ) -> dict[str, Any]:
@@ -262,6 +285,7 @@ _TOOL_WRAPPERS = (
     positioning_from_report,
     distribution_strategy,
     distribution_geo,
+    distribution_engage,
     distribution_data_report,
     distribution_assets,
     distribution_requirements,

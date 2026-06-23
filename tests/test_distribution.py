@@ -25,6 +25,8 @@ from metalworks.contract import (
     DistributionPlan,
     Fork,
     InsightCluster,
+    ParticipationReply,
+    ParticipationTarget,
     ProductType,
     ResolvedCitation,
     SignalStrength,
@@ -46,6 +48,10 @@ from metalworks.research.distribution.data_asset import (
     _ItemLabel,
     _ReportProse,
     build_data_asset,
+)
+from metalworks.research.distribution.engage import (
+    _post_from_target,
+    participation_reply,
 )
 from metalworks.research.distribution.geo import (
     _AnswerDraft,
@@ -976,6 +982,162 @@ def test_mcp_distribution_geo_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res["geo"]["report_id"] == "rpt-d2"
     assert res["geo"]["participation_targets"]
     assert res["geo"]["citability_probes"]
+
+
+# ── D9: participation/execution arm — participation_reply ────────────────────
+
+
+def _reply_chat(text: str) -> FakeChatModel:
+    """A FakeChatModel scripting the discovery reply-generation call."""
+    from metalworks.discovery.prompts import ReplyGenerationV2
+
+    chat = FakeChatModel()
+    chat.script(
+        ReplyGenerationV2,
+        ReplyGenerationV2(
+            reply_text=text,
+            account_type="founder",
+            short_description="focus timer for indie devs",
+            voice_match_self_score=0.9,
+            confidence=0.85,
+            reasoning="answers the question first and discloses the affiliation",
+        ),
+    )
+    return chat
+
+
+def _target() -> ParticipationTarget:
+    return ParticipationTarget(
+        community="r/SideProject",
+        permalink="https://reddit.com/r/SideProject/comments/1/x",
+        why="they want a jitter-free focus tool on a budget",
+        suggested_angle="answer the jitter question directly, then disclose you built one",
+    )
+
+
+def test_post_from_target_parses_thread_from_permalink() -> None:
+    post = _post_from_target(_target())
+    # subreddit + post id come off the real permalink/community, no network.
+    assert post.subreddit == "SideProject"
+    assert post.post_id == "1"
+    assert post.url == "https://reddit.com/r/SideProject/comments/1/x"
+    # the target's `why` becomes the thread's question for the generator.
+    assert "jitter-free focus tool" in post.title
+
+
+def test_participation_reply_is_gated_and_references_the_thread() -> None:
+    report = _geo_report()
+    chat = _reply_chat(
+        "I hit the same jitter problem and ended up building a tiny focus timer "
+        "for it (I made it, so grain of salt). What OS are you on?"
+    )
+    reply = participation_reply(_deps(chat), report, _target())
+    assert isinstance(reply, ParticipationReply)
+    # (c) references the target's thread.
+    assert reply.community == "r/SideProject"
+    assert reply.permalink == "https://reddit.com/r/SideProject/comments/1/x"
+    # (a) compliance-gated — the deterministic honesty gate ran and passed here.
+    assert reply.compliance.pass_ is True
+    assert reply.compliance.violations == []
+    # posting stays gated — drafting only, a human posts.
+    assert reply.requires_human is True
+    assert reply.posting_gated is True
+    assert reply.draft
+
+
+def test_participation_reply_runs_the_compliance_gate() -> None:
+    # A reply riddled with AI-tells must be FAILED by heuristic_check, proving the
+    # gate actually runs over the participation draft (not bypassed).
+    report = _geo_report()
+    chat = _reply_chat(
+        "Great question! I completely understand. Hope this helps, happy to help more."
+    )
+    reply = participation_reply(_deps(chat), report, _target())
+    assert reply.compliance.pass_ is False
+    assert reply.compliance.violations  # the AI-tells were caught
+
+
+def test_participation_reply_strips_upvote_ask() -> None:
+    # (b) no 'upvote' ask survives — the single voice system's guard strips it.
+    report = _geo_report()
+    chat = _reply_chat(
+        "I built a small focus timer after hitting the same jitter you describe; "
+        "happy to share what worked. Please upvote this if it helps you out. "
+        "What OS are you on?"
+    )
+    reply = participation_reply(_deps(chat), report, _target())
+    assert "upvote" not in reply.draft.lower()
+
+
+def test_participation_reply_empty_generation_fails_closed() -> None:
+    # The model declines (the reply seam returns None) → empty draft → the gate
+    # fails closed, never an un-vetted empty reply presented as a pass.
+    from metalworks.errors import StructuredOutputError
+
+    class _DecliningChat:
+        """A ChatModel that always declines structured output (returns None upstream)."""
+
+        model_id = "fake-declining"
+        capabilities = FakeChatModel().capabilities
+        protocol_version = FakeChatModel().protocol_version
+
+        def complete_text(self, *_a: Any, **_k: Any) -> str:
+            return ""
+
+        def complete_structured(self, *_a: Any, **_k: Any) -> Any:
+            raise StructuredOutputError("fake-declining", "model declined")
+
+    report = _geo_report()
+    deps = ResearchDeps(
+        chat=_DecliningChat(),  # type: ignore[arg-type]
+        embeddings=FakeEmbedding(),
+        corpus=MemoryStores(),
+        reader=_NullReader(),
+    )
+    reply = participation_reply(deps, report, _target())
+    assert reply.draft == ""
+    assert reply.compliance.pass_ is False
+    assert "empty" in reply.compliance.violations
+
+
+def test_mcp_distribution_engage_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_engage(
+        "nope", "https://reddit.com/r/X/comments/1/x", "they want a thing"
+    )
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_engage_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _geo_report()
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(
+        config,
+        "resolve_chat",
+        lambda *_a, **_k: _reply_chat("I built a small focus timer for this exact jitter problem."),
+    )
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_engage(
+        report.report_id,
+        "https://reddit.com/r/SideProject/comments/1/x",
+        "they want a jitter-free focus tool",
+        community="r/SideProject",
+        suggested_angle="answer first, disclose",
+    )
+    assert "participation_reply" in res
+    assert res["participation_reply"]["permalink"].endswith("/comments/1/x")
+    assert res["participation_reply"]["posting_gated"] is True
+    assert "compliance" in res["participation_reply"]
 
 
 # ── D3: distribution → build requirements ────────────────────────────────────
