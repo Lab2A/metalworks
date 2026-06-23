@@ -72,3 +72,21 @@ def verbatim_match(
         if needle in _normalize(quote.text):
             return quote
     return None
+
+
+def appears_in_corpus(entity: str, corpus_text: str) -> bool:
+    """Whether a short NAMED entity occurs verbatim in the corpus text.
+
+    The :func:`verbatim_match` cousin for *named entities* (a platform, a media
+    handle, an incumbent) rather than multi-word claim fragments: a name is often
+    one or two words, so the ``min_words`` floor doesn't apply. Both sides are
+    normalized (whitespace collapsed, curly quotes / dashes folded) and compared
+    case-insensitively, so an LLM-enriched entity is only believed when the
+    audience actually said it — the no-fabrication rule applied to enrichment.
+
+    Returns ``False`` for a blank entity.
+    """
+    needle = _normalize(entity).casefold()
+    if not needle:
+        return False
+    return needle in _normalize(corpus_text).casefold()

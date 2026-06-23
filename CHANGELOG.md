@@ -314,6 +314,28 @@ contracts may change in any release.
   non-`HackerNewsArchiveReader` reader and the `comments` kwarg, so HN always reads its **own**
   archive (the live `hackernews`, `web`, and `producthunt` factories already raised `TypeError` on
   those kwargs and needed no change).
+- **Distribution post-ship review fixes (Show HN shape, enriched-entity grounding, surfaced
+  compliance).** Three Distribution defects found in review: (1) **Show HN drew the Product Hunt
+  shape.** D2 creates the `show_hn` channel as a `launch_platform`, but `assets._shape_for` keyed the
+  Product-Hunt shape (tagline + maker_comment + gallery) to `LAUNCH_PLATFORM` and the Show-HN shape
+  (title + technical first_comment, no superlatives) to `EARNED_MEDIA` — which no channel emits — so
+  HN drafted as a PH launch and the HN shape was unreachable. `show_hn` is now special-cased **by
+  name** (exactly as `linkedin` already is) to draw the technical title + first_comment shape; its
+  `surface_type` is unchanged. (2) **Enriched entities weren't corpus-verified.** The LLM
+  enrichment pass (`channels._enrich_entities`) returned `named_platforms` / `named_media` /
+  `hated_incumbent` / `benchmark_hunger` with no check that they appear in the corpus, while the
+  contract + module docstrings claimed `routing_signal` "always traces to a real corpus entity /
+  never invents." A new `_verify_enrichment` now drops any platform / media / incumbent absent from
+  the corpus text (a normalized substring check, `grounding.appears_in_corpus` — the named-entity
+  cousin of `verbatim_match`), and `benchmark_hunger` survives only with a real benchmark cue in the
+  corpus — so an un-verified entity can no longer become a channel or populate a `routing_signal`.
+  The deterministic community grounding is unchanged. (3) **A computed compliance verdict was
+  discarded.** `build_channel_assets` ran `heuristic_check(asset.body)` under `contextlib.suppress`
+  and threw the result away; `ChannelAsset` now carries an additive `compliance: ComplianceVerdict |
+  None` field (default `None`, the same signal D9's `ParticipationReply.compliance` carries),
+  populated from that check. `ts/contract.ts` regenerated. Plus two docstring corrections (the
+  funnel-note `else` branch and `plan.plan_distribution`'s rerank note, which overstated that rerank
+  reorders spike pushes — spikes are always re-sorted by `(playbook_day, name)`).
 
 ## [0.0.5] - 2026-06-18
 

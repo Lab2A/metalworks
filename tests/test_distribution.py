@@ -263,6 +263,79 @@ def test_extract_signals_enrichment_is_best_effort() -> None:
     assert signals.named_platforms == []  # enrichment failed silently
 
 
+def test_enriched_entities_must_appear_in_the_corpus() -> None:
+    """An enriched platform NOT in the corpus is DROPPED; one that IS present survives.
+
+    The LLM enrichment is told never to invent, but the guarantee is the
+    deterministic corpus check — so a hallucinated entity can't become a channel
+    or a routing_signal, while a really-named one does.
+    """
+    # The corpus text the audience actually wrote: it names Shopify, never Acme.
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote(
+                        "I run my whole store on Shopify and need this to plug in",
+                        "https://reddit.com/r/Entrepreneur/comments/1/x",
+                        "r/Entrepreneur",
+                    )
+                ],
+            )
+        ]
+    )
+    # The LLM "enriches" one REAL platform (Shopify, present) and one INVENTED one
+    # (AcmeCorp, absent) + an incumbent the audience never named.
+    entities = _CorpusEntities(
+        named_platforms=["Shopify", "AcmeCorp"],
+        hated_incumbent="NeverNamedCo",
+        benchmark_hunger=True,  # no benchmark cue in the corpus → must be scrubbed false
+    )
+    signals = extract_channel_signals(_deps(_scripted_chat(entities=entities)), report)
+    # The verified platform survived; the invented one was dropped.
+    assert "Shopify" in signals.named_platforms
+    assert "AcmeCorp" not in signals.named_platforms
+    # The incumbent that doesn't appear in the corpus is dropped (no wedge channel for it).
+    assert signals.hated_incumbent is None
+    # benchmark_hunger isn't believed on the model's say-so without a real corpus cue.
+    assert signals.benchmark_hunger is False
+
+    # And it really gates channel selection: no marketplace channel for the phantom
+    # platform, and no wedge channel for the phantom incumbent.
+    channels = select_channels(_deps(_scripted_chat()), report, None, ProductType.CONSUMER, signals)
+    marketplace_names = [
+        c.name for c in channels if c.surface_type == ChannelSurfaceType.MARKETPLACE
+    ]
+    assert any("shopify" in n for n in marketplace_names)
+    assert not any("acmecorp" in n for n in marketplace_names)
+    assert not any(c.surface_type == ChannelSurfaceType.WEDGE_INTEGRATION for c in channels)
+    # No routing_signal anywhere names the invented entities.
+    assert all("AcmeCorp" not in c.routing_signal for c in channels)
+    assert all("NeverNamedCo" not in c.routing_signal for c in channels)
+
+
+def test_benchmark_hunger_survives_with_a_real_corpus_cue() -> None:
+    """benchmark_hunger is believed only when a benchmark cue is actually in the corpus."""
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote(
+                        "what's the average focus time people get? I want a benchmark",
+                        "https://reddit.com/r/productivity/comments/2/y",
+                        "r/productivity",
+                    )
+                ],
+            )
+        ]
+    )
+    entities = _CorpusEntities(benchmark_hunger=True)
+    signals = extract_channel_signals(_deps(_scripted_chat(entities=entities)), report)
+    assert signals.benchmark_hunger is True  # "average" / "benchmark" cue is present
+
+
 # ── test→focus select_channels ───────────────────────────────────────────────
 
 
@@ -661,6 +734,80 @@ def test_build_channel_assets_shapes_x_thread() -> None:
     assert len(assets) == 1
     tweets = [p for p in assets[0].parts if p.role == "tweet"]
     assert len(tweets) >= 2  # X has ≥2 tweet parts
+
+
+def test_show_hn_draws_the_technical_title_first_comment_shape() -> None:
+    """A `show_hn` channel (a launch_platform by surface_type) draws the Show-HN
+    shape — a plain title + a technical first_comment — NOT the Product Hunt
+    tagline/maker_comment/gallery shape. The name special-case makes the HN shape
+    reachable (its EARNED_MEDIA key is emitted by no channel)."""
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    # Offer every PH role AND the HN roles; only the HN roles should survive the shape.
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="title", text="Show HN: a jitter-free focus timer"),
+            _DraftedPart(
+                role="first_comment",
+                text="I built this solo. It runs offline and avoids the jitter. Here's how.",
+            ),
+            _DraftedPart(role="tagline", text="Focus that just works."),
+            _DraftedPart(role="maker_comment", text="The honest origin story."),
+            _DraftedPart(role="gallery_caption", text="The focus screen."),
+        ],
+        offer="Repo in the comments.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    # The real D2 channel: show_hn is a LAUNCH_PLATFORM by surface_type.
+    channel = _channel(name="show_hn", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    roles = {p.role for p in asset.parts}
+    # The Show-HN shape: title + first_comment survive…
+    assert "title" in roles
+    assert "first_comment" in roles
+    # …and the Product Hunt shape's roles were dropped (not this channel's shape).
+    assert "tagline" not in roles
+    assert "maker_comment" not in roles
+    assert "gallery_caption" not in roles
+
+
+def test_drafted_asset_carries_a_populated_compliance_verdict() -> None:
+    """build_channel_assets surfaces the heuristic_check verdict on the asset
+    (matching D9's ParticipationReply.compliance) instead of discarding it."""
+    from metalworks.contract import ComplianceVerdict
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="title", text="Show HN: a jitter-free focus timer"),
+            _DraftedPart(
+                role="first_comment",
+                text="I built this solo. It runs offline and avoids the jitter. Here's how.",
+            ),
+        ],
+        offer="Repo in the comments.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="show_hn", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    # The verdict is populated (the heuristic_check result is no longer discarded).
+    assert asset.compliance is not None
+    assert isinstance(asset.compliance, ComplianceVerdict)
+    assert 0.0 <= asset.compliance.confidence <= 1.0
 
 
 def test_demand_claims_ground_but_hooks_are_free() -> None:

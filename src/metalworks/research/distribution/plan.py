@@ -252,9 +252,11 @@ def plan_distribution(
     :class:`~metalworks.contract.distribution.ChannelResult`\\ s are passed, the
     channels are re-ranked (winners first, via
     :func:`~metalworks.research.distribution.measure.rerank_from_results`) BEFORE the
-    cadence split, so the proven channels lead the next push's streams (and any
-    re-ordered spikes). The default (``prior_results=None``) path is unchanged — the
-    spike pushes are still ordered deterministically by their playbook day.
+    cadence split, so the proven channels lead the next push's STREAMS — the
+    streams preserve that order. The spike pushes do NOT inherit it: they are always
+    re-sorted by ``(playbook_day, name)`` so the launch week stays deterministically
+    sequenced regardless of results. The default (``prior_results=None``) path is
+    unchanged.
     """
     if prior_results:
         from metalworks.research.distribution.measure import rerank_from_results

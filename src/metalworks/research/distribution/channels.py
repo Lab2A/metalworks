@@ -39,6 +39,7 @@ from metalworks.contract import (
     DemandReport,
     ProductType,
 )
+from metalworks.research.grounding import appears_in_corpus
 
 if TYPE_CHECKING:
     from metalworks.contract import ChannelResult, PositioningBrief
@@ -49,6 +50,9 @@ if TYPE_CHECKING:
 _SUBREDDIT_RE = re.compile(r"\br/([A-Za-z0-9][A-Za-z0-9_]{1,50})\b")
 # The funnel stages every plan should try to span; an all-awareness plan is a leak.
 _FUNNEL_ORDER = ("awareness", "consideration", "conversion", "retention")
+# The corpus cues that justify the LLM's `benchmark_hunger` boolean — the audience
+# must actually use this language for the data-as-marketing signal to be grounded.
+_BENCHMARK_CUES = ("benchmark", "average", "state of", "industry standard", "median", "baseline")
 
 
 # ── Private signal shape ─────────────────────────────────────────────────────
@@ -91,7 +95,10 @@ class _CorpusEntities(BaseModel):
 
     The community grounding is already deterministic; this pass only surfaces
     platforms / media / attitudinal booleans the audience NAMED. It must not
-    invent — anything not in the quotes is left empty."""
+    invent — and the prompt's "don't invent" instruction is BACKSTOPPED
+    deterministically: :func:`_verify_enrichment` drops any platform / media /
+    incumbent that doesn't actually appear in the corpus text, so an
+    un-verified entity never becomes a channel or a ``routing_signal``."""
 
     named_platforms: list[str] = Field(
         default_factory=list[str],
@@ -204,6 +211,37 @@ def _enrich_entities(deps: ResearchDeps, report: DemandReport) -> _CorpusEntitie
     )
 
 
+def _verify_enrichment(enriched: _CorpusEntities, corpus_text: str) -> _CorpusEntities:
+    """Keep only enriched entities that ACTUALLY appear in the corpus text.
+
+    The LLM enrichment pass is told never to invent, but "told not to" isn't a
+    guarantee — so every enriched platform / media / incumbent is checked against
+    the audience's own words (a normalized substring match, the
+    :func:`~metalworks.research.grounding.appears_in_corpus` cousin of
+    ``verbatim_match`` for short named entities) and DROPPED when absent. This is
+    the same no-fabrication discipline the deterministic community grounding
+    already enforces, now applied to the LLM-enriched entities so a channel /
+    ``routing_signal`` can only ever name a real corpus entity. ``benchmark_hunger``
+    survives only when a real benchmark cue is present in the corpus, never on the
+    model's say-so alone. ``shareable_output`` is a product-shape judgement, not a
+    named entity, so it passes through unverified.
+    """
+    return _CorpusEntities(
+        named_platforms=[p for p in enriched.named_platforms if appears_in_corpus(p, corpus_text)],
+        named_media=[m for m in enriched.named_media if appears_in_corpus(m, corpus_text)],
+        shareable_output=enriched.shareable_output,
+        hated_incumbent=(
+            enriched.hated_incumbent
+            if enriched.hated_incumbent and appears_in_corpus(enriched.hated_incumbent, corpus_text)
+            else None
+        ),
+        benchmark_hunger=(
+            enriched.benchmark_hunger
+            and any(appears_in_corpus(cue, corpus_text) for cue in _BENCHMARK_CUES)
+        ),
+    )
+
+
 # ── Public entry points ──────────────────────────────────────────────────────
 
 
@@ -260,11 +298,16 @@ def extract_channel_signals(deps: ResearchDeps, report: DemandReport) -> _Channe
     Communities/permalinks are pulled DETERMINISTICALLY from the report. An LLM
     pass may enrich named platforms/media + the attitudinal booleans from the
     corpus language; it is best-effort and never invents the community grounding.
+    Every enriched entity is then VERIFIED against the corpus text
+    (:func:`_verify_enrichment`) and dropped if it doesn't actually appear — so a
+    channel / ``routing_signal`` only ever traces to a real corpus entity, not the
+    model's say-so. The flagship grounding claim ("routing_signal always traces to
+    a real corpus entity / never invents") is enforced here, not just asserted.
     """
     communities = _extract_communities(report)
     signals = _ChannelSignals(named_communities=communities)
     try:
-        enriched = _enrich_entities(deps, report)
+        enriched = _verify_enrichment(_enrich_entities(deps, report), _report_text(report))
         signals.named_platforms = enriched.named_platforms
         signals.named_media = enriched.named_media
         signals.shareable_output = enriched.shareable_output
@@ -536,7 +579,7 @@ def build_channel_strategy(
         funnel_note = f"Funnel coverage spans {', '.join(stages)}. " + (
             "Watch that the awareness pushes hand off to a real conversion surface."
             if "conversion" not in stages
-            else "Awareness, consideration and conversion are all represented."
+            else "A conversion surface is represented to catch the awareness it drives."
         )
 
     return ChannelStrategy(
