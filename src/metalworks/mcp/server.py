@@ -114,6 +114,14 @@ async def distribution_assets(report_id: str, store_path: str | None = None) -> 
     return tools.distribution_assets(report_id, store_path)
 
 
+async def distribution_requirements(
+    report_id: str, store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Emit the distribution → build requirements (D3) — embedded loops + the
+    conversion surface, as BUILD requirements that feed build-spec (chat key)."""
+    return tools.distribution_requirements(report_id, store_path)
+
+
 async def landscape_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Map the full landscape — competitors + existing solutions + do-nothing cost."""
     return tools.landscape_from_report(report_id, store_path)
@@ -241,6 +249,7 @@ _TOOL_WRAPPERS = (
     distribution_geo,
     distribution_data_report,
     distribution_assets,
+    distribution_requirements,
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,

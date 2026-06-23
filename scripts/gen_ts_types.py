@@ -52,6 +52,7 @@ from metalworks.contract import (  # noqa: E402
     Competitor,
     CompetitorMap,
     ComplianceVerdict,
+    ConversionSurfaceRequirement,
     CorpusStats,
     CrossReference,
     DataReportAsset,
@@ -84,6 +85,7 @@ from metalworks.contract import (  # noqa: E402
     LintViolation,
     LogoOption,
     LogoSet,
+    LoopRequirement,
     MarketSizing,
     Opportunity,
     ParticipationTarget,
@@ -207,6 +209,9 @@ MODELS: list[type[BaseModel]] = [
     DataReportAsset,
     AssetPart,
     ChannelAsset,
+    # distribution → build requirements (D3) — embedded loops + conversion surface
+    LoopRequirement,
+    ConversionSurfaceRequirement,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

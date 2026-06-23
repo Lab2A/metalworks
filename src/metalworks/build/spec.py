@@ -43,7 +43,17 @@ from metalworks.contract import (
 from metalworks.contract.surface import SurfaceKind
 
 if TYPE_CHECKING:
+    from metalworks.contract import (
+        ConversionSurfaceRequirement,
+        LoopRequirement,
+    )
     from metalworks.research.deps import ResearchDeps
+
+# The distribution→build requirements (D3) shape: the tuple
+# ``distribution_requirements(channels)`` returns — embedded-loop requirements +
+# the conversion-surface requirement(s) — fed into the spec so it records the
+# build requirements distribution decided.
+DistributionRequirements = tuple["list[LoopRequirement]", "list[ConversionSurfaceRequirement]"]
 
 _MAX_FEATURES = 8
 _MAX_PERSONAS = 3
@@ -299,6 +309,7 @@ def build_spec_from_report(
     surface: SurfaceKind | Literal["auto"] = "auto",
     *,
     stack: str = "empty",
+    distribution_requirements: DistributionRequirements | None = None,
 ) -> BuildSpec:
     """Derive an evidence-grounded :class:`BuildSpec` from a finished report.
 
@@ -306,6 +317,13 @@ def build_spec_from_report(
     surface + a one-line rationale; pinning ``surface`` (e.g. ``"cli"``) honors it
     and skips the pick. Screens are sketched after the features so each maps to a
     real ``feature_id``.
+
+    ``distribution_requirements`` (D3) is the
+    ``(loop_requirements, conversion_surface_requirements)`` tuple from
+    :func:`metalworks.research.distribution_requirements` — the embedded-loop +
+    conversion-surface build requirements distribution decided. When supplied, the
+    spec RECORDS them (``loop_requirements`` / ``conversion_surface_requirements``);
+    the default ``None`` leaves both empty, so behavior is byte-for-byte unchanged.
     """
     auto_surface = surface == "auto"
     wedge = (
@@ -368,6 +386,9 @@ def build_spec_from_report(
         if partial
         else None
     )
+    loop_reqs, conversion_reqs = (
+        distribution_requirements if distribution_requirements is not None else ([], [])
+    )
     return BuildSpec(
         spec_id=f"spec:{report.report_id}",
         report_id=report.report_id,
@@ -378,6 +399,8 @@ def build_spec_from_report(
         personas=personas,
         pricing_tiers=pricing,
         screens=screens,
+        loop_requirements=list(loop_reqs),
+        conversion_surface_requirements=list(conversion_reqs),
         partial=partial,
         caveat=caveat,
     )

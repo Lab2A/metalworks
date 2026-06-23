@@ -10,7 +10,7 @@ bodies own the error-envelope contract. The authoritative registered set is the
 `metalworks.mcp.tools` begins with `TIER 1` or `TIER 2` — that prefix is the
 source of truth for its tier.
 
-**31 tools** are registered.
+**32 tools** are registered.
 
 ## The tier model
 
@@ -52,6 +52,7 @@ source of truth for its tier.
 | `distribution_geo` | The GEO / LLM-citability stream (D6) — participation targets (real threads from the report's permalinks), citability probes (queries to test you're cited), and answer-first answer briefs (grounded; evidence resolves against `report.evidence`, ungrounded dropped). Drafting only (chat key). | `report_id`, `store_path` |
 | `distribution_data_report` | Project a stored report into a corpus-derived **data report** (D5) — a deterministic ranking of its clusters carrying their REAL distinct-author / mention counts, real permalinks, and a verbatim quote per row; the LLM writes only the title + framing labels, and methodology discloses the honest base (chat key). | `report_id`, `kind` (`complaint_index`), `store_path` |
 | `distribution_assets` | Draft channel-SHAPED, drafting-only assets (D4) — one per selected channel, shaped to its surface (PH = tagline + maker comment + captions; Show HN = title + first comment; X = tweet thread; LinkedIn = carousel). Demand claims ground (no-cite-no-claim); hooks + the offer are free; no upvote ask, native-first, founder-voiced (chat key). | `report_id`, `store_path` |
+| `distribution_requirements` | The distribution → build requirements (D3) — for each selected **embedded_loop** channel a `LoopRequirement` (loop kind → concrete build requirements, e.g. watermark ⇒ public share-URLs + branded viewer + badge-gating, grounded in the channel's `routing_signal`), and always a `ConversionSurfaceRequirement` for the conversion destination the channels point at. Deterministic; feed it to `build_spec` so the spec records it (chat key). | `report_id`, `store_path` |
 | `landscape_from_report` | The full "what exists today" — direct/adjacent/status-quo rivals (each gap cited, each tagged with the clusters it competes for) **plus** an empirical existing-solutions scan, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ideate_from_idea` | Idea-first: sharpen a raw idea into a testable hypothesis + a brief (chat key). | `idea`, `store_path` |
 | `ideate_from_report` | Evidence-first: surface a stored report's forks as grounded idea sketches (chat key). | `report_id`, `store_path` |

@@ -460,3 +460,63 @@ class GeoPlan(BaseModel):
         default_factory=list[AnswerBrief],
         description="Answer-first grounded briefs; each resolves against report.evidence.",
     )
+
+
+# ── Distribution → build requirements (D3) ───────────────────────────────────
+
+
+class LoopRequirement(BaseModel):
+    """One embedded-loop channel's BUILD requirements — the distribution→build feed.
+
+    An embedded loop (a watermark, a UGC-SEO surface, a referral, a free tool, an
+    OSS wedge, a single-player aha) is a channel that is designed INTO the product,
+    not bolted on as a post-hoc marketing tactic — so the moment distribution
+    *selects* such a channel it implies concrete things the build must ship.
+    Notion's public-page SEO underperformed precisely because the build lacked
+    SSR + a sitemap; a watermark loop is worthless without a branded public viewer
+    and badge-gating. The mapping ``loop_kind`` → ``build_requirements`` is
+    DETERMINISTIC (a fixed table), and ``rationale`` traces to the selected
+    channel's grounded ``routing_signal`` so the requirement is never an invented
+    feature — it is the build face of a real, audience-derived loop decision.
+    """
+
+    loop_kind: Literal["watermark", "ugc_seo", "referral", "free_tool", "oss", "single_player"] = (
+        Field(description="The loop mechanic this requirement set serves.")
+    )
+    build_requirements: list[str] = Field(
+        description="Concrete things the build must ship for this loop, e.g. "
+        "['public_share_urls', 'branded_viewer', 'badge_gating'] for a watermark; "
+        "['ssr_public_pages', 'sitemap'] for UGC-SEO; ['solo_aha_before_invite'] for "
+        "single_player.",
+    )
+    rationale: str = Field(
+        description="Why the build needs this, grounded in the selected channel's routing_signal."
+    )
+
+
+class ConversionSurfaceRequirement(BaseModel):
+    """The conversion destination every channel points at — a BUILD requirement (D3).
+
+    Distribution channels create attention (awareness/consideration), but attention
+    with no surface to catch it leaks out — so the build MUST include a conversion
+    destination, and naming its funnel job is a distribution decision that feeds
+    build-spec. This re-opens generate-site (#67) from the right side: not
+    cite-or-die marketing copy, but "the build must include a conversion
+    destination, here is its job per the funnel." Always emitted (every plan needs
+    a place to convert); ``destination`` names the surface, ``funnel_job`` its
+    conversion job, and ``build_requirements`` the concrete things it must ship.
+    """
+
+    destination: str = Field(
+        description="The surface channels point at, e.g. 'landing_page' | 'in_product_onboarding'."
+    )
+    funnel_job: str = Field(
+        description="The conversion job this destination does for the funnel (what it converts)."
+    )
+    build_requirements: list[str] = Field(
+        description="Concrete things the conversion destination must ship, e.g. "
+        "['above_fold_value_prop', 'single_primary_cta', 'instrumented_signup'].",
+    )
+    rationale: str = Field(
+        description="Why the build needs a conversion destination, grounded in the channel plan."
+    )

@@ -51,6 +51,11 @@ from metalworks.research.distribution.geo import (
     citability_probes,
     participation_targets,
 )
+from metalworks.research.distribution.requirements import (
+    conversion_surface_requirement,
+    distribution_requirements,
+    loop_requirements,
+)
 from metalworks.stores import MemoryStores
 
 # ── D1 contract ──────────────────────────────────────────────────────────────
@@ -960,3 +965,196 @@ def test_mcp_distribution_geo_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res["geo"]["report_id"] == "rpt-d2"
     assert res["geo"]["participation_targets"]
     assert res["geo"]["citability_probes"]
+
+
+# ── D3: distribution → build requirements ────────────────────────────────────
+
+
+def _loop_channel(name: str = "shareable_output_loop", *, routing_signal: str = "") -> Channel:
+    return Channel(
+        surface_type=ChannelSurfaceType.EMBEDDED_LOOP,
+        name=name,
+        motion="pull",
+        cadence="compounding",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage="awareness",
+        routing_signal=routing_signal or "product output is shared publicly / with a third party",
+    )
+
+
+def _launch_channel() -> Channel:
+    return Channel(
+        surface_type=ChannelSurfaceType.LAUNCH_PLATFORM,
+        name="product_hunt",
+        motion="push",
+        cadence="spike",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage="awareness",
+        routing_signal="a reachable audience surfaced in the corpus",
+    )
+
+
+def _conversion_channel() -> Channel:
+    return Channel(
+        surface_type=ChannelSurfaceType.MARKETPLACE,
+        name="notion_marketplace",
+        motion="pull",
+        cadence="compounding",
+        discovery="curated",
+        role="revenue",
+        funnel_stage="conversion",
+        routing_signal="audience names Notion in their workflow",
+    )
+
+
+def test_loop_requirement_maps_watermark_to_build_requirements() -> None:
+    """A selected embedded_loop channel → a LoopRequirement carrying the loop's build reqs."""
+    loops = loop_requirements([_loop_channel()])
+    assert len(loops) == 1
+    req = loops[0]
+    assert req.loop_kind == "watermark"
+    # The deterministic watermark table — designed-in build requirements, grounded.
+    assert req.build_requirements == ["public_share_urls", "branded_viewer", "badge_gating"]
+    # Rationale traces to the channel's grounded routing_signal.
+    assert "shared publicly" in req.rationale
+
+
+def test_loop_kind_inferred_from_channel_language() -> None:
+    """A loop channel that isn't the named watermark loop routes by its language."""
+    ugc = loop_requirements([_loop_channel("ugc_loop", routing_signal="public content / UGC SEO")])
+    assert ugc[0].loop_kind == "ugc_seo"
+    assert ugc[0].build_requirements == ["ssr_public_pages", "sitemap", "canonical_urls"]
+    solo = _loop_channel("solo_loop", routing_signal="single-player solo aha before invite")
+    assert loop_requirements([solo])[0].loop_kind == "single_player"
+    assert loop_requirements([solo])[0].build_requirements == [
+        "solo_aha_before_invite",
+        "deferred_invite_prompt",
+    ]
+
+
+def test_non_loop_channels_emit_no_loop_requirements() -> None:
+    assert loop_requirements([_launch_channel(), _conversion_channel()]) == []
+
+
+def test_conversion_surface_always_emitted_and_flags_tofu_leak() -> None:
+    """Conversion surface is always emitted; its framing flags an all-TOFU plan as a leak."""
+    leaky = conversion_surface_requirement([_launch_channel(), _loop_channel()])
+    assert leaky.destination == "landing_page"
+    assert leaky.build_requirements == [
+        "above_fold_value_prop",
+        "single_primary_cta",
+        "instrumented_signup",
+    ]
+    assert "leak" in leaky.rationale.lower()
+    # A plan that already converts gets the catch-conversion framing, not the leak one.
+    catches = conversion_surface_requirement([_launch_channel(), _conversion_channel()])
+    assert "leak" not in catches.rationale.lower()
+
+
+def test_distribution_requirements_returns_loops_and_conversion() -> None:
+    loops, conversion = distribution_requirements([_loop_channel(), _launch_channel()])
+    assert [lr.loop_kind for lr in loops] == ["watermark"]
+    assert len(conversion) == 1  # always exactly one conversion surface
+
+
+def _spec_chat() -> FakeChatModel:
+    """Script the one _BuildPhrasing call build_spec_from_report makes (no screens scripted)."""
+    from metalworks.build.spec import _BuildPhrasing, _FeatureDraft
+
+    return FakeChatModel().script(
+        _BuildPhrasing,
+        _BuildPhrasing(
+            features=[
+                _FeatureDraft(
+                    feature_id="share-it",
+                    title="Shareable output",
+                    rationale="serves the share loop",
+                    source_cluster_rank=1,
+                )
+            ]
+        ),
+    )
+
+
+def _spec_report() -> DemandReport:
+    return _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[_quote("I share my output everywhere", "https://r/x/1", "r/Make")],
+            )
+        ]
+    )
+
+
+def test_build_spec_records_distribution_requirements() -> None:
+    """build_spec_from_report(..., distribution_requirements=...) records them on the spec."""
+    from metalworks.build.spec import build_spec_from_report
+
+    reqs = distribution_requirements([_loop_channel(), _launch_channel()])
+    spec = build_spec_from_report(
+        _deps(_spec_chat()), _spec_report(), surface="cli", distribution_requirements=reqs
+    )
+    assert [lr.loop_kind for lr in spec.loop_requirements] == ["watermark"]
+    assert spec.loop_requirements[0].build_requirements == [
+        "public_share_urls",
+        "branded_viewer",
+        "badge_gating",
+    ]
+    assert len(spec.conversion_surface_requirements) == 1
+    assert spec.conversion_surface_requirements[0].destination == "landing_page"
+
+
+def test_build_spec_default_none_leaves_requirements_empty() -> None:
+    """Default-None path is unchanged: no distribution requirements recorded."""
+    from metalworks.build.spec import build_spec_from_report
+
+    spec = build_spec_from_report(_deps(_spec_chat()), _spec_report(), surface="cli")
+    assert spec.loop_requirements == []
+    assert spec.conversion_surface_requirements == []
+    # The rest of the spec still ships normally (the feature grounded).
+    assert spec.features and spec.features[0].feature_id == "share-it"
+
+
+def test_mcp_distribution_requirements_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_requirements("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_requirements_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote("help", "https://reddit.com/r/SideProject/comments/1/x", "r/SideProject")
+                ],
+            )
+        ]
+    )
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    # shareable_output=True so select_channels emits an embedded_loop channel.
+    monkeypatch.setattr(
+        config,
+        "resolve_chat",
+        lambda *_a, **_k: _scripted_chat(entities=_CorpusEntities(shareable_output=True)),
+    )
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_requirements(report.report_id)
+    assert "loop_requirements" in res
+    assert "conversion_surface_requirements" in res
+    assert res["loop_requirements"][0]["loop_kind"] == "watermark"
+    assert len(res["conversion_surface_requirements"]) == 1

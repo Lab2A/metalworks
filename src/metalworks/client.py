@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         BuildSpec,
         ChannelAsset,
         ChannelStrategy,
+        ConversionSurfaceRequirement,
         DataReportAsset,
         DemandReport,
         DesignReview,
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
         InboxItem,
         Landscape,
         LogoSet,
+        LoopRequirement,
         Opportunity,
         Persona,
         PositioningBrief,
@@ -379,6 +381,26 @@ class Metalworks:
 
         return build_channel_strategy(self.deps, _demand(research), positioning)
 
+    def distribution_requirements(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+    ) -> tuple[list[LoopRequirement], list[ConversionSurfaceRequirement]]:
+        """Distribution → build requirements (D3) — the embedded loops + conversion surface
+        that distribution designs INTO the product, emitted as BUILD requirements that feed
+        build-spec. Routes the report into its channel strategy (D2), then for each selected
+        ``embedded_loop`` channel emits a :class:`~metalworks.contract.distribution.LoopRequirement`
+        (its loop kind → concrete build requirements, grounded in the channel's ``routing_signal``)
+        and always emits a :class:`~metalworks.contract.distribution.ConversionSurfaceRequirement`
+        for the conversion destination the channels point at. Pure + deterministic. Feed the
+        result to :meth:`build_spec` (``distribution_requirements=...``) so the spec records it."""
+        from metalworks.research import build_channel_strategy
+        from metalworks.research import distribution_requirements as _distribution_requirements
+
+        report = _demand(research)
+        strategy = build_channel_strategy(self.deps, report, positioning)
+        return _distribution_requirements(strategy.channels)
+
     def geo(self, research: Research | DemandReport) -> GeoPlan:
         """Distribution (D6) — the GEO / LLM-citability stream. Turns the report into
         **participation targets** (real threads to engage, from the report's permalinks),
@@ -551,15 +573,25 @@ class Metalworks:
         surface: SurfaceKind | Literal["auto"] = "auto",
         *,
         stack: str = "empty",
+        distribution_requirements: tuple[list[LoopRequirement], list[ConversionSurfaceRequirement]]
+        | None = None,
     ) -> BuildSpec:
         """Pillar D — an evidence-grounded :class:`BuildSpec` for a coding agent.
 
         ``surface="auto"`` (default) lets the spec pick the surface + rationale; pin
-        a surface (e.g. ``"cli"``) to honor it and skip the pick."""
+        a surface (e.g. ``"cli"``) to honor it and skip the pick. Pass
+        ``distribution_requirements`` (from :meth:`distribution_requirements`) to record
+        the embedded-loop + conversion-surface build requirements distribution decided (D3);
+        the default ``None`` leaves the spec's behavior unchanged."""
         from metalworks.build import build_spec_from_report
 
         return build_spec_from_report(
-            self.deps, _demand(research), positioning, surface, stack=stack
+            self.deps,
+            _demand(research),
+            positioning,
+            surface,
+            stack=stack,
+            distribution_requirements=distribution_requirements,
         )
 
     def scaffold(

@@ -46,9 +46,11 @@ from metalworks.contract.distribution import (
     ChannelSurfaceType,
     CitabilityProbe,
     ClaimCitation,
+    ConversionSurfaceRequirement,
     DataReportAsset,
     DataReportItem,
     GeoPlan,
+    LoopRequirement,
     ParticipationTarget,
     ProductType,
 )
@@ -222,6 +224,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "CitabilityProbe",
     "AnswerBrief",
     "GeoPlan",
+    # Distribution → build requirements (D3) — embedded loops + conversion surface.
+    "LoopRequirement",
+    "ConversionSurfaceRequirement",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",

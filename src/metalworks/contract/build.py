@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from metalworks.contract.distribution import (
+    ConversionSurfaceRequirement,
+    LoopRequirement,
+)
 from metalworks.contract.evidence import EvidenceRef
 from metalworks.contract.surface import Screen, SurfaceKind
 
@@ -99,6 +103,23 @@ class BuildSpec(BaseModel):
         description=(
             "The build's UX skeleton, sketched AFTER the features so each screen maps to real "
             "``feature_id``s. Shell screens (auth/settings) are flagged ``scaffolding``."
+        ),
+    )
+    loop_requirements: list[LoopRequirement] = Field(
+        default_factory=list[LoopRequirement],
+        description=(
+            "Distribution-driven build requirements (D3): one entry per selected embedded-loop "
+            "channel — the build face of a designed-in loop (watermark ⇒ public share-URLs + "
+            "branded viewer + badge-gating; UGC-SEO ⇒ SSR pages + sitemap; …). Empty when "
+            "distribution requirements weren't supplied or no loop channel was selected."
+        ),
+    )
+    conversion_surface_requirements: list[ConversionSurfaceRequirement] = Field(
+        default_factory=list[ConversionSurfaceRequirement],
+        description=(
+            "Distribution-driven build requirements (D3): the conversion destination the "
+            "channels point at (its funnel job + what it must ship) — the build must include a "
+            "place to convert. Empty when distribution requirements weren't supplied."
         ),
     )
     partial: bool = Field(default=False)
