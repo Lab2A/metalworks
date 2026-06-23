@@ -226,18 +226,30 @@ paths = mw.scaffold(spec, research, Path("./my-startup"))
 
 ```python
 def channel_strategy(self, research, positioning=None) -> ChannelStrategy: ...
+def distribution_plan(self, research, positioning=None) -> DistributionPlan: ...
 def geo(self, research) -> GeoPlan: ...
 ```
 
 `channel_strategy` routes the report's real named entities + signals into **test→focus** channel
-experiments (D2) — every `routing_signal` traces to a real corpus entity. `geo` is the GEO /
+experiments (D2) — every `routing_signal` traces to a real corpus entity. `distribution_plan`
+sequences those channels into a campaign (D7): **pushes** (the `spike`-cadence channels placed into
+concentrated launch moments, their `timing` READ from a deterministic playbook table — Product Hunt
+12:01am PT Tue/Wed, Show HN Tue-Thu 8-10am, … — never invented hours; one all-day-attention channel
+per day, never Product Hunt + a big HN push the same day; pre-launch warming → push week → a 30-day
+post step) + **streams** (the `compounding`-cadence channels run continuously). `geo` is the GEO /
 LLM-citability stream (D6): **participation targets** (real threads to engage, from the report's
 permalinks), **citability probes** (conversational queries to test you're cited, from the cluster
 claims), and answer-first **answer briefs** (grounded — each `evidence_refs` resolves against
 `report.evidence`, `stat_anchors` carry the cluster's real counts, ungrounded answers dropped).
-Both are **drafting only** — nothing posts.
+All are **drafting only** — nothing posts.
 
 ```python
+dist = mw.distribution_plan(research)
+for p in dist.pushes:
+    print(p.timing, "—", p.channel_name, "→ sparks", p.spark_channel)
+for s in dist.streams:
+    print(s.channel_name, "—", s.cadence_note)
+
 plan = mw.geo(research)
 for t in plan.participation_targets:
     print(t.community, t.permalink, "—", t.why)

@@ -122,6 +122,13 @@ async def distribution_requirements(
     return tools.distribution_requirements(report_id, store_path)
 
 
+async def distribution_plan(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Sequence a report's channels into a distribution plan (D7) — pushes (spike
+    channels at deterministic playbook timings) + streams (compounding channels). Drafting +
+    planning only — every push is human-executed (chat key)."""
+    return tools.distribution_plan(report_id, store_path)
+
+
 async def landscape_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Map the full landscape — competitors + existing solutions + do-nothing cost."""
     return tools.landscape_from_report(report_id, store_path)
@@ -250,6 +257,7 @@ _TOOL_WRAPPERS = (
     distribution_data_report,
     distribution_assets,
     distribution_requirements,
+    distribution_plan,
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,

@@ -30,6 +30,7 @@ from metalworks.research.distribution import (
     distribution_requirements,
     loop_requirements,
     participation_targets,
+    plan_distribution,
 )
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
@@ -65,6 +66,7 @@ __all__ = [
     "ideate_from_report",
     "loop_requirements",
     "participation_targets",
+    "plan_distribution",
     "render_design_md",
     "render_design_preview_html",
     "render_logo_picker_html",

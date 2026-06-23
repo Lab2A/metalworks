@@ -520,3 +520,112 @@ class ConversionSurfaceRequirement(BaseModel):
     rationale: str = Field(
         description="Why the build needs a conversion destination, grounded in the channel plan."
     )
+
+
+# ── Distribution plan — pushes + streams, deterministically sequenced (D7) ────
+
+
+class Push(BaseModel):
+    """One sequenced, concentrated launch MOMENT — a spike channel placed in time.
+
+    A push is a ``spike``-cadence channel scheduled into the launch campaign at a
+    timing the research dictates, NOT a timing the LLM invents. ``timing`` is read
+    from a DETERMINISTIC, module-level playbook table (Product Hunt → "Day 1,
+    12:01am PT (Tue/Wed)"; Show HN → "Day 3-4, Tue-Thu 8-10am PT"; …) — the
+    opposite of the old toy ``T+{i*2}h`` even-spacing (the arbitrary-constant
+    anti-pattern). The sequencer enforces the playbook's rules — at most one
+    all-day-attention channel per day, never Product Hunt and a big HN push on the
+    same day — by staggering pushes across the campaign's days. Each push is a
+    channel *test* in the test→focus discipline (the early pushes prove a channel
+    before you concentrate on the winner); ``spark_channel`` carries the
+    spark→flywheel edge when this push ignites an amplifier. DRAFTING + PLANNING
+    ONLY: ``requires_human`` / ``posting_gated`` default true — metalworks never
+    posts a push.
+    """
+
+    channel_name: str = Field(
+        description="The spike channel this push fires, matching the Channel.name it came from."
+    )
+    surface_type: ChannelSurfaceType = Field(
+        description="The channel's surface type (carried from the channel)."
+    )
+    timing: str = Field(
+        description="When to fire this push, READ from the deterministic playbook table — e.g. "
+        "'Day 1, 12:01am PT (Tue/Wed)'. Never an LLM-invented hour."
+    )
+    spark_channel: str | None = Field(
+        default=None,
+        description="The amplifier channel this push ignites, when it carries a spark→flywheel "
+        "edge (else null).",
+    )
+    action: str = Field(
+        description="The concrete human action for this moment (what to do), e.g. 'Post the Show "
+        "HN with a technical maker first comment.'"
+    )
+    rationale: str = Field(
+        description="Why this push is placed here — the playbook reasoning / test→focus framing."
+    )
+    requires_human: bool = Field(
+        default=True,
+        description="Always true — a human executes the push; metalworks plans, it does not post.",
+    )
+    posting_gated: bool = Field(
+        default=True,
+        description="Always true — posting is gated behind explicit human action (drafting only).",
+    )
+
+
+class Stream(BaseModel):
+    """One continuously-running COMPOUNDING channel — a stream, not a moment.
+
+    A stream is a ``compounding``-cadence channel that runs all the time rather
+    than firing once: community participation, a UGC/SEO loop, a data-asset cadence,
+    the GEO answer-first stream. It carries no playbook timing (it isn't a moment);
+    ``cadence_note`` describes how it runs continuously (e.g. "post one story-led
+    showcase every 2-3 weeks after participating daily"). Together the pushes (the
+    spike campaign) and the streams (the compounding tail) ARE the distribution
+    plan — the spike-vs-compounding axis that made the old launch-vs-growth pillar
+    split unnecessary.
+    """
+
+    channel_name: str = Field(
+        description="The compounding channel this stream runs, matching the Channel.name."
+    )
+    surface_type: ChannelSurfaceType = Field(
+        description="The channel's surface type (carried from the channel)."
+    )
+    cadence_note: str = Field(
+        description="How this channel runs continuously — the compounding rhythm, not a one-time "
+        "moment."
+    )
+    rationale: str = Field(
+        description="Why this channel is a stream and what it compounds toward, grounded in the "
+        "channel's routing signal."
+    )
+
+
+class DistributionPlan(BaseModel):
+    """The sequenced distribution plan for one report — pushes + streams (D7).
+
+    Replaces the toy even-spacing plan (``T+{i*2}h``) with distribution-as-a-campaign:
+    the report's channels are split by their ``cadence`` axis — ``spike`` channels
+    become :class:`Push`\\ es sequenced into concentrated moments from a DETERMINISTIC
+    playbook table (reproducible + citable, never LLM-invented hours), ``compounding``
+    channels become :class:`Stream`\\ s that run continuously. The sequencer enforces
+    the playbook's staggering rules (one all-day-attention channel per day; never
+    Product Hunt and a big HN push the same day), opens with pre-launch warming
+    steps and closes with a 30-day post step, and pairs each spark-requiring channel
+    with its ``spark_channel`` (the spark→flywheel edge). PURE + DETERMINISTIC — no
+    LLM, no network. DRAFTING + PLANNING ONLY: every push is human-executed and
+    posting-gated.
+    """
+
+    report_id: str = Field(description="The source report this plan was sequenced from.")
+    pushes: list[Push] = Field(
+        default_factory=list[Push],
+        description="The spike channels sequenced into concentrated, staggered launch moments.",
+    )
+    streams: list[Stream] = Field(
+        default_factory=list[Stream],
+        description="The compounding channels that run continuously.",
+    )

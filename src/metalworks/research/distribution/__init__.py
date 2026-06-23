@@ -33,6 +33,7 @@ from metalworks.research.distribution.geo import (
     citability_probes,
     participation_targets,
 )
+from metalworks.research.distribution.plan import plan_distribution
 from metalworks.research.distribution.requirements import (
     conversion_surface_requirement,
     distribution_requirements,
@@ -52,5 +53,6 @@ __all__ = [
     "extract_channel_signals",
     "loop_requirements",
     "participation_targets",
+    "plan_distribution",
     "select_channels",
 ]

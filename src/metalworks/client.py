@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         DesignReview,
         DesignSystem,
         DiscoveryContext,
+        DistributionPlan,
         GeoPlan,
         IdeaSketch,
         IdeationResult,
@@ -400,6 +401,26 @@ class Metalworks:
         report = _demand(research)
         strategy = build_channel_strategy(self.deps, report, positioning)
         return _distribution_requirements(strategy.channels)
+
+    def distribution_plan(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+    ) -> DistributionPlan:
+        """Distribution (D7) — sequence the report's channels into a campaign of **pushes**
+        (spike channels placed into concentrated launch moments) + **streams** (compounding
+        channels run continuously). Routes the report into its channel strategy (D2), then
+        sequences DETERMINISTICALLY from a playbook timing table (Product Hunt 12:01am PT Tue/Wed,
+        Show HN Tue-Thu 8-10am, …) — never LLM-invented hours. Enforces the playbook's rules
+        (one all-day-attention channel per day; never Product Hunt + a big HN push the same day),
+        opens with pre-launch warming + closes with a 30-day post step, and pairs each
+        spark-requiring channel with its ``spark_channel``. Pure + deterministic; every push is
+        human-executed + posting-gated (DRAFTING ONLY)."""
+        from metalworks.research import build_channel_strategy, plan_distribution
+
+        report = _demand(research)
+        strategy = build_channel_strategy(self.deps, report, positioning)
+        return plan_distribution(report, strategy.channels)
 
     def geo(self, research: Research | DemandReport) -> GeoPlan:
         """Distribution (D6) — the GEO / LLM-citability stream. Turns the report into

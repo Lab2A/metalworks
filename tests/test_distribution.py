@@ -20,6 +20,7 @@ from metalworks.contract import (
     ChannelSurfaceType,
     DataReportAsset,
     DemandReport,
+    DistributionPlan,
     Fork,
     InsightCluster,
     ProductType,
@@ -50,6 +51,10 @@ from metalworks.research.distribution.geo import (
     build_geo_plan,
     citability_probes,
     participation_targets,
+)
+from metalworks.research.distribution.plan import (
+    _PLAYBOOK_TIMING_BY_NAME,
+    plan_distribution,
 )
 from metalworks.research.distribution.requirements import (
     conversion_surface_requirement,
@@ -1158,3 +1163,197 @@ def test_mcp_distribution_requirements_ok(monkeypatch: pytest.MonkeyPatch) -> No
     assert "conversion_surface_requirements" in res
     assert res["loop_requirements"][0]["loop_kind"] == "watermark"
     assert len(res["conversion_surface_requirements"]) == 1
+
+
+# ── D7: distribution plan — pushes + streams ─────────────────────────────────
+
+
+def _spike_channel(
+    name: str,
+    surface: ChannelSurfaceType = ChannelSurfaceType.LAUNCH_PLATFORM,
+    *,
+    spark_channel: str | None = None,
+) -> Channel:
+    """A spike-cadence channel → sequenced into a push."""
+    return Channel(
+        surface_type=surface,
+        name=name,
+        motion="push",
+        cadence="spike",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage="awareness",
+        routing_signal=f"a reachable audience for {name} surfaced in the corpus",
+        spark_channel=spark_channel,
+        test=f"Fire the {name} push at the playbook window; reply to everyone.",
+    )
+
+
+def _compounding_channel(
+    name: str,
+    surface: ChannelSurfaceType = ChannelSurfaceType.COMMUNITY,
+    *,
+    requires_spark: bool = False,
+    spark_channel: str | None = None,
+) -> Channel:
+    """A compounding-cadence channel → a continuous stream."""
+    return Channel(
+        surface_type=surface,
+        name=name,
+        motion="pull",
+        cadence="compounding",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage="consideration",
+        routing_signal=f"audience lives in {name} per the corpus",
+        requires_spark=requires_spark,
+        spark_channel=spark_channel,
+        test=f"Run {name} continuously and let it compound.",
+    )
+
+
+def test_plan_splits_spike_into_pushes_and_compounding_into_streams() -> None:
+    """spike channels → pushes (with playbook timings); compounding → streams."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    channels = [
+        _spike_channel("product_hunt"),
+        _compounding_channel("r/SideProject"),
+    ]
+    plan = plan_distribution(report, channels)
+    assert isinstance(plan, DistributionPlan)
+    assert plan.report_id == "rpt-d2"
+    # The spike channel rode into a push carrying the PH playbook timing.
+    ph = next(p for p in plan.pushes if p.channel_name == "product_hunt")
+    assert ph.timing == _PLAYBOOK_TIMING_BY_NAME["product_hunt"][1]
+    assert ph.timing == "Day 1, 12:01am PT (Tue/Wed)"
+    assert ph.requires_human is True and ph.posting_gated is True
+    # The compounding channel became a stream, not a push.
+    stream_names = {s.channel_name for s in plan.streams}
+    assert "r/SideProject" in stream_names
+    assert "r/SideProject" not in {p.channel_name for p in plan.pushes}
+    # The campaign frame: a pre-launch warming push and a 30-day post step.
+    timings = {p.timing for p in plan.pushes}
+    assert any("Pre-launch" in t for t in timings)
+    assert any("Day 30" in t for t in timings)
+
+
+def test_plan_timings_come_from_the_playbook_not_invented() -> None:
+    """Every real-channel push timing is a value from the deterministic playbook table."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    channels = [_spike_channel("show_hn"), _spike_channel("x_thread")]
+    plan = plan_distribution(report, channels)
+    show_hn = next(p for p in plan.pushes if p.channel_name == "show_hn")
+    x_thread = next(p for p in plan.pushes if p.channel_name == "x_thread")
+    assert show_hn.timing == _PLAYBOOK_TIMING_BY_NAME["show_hn"][1]
+    assert x_thread.timing == _PLAYBOOK_TIMING_BY_NAME["x_thread"][1]
+    # The plan is reproducible: same input → same timings.
+    again = plan_distribution(report, channels)
+    assert [p.timing for p in again.pushes] == [p.timing for p in plan.pushes]
+
+
+def test_plan_never_puts_product_hunt_and_a_big_hn_push_on_the_same_day() -> None:
+    """The 'one all-day-attention channel per day' rule — PH + Show HN don't share a day."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    # Both Product Hunt and Show HN are all-day-attention launch_platform pushes.
+    channels = [_spike_channel("product_hunt"), _spike_channel("show_hn")]
+    plan = plan_distribution(report, channels)
+    launch_pushes = [p for p in plan.pushes if p.surface_type == ChannelSurfaceType.LAUNCH_PLATFORM]
+    assert len(launch_pushes) == 2
+
+    def _day_of(timing: str) -> str:
+        # Each launch timing leads with 'Day N…'; the day token identifies the slot.
+        return timing.split(",")[0].split("(")[0].strip()
+
+    days = [_day_of(p.timing) for p in launch_pushes]
+    # No two all-day-attention launch pushes share a launch day (esp. not PH + HN).
+    assert len(set(days)) == len(days)
+
+
+def test_plan_pairs_a_spark_requiring_channel_with_its_spark() -> None:
+    """A spark-requiring channel carries its spark_channel through the plan (the flywheel edge)."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    # A compounding marketplace amplifier that sparks off the product_hunt push.
+    amplifier = _compounding_channel(
+        "shopify_marketplace",
+        ChannelSurfaceType.MARKETPLACE,
+        requires_spark=True,
+        spark_channel="product_hunt",
+    )
+    channels = [_spike_channel("product_hunt"), amplifier]
+    plan = plan_distribution(report, channels)
+    # The amplifier streams, carrying its spark pairing.
+    stream = next(s for s in plan.streams if s.channel_name == "shopify_marketplace")
+    assert "product_hunt" in stream.rationale
+    # A spike channel that itself names a spark also threads it through its push.
+    sparking = _spike_channel("product_hunt", spark_channel="shopify_marketplace")
+    plan2 = plan_distribution(report, [sparking])
+    push = next(p for p in plan2.pushes if p.channel_name == "product_hunt")
+    assert push.spark_channel == "shopify_marketplace"
+
+
+def test_plan_all_streams_has_no_launch_week() -> None:
+    """A plan with no spike channel emits no pushes (no warming/post scaffolding either)."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    channels = [_compounding_channel("r/X"), _compounding_channel("r/Y")]
+    plan = plan_distribution(report, channels)
+    assert plan.pushes == []
+    assert {s.channel_name for s in plan.streams} == {"r/X", "r/Y"}
+
+
+def test_plan_distribution_via_strategy_end_to_end() -> None:
+    """build_channel_strategy → plan_distribution sequences a real strategy's channels."""
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote("help", "https://reddit.com/r/SideProject/comments/1/x", "r/SideProject")
+                ],
+            )
+        ]
+    )
+    entities = _CorpusEntities(named_platforms=["Notion"], shareable_output=True)
+    strategy = build_channel_strategy(_deps(_scripted_chat(entities=entities)), report)
+    plan = plan_distribution(report, strategy.channels)
+    # The launch spike (show_hn for a dev_tool) is a push; the community is a stream.
+    push_names = {p.channel_name for p in plan.pushes}
+    stream_names = {s.channel_name for s in plan.streams}
+    assert "show_hn" in push_names
+    assert any(name.startswith("r/") for name in stream_names)
+
+
+def test_mcp_distribution_plan_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_plan("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_plan_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote("help", "https://reddit.com/r/SideProject/comments/1/x", "r/SideProject")
+                ],
+            )
+        ]
+    )
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _scripted_chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_plan(report.report_id)
+    assert "plan" in res
+    assert res["plan"]["report_id"] == "rpt-d2"
+    # The dev_tool strategy emits a show_hn spike → at least one push.
+    assert res["plan"]["pushes"]

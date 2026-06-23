@@ -141,6 +141,7 @@ Plan where this product gets distributed, off a stored report (see
 | `metalworks distribution strategy [REPORT]` | Route the report's named entities + signals into **test→focus** channel experiments; every channel traces to a real corpus entity. | chat key |
 | `metalworks distribution geo [REPORT]` | The GEO / LLM-citability stream — participation targets (real threads from the report's permalinks), citability probes, and answer-first answer briefs (grounded; evidence resolves, ungrounded dropped). Drafting only. | chat key |
 | `metalworks distribution requirements [REPORT]` | The distribution → build requirements (D3) — embedded-loop build requirements (loop kind → concrete things to build, grounded in the channel) + the conversion-surface destination the channels point at. Feeds the build spec. | chat key |
+| `metalworks distribution plan [REPORT]` | The distribution plan (D7) — the report's channels sequenced into **pushes** (spike channels at deterministic playbook timings: Product Hunt 12:01am PT Tue/Wed, Show HN Tue-Thu 8-10am, …; one all-day-attention channel per day, never PH + a big HN push the same day) + **streams** (compounding channels run continuously). Pre-launch warming → staggered push week → 30-day post step. Drafting + planning only. | chat key |
 
 `REPORT` is an id/prefix or omitted for your latest run. Both accept
 `--out, -o PATH` to write the JSON result.

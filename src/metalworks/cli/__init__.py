@@ -2736,6 +2736,70 @@ def distribution_requirements(
     _print_distribution_requirements(list(loops), list(conversion))
 
 
+def _print_distribution_plan(plan: object) -> None:
+    console.print(
+        f"\n[bold]Distribution plan[/bold] (D7) — report {getattr(plan, 'report_id', '')}"
+    )
+    pushes = getattr(plan, "pushes", [])
+    console.print("\n  [bold]Pushes[/bold] (sequenced moments)")
+    if pushes:
+        for p in pushes:
+            spark = f" [dim]→ sparks: {p.spark_channel}[/dim]" if p.spark_channel else ""
+            console.print(f"    [bold]{p.timing}[/bold] — {p.channel_name}{spark}")
+            console.print(f"      [dim]{p.action}[/dim]")
+    else:
+        console.print("    [dim]No spike channels — nothing to sequence into pushes.[/dim]")
+    streams = getattr(plan, "streams", [])
+    console.print("\n  [bold]Streams[/bold] (run continuously)")
+    if streams:
+        for s in streams:
+            console.print(f"    [bold]{s.channel_name}[/bold] ([dim]{s.surface_type}[/dim])")
+            console.print(f"      [dim]{s.cadence_note}[/dim]")
+    else:
+        console.print("    [dim]No compounding channels — no streams.[/dim]")
+
+
+@distribution_app.command("plan")
+def distribution_plan(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the distribution plan JSON here.")
+    ] = None,
+) -> None:
+    """Sequence the report's channels into pushes (moments) + streams (continuous) (D7)."""
+    from metalworks.research import build_channel_strategy, plan_distribution
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Distribution plan[/bold] report {report_id}...")
+    try:
+        strategy = build_channel_strategy(deps, report)
+        plan = plan_distribution(report, strategy.channels)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote distribution plan[/green] {out}")
+    _print_distribution_plan(plan)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
