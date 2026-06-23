@@ -34,6 +34,7 @@ _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "src"))
 
 from metalworks.contract import (  # noqa: E402
+    AnswerBrief,
     Assessment,
     AudienceAttribute,
     AudienceProfile,
@@ -43,6 +44,7 @@ from metalworks.contract import (  # noqa: E402
     Channel,
     ChannelStrategy,
     ChannelSurfaceType,
+    CitabilityProbe,
     CitationRef,
     ClaimCitation,
     Competitor,
@@ -68,6 +70,7 @@ from metalworks.contract import (  # noqa: E402
     ForkVerdict,
     GapAnalysis,
     GapClaim,
+    GeoPlan,
     IdeaSketch,
     IdeationResult,
     InboxItem,
@@ -79,6 +82,7 @@ from metalworks.contract import (  # noqa: E402
     LogoSet,
     MarketSizing,
     Opportunity,
+    ParticipationTarget,
     Persona,
     PersonaSet,
     PivotTarget,
@@ -190,6 +194,11 @@ MODELS: list[type[BaseModel]] = [
     ClaimCitation,
     Channel,
     ChannelStrategy,
+    # GEO / LLM-citability stream (D6) — participation + probes + answer-first briefs.
+    ParticipationTarget,
+    CitabilityProbe,
+    AnswerBrief,
+    GeoPlan,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,

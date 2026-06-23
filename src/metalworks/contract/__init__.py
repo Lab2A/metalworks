@@ -38,10 +38,14 @@ from metalworks.contract.design import (
     StyleFinding,
 )
 from metalworks.contract.distribution import (
+    AnswerBrief,
     Channel,
     ChannelStrategy,
     ChannelSurfaceType,
+    CitabilityProbe,
     ClaimCitation,
+    GeoPlan,
+    ParticipationTarget,
     ProductType,
 )
 from metalworks.contract.evidence import (
@@ -205,6 +209,11 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "ChannelSurfaceType",
     "ClaimCitation",
     "ProductType",
+    # GEO / LLM-citability stream (D6) — participation + probes + answer-first briefs.
+    "ParticipationTarget",
+    "CitabilityProbe",
+    "AnswerBrief",
+    "GeoPlan",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",

@@ -131,6 +131,19 @@ Scaffold an evidence-grounded build harness from a report (see the
 - `--surface TEXT` — `auto` (default) lets the spec pick the surface + explain why, or pin one: `web` | `mobile` | `cli` | `api` | `sdk` | `browser_extension` | `desktop`.
 - `--base TEXT` — stack hint recorded in the spec, e.g. `next-shipfast` (default `empty`).
 
+## distribution
+
+Plan where this product gets distributed, off a stored report (see
+[Distribution](/docs/distribution) and [GEO / LLM-citability](/docs/distribution-geo)).
+
+| Command | Description | Keys |
+| --- | --- | --- |
+| `metalworks distribution strategy [REPORT]` | Route the report's named entities + signals into **test→focus** channel experiments; every channel traces to a real corpus entity. | chat key |
+| `metalworks distribution geo [REPORT]` | The GEO / LLM-citability stream — participation targets (real threads from the report's permalinks), citability probes, and answer-first answer briefs (grounded; evidence resolves, ungrounded dropped). Drafting only. | chat key |
+
+`REPORT` is an id/prefix or omitted for your latest run. Both accept
+`--out, -o PATH` to write the JSON result.
+
 ## reddit
 
 Search Reddit, fetch intel, and post (gated). The `[reddit]` extra is required;

@@ -356,6 +356,33 @@ def distribution_strategy(report_id: str, store_path: str | None = None) -> Tool
 
 
 @guard
+def distribution_geo(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Turn a stored report into the GEO / LLM-citability stream
+    (D6) — participation targets (real threads from the report's permalinks),
+    citability probes (queries to test you're cited), and answer-first answer
+    briefs (grounded; evidence resolves against report.evidence, ungrounded
+    dropped). Deterministic targets+probes + one grounded LLM pass per brief.
+    Drafting only — never posts. Needs a chat-model key."""
+    from metalworks import config
+    from metalworks.research import build_geo_plan
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    plan = build_geo_plan(deps, report)
+    return {"geo": plan.model_dump(mode="json")}
+
+
+@guard
 @guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —

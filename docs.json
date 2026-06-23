@@ -70,7 +70,7 @@
           },
           {
             "group": "Distribution",
-            "pages": ["docs/distribution", "docs/reddit-engagement"]
+            "pages": ["docs/distribution", "docs/distribution-geo", "docs/reddit-engagement"]
           },
           {
             "group": "How it works",

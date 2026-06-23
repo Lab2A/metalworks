@@ -2475,6 +2475,68 @@ def distribution_strategy(
     _print_channel_strategy(strategy)
 
 
+def _print_geo_plan(plan: object) -> None:
+    console.print(f"\n[bold]GEO / LLM-citability[/bold] — report {getattr(plan, 'report_id', '')}")
+    targets = getattr(plan, "participation_targets", [])
+    console.print(f"\n  [bold]Participation targets[/bold] ({len(targets)})")
+    for t in targets:
+        console.print(f"    [bold]{t.community}[/bold] — {t.permalink}")
+        console.print(f"      [dim]why:[/dim] {t.why}")
+        console.print(f"      [dim]angle:[/dim] {t.suggested_angle}")
+    probes = getattr(plan, "citability_probes", [])
+    console.print(f"\n  [bold]Citability probes[/bold] ({len(probes)})")
+    for p in probes:
+        console.print(f'    "{p.prompt}"')
+        console.print(f"      [dim]maps to:[/dim] {p.target_phrase}")
+    briefs = getattr(plan, "answer_briefs", [])
+    console.print(f"\n  [bold]Answer briefs[/bold] ({len(briefs)})")
+    for b in briefs:
+        anchors = ", ".join(f"{k}={v}" for k, v in b.stat_anchors.items())
+        console.print(f"    [bold]Q:[/bold] {b.question}  [dim]({anchors})[/dim]")
+        console.print(f"      {b.answer}")
+        console.print(f"      [dim]cites:[/dim] {len(b.evidence_refs)} evidence ref(s)")
+
+
+@distribution_app.command("geo")
+def distribution_geo(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the GEO plan JSON here.")
+    ] = None,
+) -> None:
+    """GEO / LLM-citability: participation targets, citability probes, answer-first briefs."""
+    from metalworks.research import build_geo_plan
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]GEO / LLM-citability[/bold] report {report_id}...")
+    try:
+        plan = build_geo_plan(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote GEO plan[/green] {out}")
+    _print_geo_plan(plan)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

@@ -222,6 +222,29 @@ paths = mw.scaffold(spec, research, Path("./my-startup"))
 
 `scaffold` raises `ValueError` if `spec.report_id` doesn't match the research bundle.
 
+### Distribution stage
+
+```python
+def channel_strategy(self, research, positioning=None) -> ChannelStrategy: ...
+def geo(self, research) -> GeoPlan: ...
+```
+
+`channel_strategy` routes the report's real named entities + signals into **test→focus** channel
+experiments (D2) — every `routing_signal` traces to a real corpus entity. `geo` is the GEO /
+LLM-citability stream (D6): **participation targets** (real threads to engage, from the report's
+permalinks), **citability probes** (conversational queries to test you're cited, from the cluster
+claims), and answer-first **answer briefs** (grounded — each `evidence_refs` resolves against
+`report.evidence`, `stat_anchors` carry the cluster's real counts, ungrounded answers dropped).
+Both are **drafting only** — nothing posts.
+
+```python
+plan = mw.geo(research)
+for t in plan.participation_targets:
+    print(t.community, t.permalink, "—", t.why)
+for b in plan.answer_briefs:
+    print(b.question, b.stat_anchors)
+```
+
 ### Launch & Grow stages
 
 ```python

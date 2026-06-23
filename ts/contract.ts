@@ -827,6 +827,46 @@ export interface ChannelStrategy {
   funnel_note: string;
 }
 
+export interface ParticipationTarget {
+  /** The real community to engage, e.g. 'r/SideProject' — from the report. */
+  community: string;
+  /** A real thread/source_url pulled from the report's verified quotes. */
+  permalink: string;
+  /** What the audience is asking there, grounded in a cluster claim — not fluff. */
+  why: string;
+  /** The honest, value-first angle to engage with (answer the question, disclose). */
+  suggested_angle: string;
+}
+
+export interface CitabilityProbe {
+  /** A real conversational query you want to be the cited answer to. */
+  prompt: string;
+  /** The cluster claim this probe maps to — the demand it traces back to. */
+  target_phrase: string;
+}
+
+export interface AnswerBrief {
+  /** The audience question this brief answers (a cluster claim). */
+  question: string;
+  /** Answer-first, grounded prose — the factual answer you want cited. */
+  answer: string;
+  /** Refs into report.evidence backing the answer. An answer with none is dropped. */
+  evidence_refs?: EvidenceRef[];
+  /** Real counts from the cluster, e.g. {'distinct_authors': 12, 'mentions': 30}. */
+  stat_anchors?: Record<string, number>;
+}
+
+export interface GeoPlan {
+  /** The source report this GEO plan was derived from. */
+  report_id: string;
+  /** Real threads/communities to engage, from the report's permalinks. */
+  participation_targets?: ParticipationTarget[];
+  /** Conversational queries to test citation, from the cluster claims. */
+  citability_probes?: CitabilityProbe[];
+  /** Answer-first grounded briefs; each resolves against report.evidence. */
+  answer_briefs?: AnswerBrief[];
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;
