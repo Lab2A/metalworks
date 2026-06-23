@@ -39,11 +39,15 @@ from metalworks.contract.design import (
 )
 from metalworks.contract.distribution import (
     AnswerBrief,
+    AssetPart,
     Channel,
+    ChannelAsset,
     ChannelStrategy,
     ChannelSurfaceType,
     CitabilityProbe,
     ClaimCitation,
+    DataReportAsset,
+    DataReportItem,
     GeoPlan,
     ParticipationTarget,
     ProductType,
@@ -204,10 +208,14 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Distribution stage — one pillar (pushes + streams), replacing the former
     # Pillar F (Launch) + Pillar G (Content/SEO). Rebuilt over D1+; carries the
     # salvaged no-cite-no-claim primitive for now.
+    "AssetPart",
     "Channel",
+    "ChannelAsset",
     "ChannelStrategy",
     "ChannelSurfaceType",
     "ClaimCitation",
+    "DataReportAsset",
+    "DataReportItem",
     "ProductType",
     # GEO / LLM-citability stream (D6) — participation + probes + answer-first briefs.
     "ParticipationTarget",

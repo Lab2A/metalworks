@@ -21,7 +21,9 @@ from metalworks.research.design import (
 from metalworks.research.design_review import review_design
 from metalworks.research.distribution import (
     answer_briefs,
+    build_channel_assets,
     build_channel_strategy,
+    build_data_asset,
     build_geo_plan,
     citability_probes,
     participation_targets,
@@ -46,7 +48,9 @@ __all__ = [
     "CorpusReader",
     "ResearchDeps",
     "answer_briefs",
+    "build_channel_assets",
     "build_channel_strategy",
+    "build_data_asset",
     "build_design_system",
     "build_geo_plan",
     "build_logo_set",

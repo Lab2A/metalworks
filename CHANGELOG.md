@@ -26,6 +26,36 @@ contracts may change in any release.
   count 28 → 29), and the `distribution-geo` skill. Drafting only — nothing posts. Additive
   contract: the new `ParticipationTarget`, `CitabilityProbe`, `AnswerBrief`, and `GeoPlan` models.
   (#104)
+- **Data-as-marketing data report (D5) — the on-brand flagship asset.** A new `distribution
+  data-report` surface projects a finished demand report into a corpus-derived `DataReportAsset`
+  — a publishable ranking (a `complaint_index`, a `feature_ranking`, or a `state_of` report) over
+  a proprietary Reddit corpus. It stacks every AI-citation driver at once: original research + a
+  ranking + verbatim quotes + permalinks. The ranking is DETERMINISTIC — the items ARE the
+  report's own `ranked_clusters`, in their own order, each `DataReportItem` carrying that
+  cluster's REAL `distinct_author_count` / `mention_count`, the real `source_url` permalinks of
+  its verified quotes, and one verbatim quote — never re-scored, never invented. The LLM writes
+  only the report `title` and each row's framing `label`, grounded in the cluster's claim, and
+  falls back to the claim verbatim on failure. `methodology` discloses the honest base (N threads
+  analyzed, distinct-author counting, the corpus date range) — the survey-fabrication base rate is
+  the trap, so rigor IS the credibility. Available on all four surfaces: `mw.data_asset(...)`,
+  `metalworks distribution data-report <report-id> --kind complaint_index`, the
+  `distribution_data_report` MCP tool (tool count 28 → 29), and the `distribution-data-report`
+  skill. Additive contract: the new `DataReportAsset` + `DataReportItem` models. (#103)
+- **Channel-shaped distribution assets (D4) — relaxed grounding, platform invariants, offer/CTA.**
+  A new `distribution assets` surface drafts channel-SHAPED, drafting-only launch copy off a
+  finished report and its channel strategy: one `ChannelAsset` per selected channel, broken into
+  channel-native `AssetPart`s by the channel's surface (Product Hunt = tagline + authentic maker
+  comment + gallery captions; Show HN = plain title + technical first comment; X = a numbered tweet
+  thread; LinkedIn = a carousel; default = title + body). The old flat `LaunchAsset.body: str` is
+  gone — a thread isn't a string. Grounding is **relaxed** on purpose: only DEMAND/factual claims
+  are held to no-cite-no-claim (each resolves to a real Reddit quote via `verbatim_match` and emits
+  a `ClaimCitation`, unresolved ones dropped), while persuasive hooks, taglines and the per-channel
+  `offer` (the CTA) are FREE craft — over-grounding the copy was a category error. Platform
+  invariants are enforced deterministically: never an "upvote us" ask (a guard strips it),
+  native-first (no link in the hook), founder-voiced. Available on all four surfaces:
+  `mw.channel_assets(...)`, `metalworks distribution assets <report-id>`, the `distribution_assets`
+  MCP tool (tool count 28 → 29), and the `distribution-assets` skill. Additive contract: the new
+  `AssetPart` + `ChannelAsset` models. (#102)
 
 - **Distribution channel strategy (D2) — entity→channel routing, test→focus.** A new
   `distribution strategy` surface routes a finished demand report's *real named entities +

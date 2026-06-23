@@ -867,6 +867,58 @@ export interface GeoPlan {
   answer_briefs?: AnswerBrief[];
 }
 
+export interface DataReportItem {
+  /** 1-based rank, copied from the source cluster's rank. */
+  rank: number;
+  /** The claim/feature/complaint headline for this row, framed to the report kind. LLM-written from the cluster's claim — the only authored prose in the row. */
+  label: string;
+  /** DISTINCT authors expressing this — copied from the cluster's distinct_author_count, the honest base rate. Never invented. */
+  distinct_authors: number;
+  /** Total mentions (>= distinct_authors) — copied from the cluster's mention_count. Kept separate so base-rate honesty stays visible. */
+  mentions: number;
+  /** Real provenance links — the source_urls of the cluster's verified quotes. */
+  permalinks: string[];
+  /** One verbatim supporting quote from the cluster (exact text, not paraphrased). */
+  quote: string;
+}
+
+export interface DataReportAsset {
+  /** The source demand report this asset was derived from. */
+  report_id: string;
+  /** The framing: 'complaint_index' (pain points), 'feature_ranking' (requested features), or 'state_of' (the overall state of the category). */
+  kind: "complaint_index" | "feature_ranking" | "state_of";
+  /** The report headline, LLM-written and grounded in the report's query + kind. */
+  title: string;
+  /** The ranked rows, projected deterministically from the report's clusters. */
+  items: DataReportItem[];
+  /** The disclosed honest base: N threads analyzed, distinct-author counting, and the corpus date range — the rigor that IS the credibility. */
+  methodology: string;
+}
+
+export interface AssetPart {
+  /** Which channel-shaped span this is — tagline | maker_comment | gallery_caption | title | first_comment | tweet | carousel_slide | … */
+  role: string;
+  /** The copy for this span (appears verbatim in the asset body). */
+  text: string;
+}
+
+export interface ChannelAsset {
+  /** The channel this asset is for (matches Channel.name). */
+  channel_name: string;
+  /** The channel's surface type — which shaped the parts. */
+  surface_type: ChannelSurfaceType;
+  /** Where in the funnel this asset acts (carried from the channel). */
+  funnel_stage: "awareness" | "consideration" | "conversion" | "retention";
+  /** The concatenated/back-compat copy; parts' text + claim spans index into it. */
+  body: string;
+  /** The channel-shaped spans (e.g. PH: tagline + maker_comment + captions). */
+  parts?: AssetPart[];
+  /** The per-channel CTA / conversion ask — persuasive, not grounded. Never an 'upvote us' ask. */
+  offer?: string;
+  /** Grounded DEMAND/factual claims only — each resolves against report.evidence; persuasive hooks/CTAs are free and not listed here. */
+  claim_citations?: ClaimCitation[];
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;

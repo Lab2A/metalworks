@@ -19,12 +19,14 @@ channel experiments.
 
 from __future__ import annotations
 
+from metalworks.research.distribution.assets import build_channel_assets
 from metalworks.research.distribution.channels import (
     build_channel_strategy,
     classify_product,
     extract_channel_signals,
     select_channels,
 )
+from metalworks.research.distribution.data_asset import build_data_asset
 from metalworks.research.distribution.geo import (
     answer_briefs,
     build_geo_plan,
@@ -34,7 +36,9 @@ from metalworks.research.distribution.geo import (
 
 __all__ = [
     "answer_briefs",
+    "build_channel_assets",
     "build_channel_strategy",
+    "build_data_asset",
     "build_geo_plan",
     "citability_probes",
     "classify_product",

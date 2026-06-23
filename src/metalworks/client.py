@@ -23,7 +23,9 @@ if TYPE_CHECKING:
     from metalworks.contract import (
         Assessment,
         BuildSpec,
+        ChannelAsset,
         ChannelStrategy,
+        DataReportAsset,
         DemandReport,
         DesignReview,
         DesignSystem,
@@ -389,6 +391,43 @@ class Metalworks:
         from metalworks.research import build_geo_plan
 
         return build_geo_plan(self.deps, _demand(research))
+
+    def data_asset(
+        self,
+        research: Research | DemandReport,
+        kind: Literal["complaint_index", "feature_ranking", "state_of"] = "complaint_index",
+    ) -> DataReportAsset:
+        """Distribution (D5) — project the report into a corpus-derived **data report**, the
+        on-brand flagship asset: a deterministic ranking of the report's clusters carrying their
+        REAL distinct-author / mention counts, real permalinks, and a verbatim quote per row. The
+        LLM only writes the title + each row's framing label, grounded in the cluster's claim; the
+        numbers/links/quotes are never invented, and ``methodology`` discloses the honest base (N
+        threads, distinct-author counting, date range). ``kind`` picks the framing —
+        ``complaint_index`` (pain points), ``feature_ranking`` (requested features), or
+        ``state_of`` (the overall state)."""
+        from metalworks.research import build_data_asset
+
+        return build_data_asset(self.deps, _demand(research), kind)
+
+    def channel_assets(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+    ) -> list[ChannelAsset]:
+        """Distribution (D4) — draft channel-SHAPED, drafting-only assets per channel.
+
+        Routes the report into its channel strategy (D2), then drafts one
+        :class:`~metalworks.contract.distribution.ChannelAsset` per selected channel,
+        shaped to that channel's surface (Product Hunt = tagline + maker comment + gallery
+        captions; Show HN = title + first comment; X = N tweets; LinkedIn = carousel).
+        Demand/factual claims are grounded (no-cite-no-claim) while persuasive hooks and the
+        per-channel ``offer`` are free; the platform invariants (no upvote ask, native-first,
+        founder voice) are enforced deterministically. DRAFTING ONLY — never posts."""
+        from metalworks.research import build_channel_assets, build_channel_strategy
+
+        report = _demand(research)
+        strategy = build_channel_strategy(self.deps, report, positioning)
+        return build_channel_assets(self.deps, report, strategy.channels, positioning)
 
     def landscape(self, research: Research | DemandReport) -> Landscape:
         """Pillar A — the full 'what exists today': direct / adjacent / status-quo rivals

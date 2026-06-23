@@ -18,6 +18,7 @@ import pytest
 from metalworks.contract import (
     Channel,
     ChannelSurfaceType,
+    DataReportAsset,
     DemandReport,
     Fork,
     InsightCluster,
@@ -37,6 +38,11 @@ from metalworks.research.distribution.channels import (
     classify_product,
     extract_channel_signals,
     select_channels,
+)
+from metalworks.research.distribution.data_asset import (
+    _ItemLabel,
+    _ReportProse,
+    build_data_asset,
 )
 from metalworks.research.distribution.geo import (
     _AnswerDraft,
@@ -375,6 +381,409 @@ def test_mcp_distribution_strategy_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "strategy" in res
     assert res["strategy"]["report_id"] == "rpt-d2"
     assert res["strategy"]["channels"]
+
+
+# ── D5: data-as-marketing data report ────────────────────────────────────────
+
+
+def _counted_cluster(
+    rank: int,
+    *,
+    distinct_authors: int,
+    mentions: int,
+    quotes: list[ResolvedCitation],
+) -> InsightCluster:
+    """A cluster with EXPLICIT counts that intentionally differ from len(quotes), so a test
+    can prove the data report copies the real cluster counts rather than re-deriving them."""
+    return InsightCluster(
+        rank=rank,
+        claim=f"consumers struggle with pain point {rank}",
+        demand_score=float(100 - rank),
+        distinct_author_count=distinct_authors,
+        mention_count=mentions,
+        signal=SignalStrength.HIGH,
+        quotes=quotes,
+    )
+
+
+def _data_report() -> DemandReport:
+    return _report(
+        clusters=[
+            _counted_cluster(
+                1,
+                distinct_authors=37,
+                mentions=52,
+                quotes=[
+                    _quote("the jitter ruins my focus", "https://reddit.com/r/A/1", "r/A", "u1"),
+                    _quote("it lags constantly", "https://reddit.com/r/A/2", "r/A", "u2"),
+                ],
+            ),
+            _counted_cluster(
+                2,
+                distinct_authors=21,
+                mentions=24,
+                quotes=[
+                    _quote("too expensive for indie", "https://reddit.com/r/B/9", "r/B", "u3"),
+                ],
+            ),
+        ]
+    )
+
+
+def _data_prose_chat() -> FakeChatModel:
+    chat = FakeChatModel()
+    chat.script(
+        _ReportProse,
+        _ReportProse(
+            title="State of Indie Focus Tools: the top complaints",
+            labels=[
+                _ItemLabel(rank=1, label="Audio jitter breaks concentration"),
+                _ItemLabel(rank=2, label="Pricing is out of reach for indies"),
+            ],
+        ),
+    )
+    return chat
+
+
+def test_data_report_items_are_ranked_and_carry_real_counts() -> None:
+    report = _data_report()
+    asset = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    assert isinstance(asset, DataReportAsset)
+    assert asset.kind == "complaint_index"
+    assert asset.report_id == "rpt-d2"
+    # One row per cluster, in rank order.
+    assert [it.rank for it in asset.items] == [1, 2]
+    first, second = asset.items
+    # Counts copied from the REAL cluster numbers — NOT len(quotes), not invented.
+    assert (first.distinct_authors, first.mentions) == (37, 52)
+    assert (second.distinct_authors, second.mentions) == (21, 24)
+    # The LLM-written labels are used.
+    assert first.label == "Audio jitter breaks concentration"
+    # methodology is disclosed and non-empty, naming the real base.
+    assert asset.methodology
+    assert "42" in asset.methodology  # total_threads from the fixture
+    assert "88" in asset.methodology  # total_distinct_authors from the fixture
+
+
+def test_data_report_items_carry_real_permalinks_and_verbatim_quote() -> None:
+    report = _data_report()
+    asset = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    first = asset.items[0]
+    # Permalinks are the real source_urls of the cluster's quotes, deduped, in order.
+    assert first.permalinks == ["https://reddit.com/r/A/1", "https://reddit.com/r/A/2"]
+    # The quote is one verbatim quote from the cluster (exact text, not paraphrased).
+    assert first.quote == "the jitter ruins my focus"
+    assert asset.items[1].permalinks == ["https://reddit.com/r/B/9"]
+
+
+def test_data_report_falls_back_to_claim_when_llm_fails() -> None:
+    # Nothing scripted → the prose pass raises → labels fall back to the cluster claim verbatim,
+    # but the deterministic counts / permalinks / quotes still ship.
+    report = _data_report()
+    asset = build_data_asset(_deps(FakeChatModel()), report, "feature_ranking")
+    assert asset.kind == "feature_ranking"
+    assert asset.items[0].label == "consumers struggle with pain point 1"
+    assert asset.items[0].distinct_authors == 37
+    assert asset.items[0].permalinks == ["https://reddit.com/r/A/1", "https://reddit.com/r/A/2"]
+    assert asset.title  # a deterministic title is always produced
+
+
+def test_data_report_kinds_share_grounded_data() -> None:
+    report = _data_report()
+    complaint = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    state_of = build_data_asset(_deps(_data_prose_chat()), report, "state_of")
+    # Different framing, same grounded numbers + permalinks per row.
+    assert complaint.kind == "complaint_index" and state_of.kind == "state_of"
+    assert [it.distinct_authors for it in complaint.items] == [
+        it.distinct_authors for it in state_of.items
+    ]
+    assert [it.permalinks for it in complaint.items] == [it.permalinks for it in state_of.items]
+
+
+def test_mcp_distribution_data_report_invalid_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_data_report("nope", kind="bogus")
+    assert res["error"]["error_code"] == "invalid_argument"
+
+
+def test_mcp_distribution_data_report_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_data_report("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_data_report_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _data_report()
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _data_prose_chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_data_report(report.report_id, kind="complaint_index")
+    assert "data_report" in res
+    assert res["data_report"]["report_id"] == "rpt-d2"
+    assert res["data_report"]["items"][0]["distinct_authors"] == 37
+    assert res["data_report"]["items"][0]["permalinks"]
+    assert res["data_report"]["methodology"]
+
+
+# ── D4: channel-shaped assets ────────────────────────────────────────────────
+
+
+def _channel(
+    *,
+    name: str,
+    surface_type: ChannelSurfaceType,
+    funnel_stage: str = "awareness",
+) -> Channel:
+    return Channel(
+        surface_type=surface_type,
+        name=name,
+        motion="push",
+        cadence="spike",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage=funnel_stage,  # type: ignore[arg-type]
+        routing_signal="grounded in the corpus",
+    )
+
+
+def _asset_chat(drafts: list[Any]) -> FakeChatModel:
+    """A FakeChatModel that returns the given _AssetDraft list FIFO (one per channel)."""
+    from metalworks.research.distribution.assets import _AssetDraft
+
+    chat = FakeChatModel()
+    chat.script(_AssetDraft, drafts)
+    return chat
+
+
+def _grounding_report() -> DemandReport:
+    """A report whose quote carries a substring a demand claim can ground against."""
+    quote = _quote(
+        "I would honestly pay for a focus tool that just works without the jitter",
+        "https://reddit.com/r/SideProject/comments/1/x",
+        "r/SideProject",
+    )
+    return _report(clusters=[_cluster(1, quotes=[quote])])
+
+
+def test_build_channel_assets_shapes_product_hunt() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tagline", text="Focus that just works."),
+            _DraftedPart(
+                role="maker_comment",
+                text="I built this after months of jitter. People want a focus tool "
+                "that just works without the jitter, so that's what I shipped.",
+            ),
+            _DraftedPart(role="gallery_caption", text="The one-tap focus screen."),
+        ],
+        offer="Try it free today — no card needed.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="product_hunt", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    assets = build_channel_assets(_deps(chat), report, [channel])
+
+    assert len(assets) == 1
+    asset = assets[0]
+    assert asset.channel_name == "product_hunt"
+    roles = [p.role for p in asset.parts]
+    assert "maker_comment" in roles  # PH has a maker_comment part
+    assert "tagline" in roles
+    # parts concatenate into body, in order.
+    for part in asset.parts:
+        assert part.text in asset.body
+    assert asset.offer  # the CTA is free (not grounded)
+
+
+def test_build_channel_assets_shapes_x_thread() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tweet", text="Shipping a focus tool I wish existed."),
+            _DraftedPart(role="tweet", text="It kills the jitter that broke my flow."),
+            _DraftedPart(role="tweet", text="Built solo over a winter. Here's how."),
+        ],
+        offer="Link in the reply below.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="x_thread", surface_type=ChannelSurfaceType.SOCIAL)
+    assets = build_channel_assets(_deps(chat), report, [channel])
+
+    assert len(assets) == 1
+    tweets = [p for p in assets[0].parts if p.role == "tweet"]
+    assert len(tweets) >= 2  # X has ≥2 tweet parts
+
+
+def test_demand_claims_ground_but_hooks_are_free() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _ClaimDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    # A grounded demand claim (verbatim slice of the quote) + an UNGROUNDED claim
+    # whose supporting_quote isn't in the corpus → dropped. The persuasive tagline
+    # carries no quote and is NOT a claim → it survives un-grounded.
+    grounded_text = "People want a focus tool that just works without the jitter"
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tagline", text="Finally, focus that sticks."),
+            _DraftedPart(
+                role="maker_comment",
+                text=f"{grounded_text}. I built exactly that.",
+            ),
+        ],
+        offer="Start your first session now.",
+        claims=[
+            _ClaimDraft(
+                text=grounded_text,
+                supporting_quote="pay for a focus tool that just works without the jitter",
+            ),
+            _ClaimDraft(
+                text="Thousands of teams switched last month",
+                supporting_quote="this number was never said by anyone in the corpus at all",
+            ),
+        ],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="product_hunt", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    # Exactly the grounded demand claim survives; the ungrounded one is dropped.
+    assert len(asset.claim_citations) == 1
+    cite = asset.claim_citations[0]
+    assert cite.claim_text == grounded_text
+    # The span resolves verbatim against the body (no-cite-no-claim contract).
+    assert asset.body[cite.span_start : cite.span_end] == cite.claim_text
+    # The citation's evidence resolves against the report's evidence by id.
+    assert cite.evidence_ref.evidence_id in {e.id for e in report.evidence}
+    # The persuasive tagline survived without any citation backing it.
+    assert any(p.role == "tagline" for p in asset.parts)
+
+
+def test_no_asset_contains_an_upvote_ask() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="title", text="Show HN: a jitter-free focus tool"),
+            _DraftedPart(
+                role="first_comment",
+                text="I built this solo. It works offline. Please upvote us if you like it! "
+                "Feedback welcome.",
+            ),
+        ],
+        offer="Smash that upvote button to support the launch.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="show_hn", surface_type=ChannelSurfaceType.EARNED_MEDIA)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    # The deterministic guard stripped every upvote ask — body, parts AND offer.
+    assert "upvote" not in asset.body.lower()
+    assert "upvote" not in asset.offer.lower()
+    for part in asset.parts:
+        assert "upvote" not in part.text.lower()
+    # The non-offending copy survived the strip.
+    assert "Feedback welcome." in asset.body
+
+
+def test_unknown_roles_dropped_and_empty_channel_skipped() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    # First channel: every part has a role not in its shape → no parts → skipped.
+    bad = _AssetDraft(
+        parts=[_DraftedPart(role="not_a_real_role", text="orphaned copy")],
+        offer="",
+        claims=[],
+    )
+    good = _AssetDraft(
+        parts=[_DraftedPart(role="title", text="A plain, honest post about the tool.")],
+        offer="Try it.",
+        claims=[],
+    )
+    chat = _asset_chat([bad, good])
+    channels = [
+        _channel(name="show_hn", surface_type=ChannelSurfaceType.EARNED_MEDIA),
+        _channel(name="state_of_x", surface_type=ChannelSurfaceType.DATA_ASSET),
+    ]
+    assets = build_channel_assets(_deps(chat), report, channels)
+    # The all-bad-roles channel is skipped; only the usable one survives.
+    assert [a.channel_name for a in assets] == ["state_of_x"]
+
+
+def test_mcp_distribution_assets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+    from metalworks.research.distribution.assets import _AssetDraft, _DraftedPart
+
+    store = MemoryStores()
+    report = _grounding_report()
+    store.save_report(report)
+
+    draft = _AssetDraft(
+        parts=[_DraftedPart(role="tagline", text="Focus that just works.")],
+        offer="Try it free.",
+        claims=[],
+    )
+
+    def _chat() -> FakeChatModel:
+        # One chat scripts BOTH the strategy's classify/enrich calls and the asset
+        # drafts — script each output_model the run will touch.
+        chat = _scripted_chat()
+        chat.script(_AssetDraft, [draft] * 12)
+        return chat
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+
+    assert tools.distribution_assets("nope")["error"]["error_code"] == "not_found"
+    res = tools.distribution_assets(report.report_id)
+    assert "assets" in res
+    assert all("parts" in a for a in res["assets"])
 
 
 # ── D6: GEO / LLM-citability ─────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 ---
 title: "Claude Code plugin"
-description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 30 tools and a hard posting gate."
+description: "Run the whole metalworks workflow inside Claude Code as slash commands — validate an idea, get positioning, scaffold a build, draft launch copy and Reddit replies — backed by an MCP server with 31 tools and a hard posting gate."
 ---
 
 The metalworks plugin brings the full workflow into Claude Code. Ask
@@ -9,7 +9,7 @@ report the library produces — every claim linked to a real quote you can open 
 then keep going (`/position-wedge`, `/build-spec`, `/launch-kit`) from there.
 
 Under the hood it's an [MCP server](/docs/mcp-tools): each slash command is a skill that calls
-one or more of its 30 tools. The commands chain through a stored demand report, exactly like the
+one or more of its 31 tools. The commands chain through a stored demand report, exactly like the
 [CLI](/docs/cli) — see [Projects & memory](/docs/projects) for how that state persists.
 
 ## Install
