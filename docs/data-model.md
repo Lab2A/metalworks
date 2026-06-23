@@ -79,8 +79,14 @@ Each one is generated from the report and links its claims back to the same quot
   can't be tied to a quote is dropped), plus the surface to build on (web, mobile, CLI… —
   chosen with a one-line rationale, or pinned) and the `Screen`s you need, each mapped to
   real features.
-- **`LaunchAsset` / `ChannelPlan` / `ContentPlan`** — launch drafts and a human-run plan,
-  each line backed by a quote. metalworks never posts.
+- **`ChannelStrategy` / `Channel`** — the **test→focus** channel experiments, each `routing_signal`
+  tied to a real corpus entity; plus the per-channel assets and plan derived from them —
+  **`ChannelAsset` / `AssetPart`** (channel-shaped drafts), **`DataReportAsset` / `DataReportItem`**
+  (a corpus-derived data report with real counts + permalinks), **`GeoPlan`** (with
+  `ParticipationTarget` / `CitabilityProbe` / `AnswerBrief`), **`DistributionPlan`** (with `Push` /
+  `Stream`), **`ChannelMetric` / `ChannelResult`**, and the build-feed
+  **`LoopRequirement` / `ConversionSurfaceRequirement`**. Every claim-bearing line is backed by a
+  quote; metalworks never posts.
 - **`Landscape` / `ExistingSolution`** — the full "what exists today": the `CompetitorMap` plus
   real shipped products (Product Hunt / web) matched to demand clusters with their traction.
 - **`Assessment` / `ForkVerdict`** — the **GO / PIVOT / NO-GO** verdict, a deterministic gap over

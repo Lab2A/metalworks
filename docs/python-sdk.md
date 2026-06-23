@@ -226,6 +226,9 @@ paths = mw.scaffold(spec, research, Path("./my-startup"))
 
 ```python
 def channel_strategy(self, research, positioning=None) -> ChannelStrategy: ...
+def distribution_requirements(self, research, positioning=None) -> tuple[list[LoopRequirement], list[ConversionSurfaceRequirement]]: ...
+def channel_assets(self, research, positioning=None) -> list[ChannelAsset]: ...
+def data_asset(self, research, kind="complaint_index") -> DataReportAsset: ...
 def distribution_plan(self, research, positioning=None) -> DistributionPlan: ...
 def channel_metrics(self, research, positioning=None) -> list[ChannelMetric]: ...
 def geo(self, research) -> GeoPlan: ...
@@ -233,7 +236,19 @@ def distribution_engage(self, research, target, *, voice=None) -> ParticipationR
 ```
 
 `channel_strategy` routes the report's real named entities + signals into **test→focus** channel
-experiments (D2) — every `routing_signal` traces to a real corpus entity. `distribution_plan`
+experiments (D2) — every `routing_signal` traces to a real corpus entity. `distribution_requirements`
+emits the embedded loops + conversion surface distribution designs INTO the product as BUILD
+requirements (D3): a `LoopRequirement` per `embedded_loop` channel (loop kind → concrete build
+requirements grounded in the channel's signal) plus a `ConversionSurfaceRequirement` for the
+destination the channels point at — feed it to `build_spec(..., distribution_requirements=...)`.
+`channel_assets` drafts channel-SHAPED, drafting-only assets per channel (D4) — one `ChannelAsset`
+per selected channel, shaped to its surface (Product Hunt tagline + maker comment; Show HN title +
+first comment; X thread; LinkedIn carousel); demand/factual claims are grounded, persuasive hooks
+free, platform invariants enforced — **it never posts**. `data_asset` projects the report into a
+corpus-derived **data report** (D5), the on-brand flagship asset: a deterministic ranking of the
+report's clusters carrying their REAL distinct-author / mention counts, real permalinks, and a
+verbatim quote per row; `kind` picks the framing (`complaint_index` | `feature_ranking` |
+`state_of`). `distribution_plan`
 sequences those channels into a campaign (D7): **pushes** (the `spike`-cadence channels placed into
 concentrated launch moments, their `timing` READ from a deterministic playbook table — Product Hunt
 12:01am PT Tue/Wed, Show HN Tue-Thu 8-10am, … — never invented hours; one all-day-attention channel
@@ -272,26 +287,6 @@ for b in plan.answer_briefs:
 reply = mw.distribution_engage(research, plan.participation_targets[0])
 print(reply.compliance.pass_, reply.community)
 print(reply.draft)
-```
-
-### Launch & Grow stages
-
-```python
-def launch(self, research, positioning=None) -> list[LaunchAsset]: ...
-def channel_plan(self, research, surfaces: list[str] | None = None) -> ChannelPlan: ...
-def content_plan(self, research) -> ContentPlan: ...
-```
-
-`launch` drafts channel-native assets (Product Hunt / Show HN / X), each claim carrying a
-`ClaimCitation` with exact character spans — **it never posts**. `channel_plan` is a
-deterministic, human-executed checklist (every step is `requires_human=True`). `content_plan`
-is deterministic and zero-key: one page per demand cluster, with FAQ blocks and citation
-targets.
-
-```python
-assets = mw.launch(research, pos)
-plan = mw.channel_plan(research, surfaces=["product_hunt", "show_hn"])
-content = mw.content_plan(research)        # no LLM call, no key needed
 ```
 
 ### `.deps`

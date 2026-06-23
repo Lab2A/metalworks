@@ -116,7 +116,7 @@ dropped at assembly.
 | `LogoSet` / `LogoOption` | `logo.py` | authored SVG logo options, drawn under the `DesignSystem` (§7) |
 | `BuildSpec` | `build.py` | `surface` (∈ {sdk, web, mobile, cli, browser_extension, api, desktop}) + `surface_rationale`, `features` (each evidence-backed, cite-or-die), feature-grounded `screens` (`Screen` from `surface.py`), `personas`, `pricing_tiers`, `stack` hint |
 | `Assessment` / `Decision` | `assess.py` | GO / PIVOT / NO_GO — **deterministic** from demand × landscape; LLM only writes the rationale |
-| `ContentPlan` | `marketing.py` | deterministic SEO/content plan, one page per cluster |
+| `ChannelStrategy` / `Channel` + `ChannelAsset` / `DataReportAsset` / `GeoPlan` / `DistributionPlan` / `ChannelMetric` / `LoopRequirement` | `distribution.py` | test→focus channel experiments + their drafting-only assets, the corpus-derived data report, the GEO stream, the pushes-and-streams plan, the per-channel metrics, and the embedded-loop / conversion-surface build requirements |
 
 The deterministic verdict is the heart of the honesty model: `assess()` computes the gap
 (demand strength vs landscape saturation); a `partial` landscape can never yield a hard GO.
@@ -218,11 +218,14 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
   `.landscape()`, `.assess()`, `.ideate()`, `.validate()`,
   `.design()`, `.render_design_preview()`,
   `.logo()`, `.render_logo_picker()`, `.design_review()`, `.build_spec()`, `.scaffold()`,
-  `.launch()`, `.channel_plan()`, `.content_plan()`, plus `.reddit` and `.discovery`
+  `.channel_strategy()`, `.distribution_requirements()`, `.channel_assets()`, `.data_asset()`,
+  `.geo()`, `.distribution_plan()`, `.channel_metrics()`, `.distribution_engage()`,
+  plus `.reddit` and `.discovery`
   namespaces and a `.deps` escape hatch. `.research()` returns the `Research` bundle;
   sub-pillars are pure functions over it.
 - **CLI** (`cli/`): `metalworks` with sub-apps `research` (the pillars: `design`,
-  `logo`, `design-review`, `launch`, …), `reddit`, `arctic`, `config`, `models`, `sources`,
+  `logo`, `design-review`, …), `distribution` (`strategy`, `assets`, `data-report`, `geo`,
+  `requirements`, `plan`, `measure`, `engage`), `reddit`, `arctic`, `config`, `models`, `sources`,
   `corpus`, `browser` (`browser install`), `mcp serve`, plus a top-level interactive menu,
   `doctor`, and a `render` debug command. Lazy-imports providers so the CLI starts free of
   heavy deps.
@@ -235,8 +238,10 @@ sources (Hacker News, Product Hunt, web) plug in through `ItemSource`.
 - **Claude Code plugin** (`plugin/`): skills over the MCP tools — five engagement
   (`/demand-report`, `/find-threads`, `/draft-reply`, `/subreddit-intel`, `/discovery`) plus
   the grounded pillars (`/position-wedge`, `/market-landscape`,
-  `/design`, `/logo`, `/design-review`, `/launch-kit`, `/content-plan`,
-  `/build-spec`, `/go-no-go`, `/ideate`, `/validate`).
+  `/design`, `/logo`, `/design-review`, `/build-spec`, `/go-no-go`, `/ideate`, `/validate`)
+  and the eight distribution skills (`/distribution-strategy`, `/distribution-requirements`,
+  `/distribution-assets`, `/distribution-data-report`, `/distribution-geo`,
+  `/distribution-engage`, `/distribution-plan`, `/distribution-measure`).
 
 **Reddit engagement** (`reddit/`) is its own subsystem: OAuth + encrypted tokens, public
 search, subreddit intel, inbox, and gated posting. The compliance gate is deterministic

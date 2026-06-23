@@ -32,15 +32,15 @@ the `fix` verbatim.
 
 ## MCP tools (the language-agnostic surface)
 
-Run `metalworks mcp serve` (stdio). **32 tools** are registered. The full table — every
+Run `metalworks mcp serve` (stdio). **35 tools** are registered. The full table — every
 tool, its tier, whether it needs a key, its purpose, and params — is the canonical [MCP tools
 reference](/docs/mcp-tools); read it there rather than re-deriving the list here. In short:
 
 - **Zero-key** data + deterministic tools (Reddit + Arctic corpus reads, run/report listing,
-  `compliance_lint`, `content_plan_from_report`, ...) need no provider key.
+  `compliance_lint`, `distribution_data_report`, ...) need no provider key.
 - **Key-gated** tools call a model: demand research (`research_start` / `research_status` /
   `research_result`), `research_plan_brief`, the report-derived pillars (`positioning_from_report`,
-  `landscape_from_report`, `assess_from_report`, design, `launch_assets_build`, `build_spec`, ...),
+  `landscape_from_report`, `assess_from_report`, design, `distribution_assets`, `build_spec`, ...),
   `generate_reply`, `discovery_run`, and the `validate_from_idea` orchestrator.
 - **Posting (the security boundary):** `reddit_post_comment` requires a `confirm_token`
   emitted by a `compliance_lint` pass over that exact text **and**

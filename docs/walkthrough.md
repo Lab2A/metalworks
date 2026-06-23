@@ -95,31 +95,35 @@ mw.scaffold(spec, research, "./my-startup")        # writes the build harness
 The scaffold includes a frozen list of the real quotes behind every feature, so whatever
 your agent builds stays true to what people actually asked for. → [Build spec](/docs/build-spec)
 
-## 4. Launch and grow
+## 4. Distribution
 
 <CodeGroup>
 
 ```text Claude Code
-/launch-kit
-/content-plan
+/distribution-strategy
+/distribution-assets
+/distribution-data-report
+/distribution-geo
 ```
 
 ```python Python
-assets = mw.launch(research, positioning)   # Product Hunt / Show HN / X drafts (never posts)
-plan = mw.channel_plan(research)            # a step-by-step launch checklist you run
+strategy = mw.channel_strategy(research)    # test→focus channel experiments, every channel grounded
+assets = mw.channel_assets(research)        # channel-shaped drafts (never posts)
+report = mw.data_asset(research)            # a corpus-derived data report — real counts + permalinks
 
-content = mw.content_plan(research)         # an SEO/content plan, one page per real need
+geo = mw.geo(research)                       # GEO / LLM-citability: real threads + answer briefs
+plan = mw.distribution_plan(research)        # pushes + streams, sequenced from a playbook
 ```
 
 </CodeGroup>
 
-Launch copy is drafting-only — metalworks never posts anything. Each claim in a draft is
-backed by a quote; the content plan lists the real threads to cite so people and AI search
-engines find you. → [Launch assets](/docs/launch) · [Content & SEO](/docs/content-seo)
+Distribution copy is drafting-only — metalworks never posts anything. Each claim in a draft is
+backed by a quote; the GEO stream lists the real threads to cite so people and AI search
+engines find you. → [Distribution](/docs/distribution) · [GEO / LLM-citability](/docs/distribution-geo)
 
 ## That's the loop
 
-One idea → one grounded report → positioning, design, a build plan, launch copy. Because it
+One idea → one grounded report → positioning, design, a build plan, distribution. Because it
 all reads from the same report, **every recommendation links back to a real quote you can
 open and read for yourself.** That's the difference between this and a tool that just makes
 things up — see [why you can trust the output](/docs/how-it-works).

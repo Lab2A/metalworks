@@ -60,14 +60,20 @@ public functions you can wire into your own flow.
   surface + a rationale and sketches feature-grounded screens) + a project scaffold
   for your own coding agent. metalworks specs and scaffolds; it writes no product
   code. See the [Build spec](/docs/build-spec).
-- `build_launch_assets(deps, report, positioning)` / `plan_channels(report)` —
-  drafting-only launch copy (never posts) + a human-executed channel plan.
-- `content_plan_from_report(report)` — a deterministic, zero-key content/SEO plan.
+- `build_channel_strategy(deps, report, positioning=None)` / `distribution_requirements(channels)` —
+  the **test→focus** channel experiments + the embedded-loop / conversion-surface build requirements.
+- `build_channel_assets(deps, report, channels, positioning=None)` /
+  `build_data_asset(deps, report, kind="complaint_index")` — drafting-only channel-shaped assets
+  (never posts) + a corpus-derived data report with real counts and permalinks.
+- `build_geo_plan(deps, report)` / `plan_distribution(report, channels)` / `channel_metrics(channels)` —
+  the GEO / LLM-citability stream, the pushes-and-streams plan, and the per-channel success metrics.
+  See [Distribution](/docs/distribution).
 
 These are also on the `Metalworks` facade —
 `mw.positioning(research)`, `mw.landscape(...)` (the competitive map + existing solutions),
 `mw.design(...)`, `mw.build_spec(...)` / `mw.scaffold(...)`,
-`mw.launch(...)` / `mw.channel_plan(...)`, `mw.content_plan(...)` — which thread
+`mw.channel_strategy(...)` / `mw.channel_assets(...)` / `mw.data_asset(...)` / `mw.geo(...)` /
+`mw.distribution_plan(...)` — which thread
 the one resolved `ResearchDeps` for you. See the [walkthrough](/docs/walkthrough).
 
 **Reddit + discovery** (`metalworks.reddit`, `metalworks.discovery`):

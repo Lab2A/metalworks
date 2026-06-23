@@ -58,10 +58,23 @@ Reddit quote by permalink:
 - **/design-review** — a deterministic audit of a *rendered* page's actual computed
   styles (fonts, heading scale, colors) against design hard-rules and the design
   system. The model writes nothing; needs the browser renderer.
-- **/launch-kit** — drafting-only Product Hunt / Show HN / X-thread assets plus a
-  human-executed channel plan. Never posts.
-- **/content-plan** — a deterministic, zero-key content/SEO plan: one page per
-  demand cluster with real stat anchors and the actual permalinks to cite.
+- **/distribution-strategy** — route the report's named entities + signals into
+  **test→focus** channel experiments; every channel traces to a real corpus entity.
+- **/distribution-requirements** — the distribution → build requirements: the
+  embedded loops + the conversion surface, emitted as concrete things to build.
+- **/distribution-assets** — drafting-only, channel-shaped assets per channel
+  (Product Hunt / Show HN / X / LinkedIn). Demand claims grounded. Never posts.
+- **/distribution-data-report** — a corpus-derived data report (complaint index /
+  feature ranking / State of X): real counts, real permalinks, a verbatim quote per
+  row. Zero-key; the numbers are copied, never invented.
+- **/distribution-geo** — the GEO / LLM-citability stream: participation targets,
+  citability probes, and answer-first answer briefs. Drafting only.
+- **/distribution-engage** — draft a disclosed, founder-voiced reply for one GEO
+  participation target, run the compliance gate, hand it to you. Posting is gated.
+- **/distribution-plan** — sequence the channels into a campaign of pushes + streams
+  at deterministic playbook timings. Planning only.
+- **/distribution-measure** — the per-channel success metric + the instrumentation
+  to wire before the push, read deterministically by surface type. Planning only.
 - **/build-spec** — an evidence-grounded build harness for a coding agent: core
   features each mapped to a real demand cluster, the product surface to build it on
   (auto-picked + explained, or pinned) and a feature-grounded screen skeleton, plus

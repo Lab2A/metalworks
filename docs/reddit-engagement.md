@@ -135,5 +135,6 @@ To wire the filter, generation, and gate together as your own building blocks, s
 
 ---
 
-Next: draft your [launch assets](/docs/launch) or a [content & SEO plan](/docs/content-seo) from
-the same report. Or read [why you can trust the output](/docs/how-it-works).
+Next: plan where it gets distributed — [distribution](/docs/distribution) and
+[GEO / LLM-citability](/docs/distribution-geo) — from the same report. Or read
+[why you can trust the output](/docs/how-it-works).

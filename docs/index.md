@@ -61,8 +61,8 @@ falls into five stages — each step is a single call:
 | **Research** | [Demand research](/docs/demand-research) — a read on how strong the demand is + the real needs people voiced, each backed by quotes. Run the full [validation loop](/docs/validation-loop) — frame an idea, weigh demand against what already exists, get a **GO / PIVOT / NO-GO** call — then your [positioning](/docs/positioning) (who it's for, why it's different) and the [competitors](/docs/competitors) to beat. |
 | **Design** | [A design system](/docs/design-system) — an aesthetic direction and a SAFE/RISK choice per dimension, read from what rivals actually do. |
 | **Build** | [A build spec](/docs/build-spec) — what to build (surface + screens), a feature plan mapped to real demand, and a project scaffold your coding agent executes. |
-| **Launch** | [Launch assets](/docs/launch) — Product Hunt / Show HN / X drafts, each line backed by a quote (it never posts). |
-| **Grow** | [Content & SEO](/docs/content-seo) — a plan that gets you cited by people and AI search — and [Reddit engagement](/docs/reddit-engagement): find threads to join and draft honest replies (you approve every post). |
+| **Distribute** | [Distribution](/docs/distribution) — **test→focus** channel experiments, channel-shaped drafts, and a corpus-derived data report, each line backed by a quote (it never posts) — plus [GEO / LLM-citability](/docs/distribution-geo): the real threads to join and answer-first briefs so people and AI search cite you. |
+| **Grow** | [Reddit engagement](/docs/reddit-engagement) — find threads to join and draft honest replies (you approve every post). |
 
 New here? Walk one idea from start to finish in the [end-to-end walkthrough](/docs/walkthrough).
 
