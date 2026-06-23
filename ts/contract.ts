@@ -5,6 +5,8 @@
 export type Fork = "product_pinned" | "demographic_pinned" | "both";
 export type SignalStrength = "low" | "medium" | "high";
 export type Decision = "go" | "pivot" | "no_go";
+export type ChannelSurfaceType = "launch_platform" | "marketplace" | "community" | "answer_engine_geo" | "embedded_loop" | "wedge_integration" | "borrowed_audience" | "data_asset" | "earned_media" | "social" | "search" | "app_store" | "paid" | "sales";
+export type ProductType = "b2b_sales_led" | "b2b_plg" | "dev_tool" | "consumer" | "ai_product" | "marketplace" | "prosumer";
 
 export interface EvidenceRef {
   /** Target ResolvedCitation/WebFinding/PriceEvidence id. Empty for a cluster ref. */
@@ -775,6 +777,39 @@ export interface ClaimCitation {
   span_end: number;
   /** Ref to the supporting quote — resolves against the report's evidence by id. */
   evidence_ref: EvidenceRef;
+}
+
+export interface Channel {
+  /** Which kind of surface this channel acts on. */
+  surface_type: ChannelSurfaceType;
+  /** The concrete channel id, e.g. 'show_hn' | 'shopify_app_store' | a subreddit. */
+  name: string;
+  /** 'push' (you broadcast) vs 'pull' (they find you). */
+  motion: "push" | "pull";
+  /** 'spike' (a sequenced push moment) vs 'compounding' (a continuous stream). */
+  cadence: "spike" | "compounding";
+  /** How you get surfaced: 'algorithmic' | 'curated' (co-sell) | 'exogenous'. */
+  discovery: "algorithmic" | "curated" | "exogenous";
+  /** 'revenue' (sells directly) vs 'lead_gen' (feeds the funnel). */
+  role: "revenue" | "lead_gen";
+  /** Where in the funnel this channel acts (awareness…retention). */
+  funnel_stage: "awareness" | "consideration" | "conversion" | "retention";
+  /** The grounded entity/signal in the corpus that selected this channel. */
+  routing_signal: string;
+  /** True when this channel is an amplifier needing an initial push to ignite — marketplaces/loops don't start their own velocity. */
+  requires_spark?: boolean;
+  /** The channel name that ignites this one, when requires_spark is true. */
+  spark_channel?: string | null;
+  /** The cheap test to validate this channel (test→focus; set downstream). */
+  test?: string;
+  /** What result counts as the test passing — the bar to concentrate here. */
+  success_threshold?: string;
+  /** Honest 'worth it' read (e.g. 'PH: awareness, not conversions'). */
+  worth_it_note?: string;
+  /** The carried caveat/risk for this channel. */
+  caveat?: string;
+  /** One line: why this channel fits this product + audience. */
+  rationale?: string;
 }
 
 export interface FeatureSpec {
