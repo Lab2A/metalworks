@@ -33,10 +33,10 @@ no key). So Anthropic/OpenRouter/local chat all work standalone.
   `build_spec_from_report` / `scaffold`
   (a `BuildSpec` — also picks the surface + sketches feature-grounded screens — plus a
   project scaffold for your own coding agent; metalworks writes no product code),
-  `build_launch_assets` / `plan_channels`, `content_plan_from_report`
-  (deterministic, zero-key). All on the `Metalworks` facade
-  (`mw.positioning/competitors/build_spec/scaffold/launch/channel_plan/content_plan`),
-  the CLI `metalworks research position|competitor-map|launch|content-plan`
+  `build_channel_strategy` (Distribution — routes the report's real named entities/signals
+  into test→focus channel experiments). All on the `Metalworks` facade
+  (`mw.positioning/competitors/build_spec/scaffold/channel_strategy`),
+  the CLI `metalworks research position|competitor-map` + `metalworks distribution strategy`
   + `metalworks build init`, and the matching synchronous MCP tools.
 - `metalworks.discovery`: `run_discovery`, plus the public `filter_post` and
   `draft_reply` building blocks.

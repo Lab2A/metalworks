@@ -17,7 +17,9 @@
     { "source": "/docs/guide-design", "destination": "/docs/design-system" },
     { "source": "/docs/design", "destination": "/docs/design-system" },
     { "source": "/docs/guide-build", "destination": "/docs/build-spec" },
-    { "source": "/docs/guide-launch-growth", "destination": "/docs/launch" },
+    { "source": "/docs/guide-launch-growth", "destination": "/docs/distribution" },
+    { "source": "/docs/launch", "destination": "/docs/distribution" },
+    { "source": "/docs/content-seo", "destination": "/docs/distribution" },
     { "source": "/docs/guide-reddit-engagement", "destination": "/docs/reddit-engagement" },
     { "source": "/docs/explanation-provenance", "destination": "/docs/how-it-works" },
     { "source": "/docs/concepts", "destination": "/docs/data-model" },
@@ -67,12 +69,8 @@
             "pages": ["docs/build-spec"]
           },
           {
-            "group": "Launch",
-            "pages": ["docs/launch"]
-          },
-          {
-            "group": "Grow",
-            "pages": ["docs/content-seo", "docs/reddit-engagement"]
+            "group": "Distribution",
+            "pages": ["docs/distribution", "docs/reddit-engagement"]
           },
           {
             "group": "How it works",

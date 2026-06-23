@@ -812,6 +812,21 @@ export interface Channel {
   rationale?: string;
 }
 
+export interface ChannelStrategy {
+  /** The source report this strategy was derived from. */
+  report_id: string;
+  /** The classified product/ICP archetype that biased the channel routing. */
+  product_type: ProductType;
+  /** One-line ICP, grounded in the report (who this is for, in their words). */
+  icp_summary: string;
+  /** The selected channel experiments (test→focus), spanning funnel stages. */
+  channels: Channel[];
+  /** The test→focus guidance — 'test these N, concentrate on the winner'. */
+  focusing_rule: string;
+  /** Coverage note across funnel stages; flags an all-top-of-funnel plan as a leak. */
+  funnel_note: string;
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;

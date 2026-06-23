@@ -2410,6 +2410,71 @@ def build_init(
     )
 
 
+# ── distribution sub-app (D2: channel strategy) ──────────────────────────────
+
+
+distribution_app = typer.Typer(
+    help="Channel strategy: route the report's signals into test→focus channel experiments.",
+    no_args_is_help=True,
+)
+
+
+def _print_channel_strategy(strategy: object) -> None:
+    console.print(
+        f"\n[bold]Channel strategy[/bold] — report {getattr(strategy, 'report_id', '')} "
+        f"([dim]{getattr(strategy, 'product_type', '')}[/dim])"
+    )
+    console.print(f"  [italic]{getattr(strategy, 'icp_summary', '')}[/italic]")
+    for ch in getattr(strategy, "channels", []):
+        spark = f" [dim]← spark: {ch.spark_channel}[/dim]" if ch.requires_spark else ""
+        console.print(f"\n  [bold]{ch.name}[/bold] ({ch.surface_type}, {ch.funnel_stage}){spark}")
+        console.print(f"    [dim]signal:[/dim] {ch.routing_signal}")
+        console.print(f"    [dim]test:[/dim] {ch.test}")
+        console.print(f"    [dim]pass when:[/dim] {ch.success_threshold}")
+    console.print(f"\n  [bold]focus:[/bold] {getattr(strategy, 'focusing_rule', '')}")
+    console.print(f"  [bold]funnel:[/bold] {getattr(strategy, 'funnel_note', '')}")
+
+
+@distribution_app.command("strategy")
+def distribution_strategy(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the channel strategy JSON here.")
+    ] = None,
+) -> None:
+    """Route a stored report's named entities + signals into test→focus channel experiments."""
+    from metalworks.research import build_channel_strategy
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Channel strategy[/bold] report {report_id}...")
+    try:
+        strategy = build_channel_strategy(deps, report)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(strategy.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote strategy[/green] {out}")
+    _print_channel_strategy(strategy)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 
@@ -2854,6 +2919,7 @@ reddit_app.add_typer(subreddit_app, name="subreddit")
 reddit_app.add_typer(auth_app, name="auth")
 
 app.add_typer(research_app, name="research")
+app.add_typer(distribution_app, name="distribution")
 app.add_typer(build_app, name="build")
 app.add_typer(reddit_app, name="reddit")
 app.add_typer(arctic_app, name="arctic")

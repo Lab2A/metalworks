@@ -331,6 +331,31 @@ def positioning_from_report(report_id: str, store_path: str | None = None) -> To
 
 
 @guard
+def distribution_strategy(report_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2 (chat key). Route a stored report's named entities + signals into the
+    structured channel space as test→focus channel experiments (D2) — one LLM
+    classify call + deterministic routing, synchronous. Every channel's
+    routing_signal traces to a real corpus entity. Needs a chat-model key."""
+    from metalworks import config
+    from metalworks.research import build_channel_strategy
+
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    strategy = build_channel_strategy(deps, report)
+    return {"strategy": strategy.model_dump(mode="json")}
+
+
+@guard
 @guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —

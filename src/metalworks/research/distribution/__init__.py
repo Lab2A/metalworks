@@ -12,5 +12,23 @@ to the no-cite-no-claim gate (see
 the Reddit engagement module (``metalworks.reddit``), re-homed here downstream.
 
 This package is the scaffolding the Distribution build fills in over D1+; it is
-import-safe with no provider dependencies and is intentionally empty for now.
+import-safe with no provider dependencies. D2 fills in the channel-strategy core
+(``channels.py``): the entity→channel routing engine that emits test→focus
+channel experiments.
 """
+
+from __future__ import annotations
+
+from metalworks.research.distribution.channels import (
+    build_channel_strategy,
+    classify_product,
+    extract_channel_signals,
+    select_channels,
+)
+
+__all__ = [
+    "build_channel_strategy",
+    "classify_product",
+    "extract_channel_signals",
+    "select_channels",
+]

@@ -182,3 +182,38 @@ class Channel(BaseModel):
     rationale: str = Field(
         default="", description="One line: why this channel fits this product + audience."
     )
+
+
+class ChannelStrategy(BaseModel):
+    """The channel-strategy output — entity→channel routing as test→focus experiments.
+
+    The heart of the Distribution pillar's strategy face: it routes the demand
+    report's recurring named entities + signals across the structured channel
+    space (:class:`Channel`) and emits a small set of **channel experiments**, NOT
+    a ranked portfolio. Each selected channel carries a cheap ``test`` + a
+    ``success_threshold`` (the test→focus discipline — most products have ONE
+    channel that works, so test cheaply and concentrate on the winner), and its
+    ``routing_signal`` traces to a real signal/entity in the corpus (the
+    no-fabrication rule — channels are derived from what the audience actually
+    named, never a hardcoded launch list). Selection is deterministic where it
+    can be; the LLM only classifies the product type / writes the ICP line and
+    per-channel prose, it never invents grounding. ``funnel_note`` flags an
+    all-top-of-funnel plan as a conversion leak.
+    """
+
+    report_id: str = Field(description="The source report this strategy was derived from.")
+    product_type: ProductType = Field(
+        description="The classified product/ICP archetype that biased the channel routing."
+    )
+    icp_summary: str = Field(
+        description="One-line ICP, grounded in the report (who this is for, in their words)."
+    )
+    channels: list[Channel] = Field(
+        description="The selected channel experiments (test→focus), spanning funnel stages."
+    )
+    focusing_rule: str = Field(
+        description="The test→focus guidance — 'test these N, concentrate on the winner'."
+    )
+    funnel_note: str = Field(
+        description="Coverage note across funnel stages; flags an all-top-of-funnel plan as a leak."
+    )
