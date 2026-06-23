@@ -37,7 +37,12 @@ from metalworks.contract.design import (
     LandscapeSignal,
     StyleFinding,
 )
-from metalworks.contract.distribution import ClaimCitation
+from metalworks.contract.distribution import (
+    Channel,
+    ChannelSurfaceType,
+    ClaimCitation,
+    ProductType,
+)
 from metalworks.contract.evidence import (
     EvidenceRecord,
     EvidenceRef,
@@ -194,7 +199,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     # Distribution stage — one pillar (pushes + streams), replacing the former
     # Pillar F (Launch) + Pillar G (Content/SEO). Rebuilt over D1+; carries the
     # salvaged no-cite-no-claim primitive for now.
+    "Channel",
+    "ChannelSurfaceType",
     "ClaimCitation",
+    "ProductType",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",

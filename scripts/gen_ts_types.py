@@ -40,6 +40,8 @@ from metalworks.contract import (  # noqa: E402
     BuildPersona,
     BuildSpec,
     CandidateWedge,
+    Channel,
+    ChannelSurfaceType,
     CitationRef,
     ClaimCitation,
     Competitor,
@@ -85,6 +87,7 @@ from metalworks.contract import (  # noqa: E402
     PriceFinding,
     PriceHypothesis,
     PricingTier,
+    ProductType,
     RedditComment,
     RedditPost,
     ReportSummary,
@@ -112,6 +115,8 @@ ENUMS: list[type[enum.Enum]] = [
     Fork,
     SignalStrength,
     Decision,
+    ChannelSurfaceType,
+    ProductType,
 ]
 
 # Models to emit, in dependency order (leaves first).
@@ -179,8 +184,10 @@ MODELS: list[type[BaseModel]] = [
     LogoOption,
     LogoSet,
     # distribution (one pillar; pushes + streams; replaces Pillar F + Pillar G).
-    # Rebuilt over D1+; carries the salvaged no-cite-no-claim primitive for now.
+    # Rebuilt over D1+; carries the salvaged no-cite-no-claim primitive + the
+    # audience-derived channel model.
     ClaimCitation,
+    Channel,
     # build (Pillar D)
     FeatureSpec,
     BuildPersona,
