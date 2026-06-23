@@ -385,7 +385,6 @@ def distribution_assets(report_id: str, store_path: str | None = None) -> ToolRe
 
 
 @guard
-@guard
 def distribution_data_report(
     report_id: str,
     kind: str = "complaint_index",
@@ -426,7 +425,6 @@ def distribution_data_report(
     return {"data_report": asset.model_dump(mode="json")}
 
 
-@guard
 @guard
 def distribution_geo(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Turn a stored report into the GEO / LLM-citability stream
@@ -491,7 +489,6 @@ def distribution_requirements(report_id: str, store_path: str | None = None) -> 
     }
 
 
-@guard
 @guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
