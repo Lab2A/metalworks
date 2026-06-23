@@ -44,6 +44,13 @@ from metalworks.research.distribution.data_asset import (
     _ReportProse,
     build_data_asset,
 )
+from metalworks.research.distribution.geo import (
+    _AnswerDraft,
+    answer_briefs,
+    build_geo_plan,
+    citability_probes,
+    participation_targets,
+)
 from metalworks.stores import MemoryStores
 
 # ── D1 contract ──────────────────────────────────────────────────────────────
@@ -777,3 +784,179 @@ def test_mcp_distribution_assets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     res = tools.distribution_assets(report.report_id)
     assert "assets" in res
     assert all("parts" in a for a in res["assets"])
+
+
+# ── D6: GEO / LLM-citability ─────────────────────────────────────────────────
+
+
+def _answer_chat(
+    answer: str = "Most indie devs report that jitter is the deal-breaker.",
+) -> FakeChatModel:
+    """A FakeChatModel scripting the answer-draft call (one instance, returned per call)."""
+    chat = FakeChatModel()
+    chat.script(_AnswerDraft, _AnswerDraft(answer=answer))
+    return chat
+
+
+def _geo_report() -> DemandReport:
+    """A report whose quotes carry real permalinks + communities, two clusters."""
+    return _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote(
+                        "the jitter on cheap focus tools is unbearable",
+                        "https://reddit.com/r/SideProject/comments/1/x",
+                        "r/SideProject",
+                        author_hash="a1",
+                    ),
+                    _quote(
+                        "I'd pay if it just stayed smooth",
+                        "https://reddit.com/r/SideProject/comments/2/y",
+                        "r/SideProject",
+                        author_hash="a2",
+                    ),
+                ],
+            ),
+            _cluster(
+                2,
+                quotes=[
+                    _quote(
+                        "everything good is locked behind a subscription",
+                        "https://reddit.com/r/Entrepreneur/comments/3/z",
+                        "r/Entrepreneur",
+                        author_hash="a3",
+                    ),
+                ],
+            ),
+        ]
+    )
+
+
+# ── participation_targets (deterministic, real permalinks) ───────────────────
+
+
+def test_participation_targets_use_real_permalinks() -> None:
+    report = _geo_report()
+    targets = participation_targets(report)
+    assert targets
+    # Every target's permalink is a REAL source_url drawn from the report's quotes.
+    real_urls = {q.source_url for c in report.ranked_clusters for q in c.quotes}
+    for t in targets:
+        assert t.permalink in real_urls
+        assert t.community.startswith("r/")
+        # why traces to a real cluster claim.
+        assert any(c.claim in t.why for c in report.ranked_clusters)
+    # Permalinks are deduped.
+    assert len({t.permalink for t in targets}) == len(targets)
+
+
+def test_participation_targets_skip_quotes_without_permalinks() -> None:
+    report = _geo_report()
+    for q in report.ranked_clusters[0].quotes:
+        q.source_url = ""  # strip permalinks from cluster 1
+    targets = participation_targets(report)
+    # Only the cluster-2 quote (which still has a permalink) survives.
+    assert targets
+    assert all("Entrepreneur" in t.permalink for t in targets)
+
+
+# ── citability_probes (map to cluster claims) ────────────────────────────────
+
+
+def test_citability_probes_map_to_cluster_claims() -> None:
+    report = _geo_report()
+    probes = citability_probes(report)
+    claims = {c.claim for c in report.ranked_clusters}
+    assert probes
+    assert len(probes) == len(report.ranked_clusters)
+    for p in probes:
+        # target_phrase is a real cluster claim; prompt is a question.
+        assert p.target_phrase in claims
+        assert p.prompt.endswith("?")
+
+
+# ── answer_briefs (grounded; evidence resolves; ungrounded dropped) ──────────
+
+
+def test_answer_briefs_are_grounded_and_carry_real_stat_anchors() -> None:
+    report = _geo_report()
+    # Two clusters → two answer-draft calls; script a list so each pops one.
+    chat = FakeChatModel()
+    chat.script(
+        _AnswerDraft,
+        [
+            _AnswerDraft(answer="Jitter is the deal-breaker; smoothness wins."),
+            _AnswerDraft(answer="Subscriptions are the recurring complaint."),
+        ],
+    )
+    briefs = answer_briefs(_deps(chat), report)
+    assert len(briefs) == 2
+    resolvable = {rec.id for rec in report.evidence}
+    for b in briefs:
+        assert b.answer  # grounded prose
+        assert b.evidence_refs  # carries refs
+        # Every ref resolves against report.evidence.
+        for ref in b.evidence_refs:
+            assert ref.evidence_id in resolvable
+    # stat_anchors carry the cluster's REAL counts.
+    first = briefs[0]
+    c0 = report.ranked_clusters[0]
+    assert first.stat_anchors["distinct_authors"] == c0.distinct_author_count
+    assert first.stat_anchors["mentions"] == c0.mention_count
+
+
+def test_answer_briefs_drops_an_ungrounded_answer() -> None:
+    report = _geo_report()
+    # A cluster whose quotes are not in report.evidence has no resolvable refs, so its
+    # brief is DROPPED (no-cite-no-claim). Clear cluster 1's quotes to force that path.
+    report.ranked_clusters[0].quotes = []
+    chat = FakeChatModel()
+    chat.script(_AnswerDraft, _AnswerDraft(answer="should not appear for the empty cluster"))
+    briefs = answer_briefs(_deps(chat), report)
+    questions = {b.question for b in briefs}
+    assert report.ranked_clusters[0].claim not in questions  # dropped
+    assert report.ranked_clusters[1].claim in questions  # kept (still grounded)
+
+
+# ── build_geo_plan + MCP ─────────────────────────────────────────────────────
+
+
+def test_build_geo_plan_assembles_three_streams() -> None:
+    report = _geo_report()
+    chat = FakeChatModel()
+    chat.script(_AnswerDraft, [_AnswerDraft(answer="a"), _AnswerDraft(answer="b")])
+    plan = build_geo_plan(_deps(chat), report)
+    assert plan.report_id == report.report_id
+    assert plan.participation_targets
+    assert plan.citability_probes
+    assert plan.answer_briefs
+
+
+def test_mcp_distribution_geo_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_geo("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_geo_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _geo_report()
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _answer_chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_geo(report.report_id)
+    assert "geo" in res
+    assert res["geo"]["report_id"] == "rpt-d2"
+    assert res["geo"]["participation_targets"]
+    assert res["geo"]["citability_probes"]

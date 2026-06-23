@@ -27,12 +27,22 @@ from metalworks.research.distribution.channels import (
     select_channels,
 )
 from metalworks.research.distribution.data_asset import build_data_asset
+from metalworks.research.distribution.geo import (
+    answer_briefs,
+    build_geo_plan,
+    citability_probes,
+    participation_targets,
+)
 
 __all__ = [
+    "answer_briefs",
     "build_channel_assets",
     "build_channel_strategy",
     "build_data_asset",
+    "build_geo_plan",
+    "citability_probes",
     "classify_product",
     "extract_channel_signals",
+    "participation_targets",
     "select_channels",
 ]

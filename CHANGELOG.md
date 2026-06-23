@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Distribution GEO / LLM-citability stream (D6) — participation targets, citability probes,
+  answer-first briefs.** A new `distribution geo` surface turns a finished demand report into the
+  GEO ("get cited by AI") stream. Reddit is the #1 AI-cited domain and most AI citations are Q&A
+  threads, so the play is to participate in the threads the audience is *already* asking in and to
+  publish answer-first content. **Participation targets** are pulled DETERMINISTICALLY from the
+  report's real permalinks + communities (a target's `permalink` is a verbatim `source_url` from a
+  verified quote — never invented) with a `why` grounded in the cluster claim. **Citability probes**
+  are derived deterministically from the cluster claims (the real questions the audience asks), not
+  templated keyword fluff. **Answer briefs** are LLM-authored answer-first prose, but cite-or-die is
+  CORRECT here — the answer is a factual claim, so each brief's `evidence_refs` resolve against
+  `report.evidence` and its `stat_anchors` carry the cluster's real distinct-author / mention
+  counts; a brief whose evidence doesn't resolve is DROPPED. Available on all four surfaces:
+  `mw.geo(...)`, `metalworks distribution geo <report-id>`, the `distribution_geo` MCP tool (tool
+  count 28 → 29), and the `distribution-geo` skill. Drafting only — nothing posts. Additive
+  contract: the new `ParticipationTarget`, `CitabilityProbe`, `AnswerBrief`, and `GeoPlan` models.
+  (#104)
 - **Data-as-marketing data report (D5) — the on-brand flagship asset.** A new `distribution
   data-report` surface projects a finished demand report into a corpus-derived `DataReportAsset`
   — a publishable ranking (a `complaint_index`, a `feature_ranking`, or a `state_of` report) over

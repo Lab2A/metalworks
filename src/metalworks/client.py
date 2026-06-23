@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         DesignReview,
         DesignSystem,
         DiscoveryContext,
+        GeoPlan,
         IdeaSketch,
         IdeationResult,
         InboxItem,
@@ -377,6 +378,19 @@ class Metalworks:
         from metalworks.research import build_channel_strategy
 
         return build_channel_strategy(self.deps, _demand(research), positioning)
+
+    def geo(self, research: Research | DemandReport) -> GeoPlan:
+        """Distribution (D6) — the GEO / LLM-citability stream. Turns the report into
+        **participation targets** (real threads to engage, from the report's permalinks),
+        **citability probes** (conversational queries to test you're cited, from the cluster
+        claims), and answer-first **answer briefs** (grounded, factual answers whose
+        ``evidence_refs`` resolve against ``report.evidence`` and whose ``stat_anchors`` carry
+        the cluster's real counts). Targets + probes are deterministic; the briefs' prose is
+        LLM-authored but cite-or-die — an answer whose evidence doesn't resolve is dropped.
+        DRAFTING ONLY — nothing here posts."""
+        from metalworks.research import build_geo_plan
+
+        return build_geo_plan(self.deps, _demand(research))
 
     def data_asset(
         self,

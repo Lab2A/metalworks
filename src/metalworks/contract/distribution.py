@@ -362,3 +362,101 @@ class DataReportAsset(BaseModel):
         description="The disclosed honest base: N threads analyzed, distinct-author counting, and "
         "the corpus date range — the rigor that IS the credibility."
     )
+
+
+# ── GEO / LLM-citability (D6) ────────────────────────────────────────────────
+
+
+class ParticipationTarget(BaseModel):
+    """One real thread/community worth engaging — the GEO participation stream.
+
+    GEO ("get cited by AI") is a compounding stream, not a separate pillar: Reddit
+    is the #1 AI-cited domain and >50% of AI citations are Q&A threads, so the
+    fastest path to being the cited answer is to participate in the threads the
+    audience is *already* asking in. Every target is pulled DETERMINISTICALLY from
+    the report's real permalinks + communities — ``permalink`` is a verbatim
+    ``source_url`` from a verified quote, never invented — and ``why`` paraphrases
+    what that audience is actually asking there (a cluster claim). DRAFTING ONLY —
+    this names where to show up; it never posts.
+    """
+
+    community: str = Field(
+        description="The real community to engage, e.g. 'r/SideProject' — from the report."
+    )
+    permalink: str = Field(
+        description="A real thread/source_url pulled from the report's verified quotes."
+    )
+    why: str = Field(
+        description="What the audience is asking there, grounded in a cluster claim — not fluff."
+    )
+    suggested_angle: str = Field(
+        description="The honest, value-first angle to engage with (answer the question, disclose)."
+    )
+
+
+class CitabilityProbe(BaseModel):
+    """A conversational query to test whether you're the cited answer.
+
+    Derived from the cluster claims — the real questions the audience asks — not
+    templated keyword fluff. You run the ``prompt`` against an answer engine and
+    check whether your content is cited; ``target_phrase`` is the cluster claim it
+    maps back to, so a probe always traces to real demand.
+    """
+
+    prompt: str = Field(
+        description="A real conversational query you want to be the cited answer to."
+    )
+    target_phrase: str = Field(
+        description="The cluster claim this probe maps to — the demand it traces back to."
+    )
+
+
+class AnswerBrief(BaseModel):
+    """One answer-first brief — a grounded, factual answer to an audience question.
+
+    Here cite-or-die is CORRECT: the answer is a factual claim, so it must be
+    grounded. ``answer`` is answer-first prose the LLM writes; ``evidence_refs``
+    resolve against the source report's ``evidence`` by id (an answer whose
+    evidence doesn't resolve is DROPPED at assembly, never shipped); ``stat_anchors``
+    carry the cluster's REAL counts (distinct_authors / mentions) so the answer
+    leads with a number the report actually measured. DRAFTING ONLY.
+    """
+
+    question: str = Field(description="The audience question this brief answers (a cluster claim).")
+    answer: str = Field(
+        description="Answer-first, grounded prose — the factual answer you want cited."
+    )
+    evidence_refs: list[EvidenceRef] = Field(
+        default_factory=list[EvidenceRef],
+        description="Refs into report.evidence backing the answer. An answer with none is dropped.",
+    )
+    stat_anchors: dict[str, int] = Field(
+        default_factory=dict[str, int],
+        description="Real counts from the cluster, e.g. {'distinct_authors': 12, 'mentions': 30}.",
+    )
+
+
+class GeoPlan(BaseModel):
+    """The assembled GEO / LLM-citability output for one report — the D6 face.
+
+    Bundles the three grounded streams the four surfaces emit together:
+    participation targets (where to show up — real threads), citability probes
+    (what to test you're cited for), and answer-first briefs (what to say —
+    grounded, evidence-resolving answers). Every element traces to the report:
+    targets to real permalinks, probes + briefs to cluster claims, briefs to
+    resolvable evidence. DRAFTING ONLY — nothing here posts.
+    """
+
+    report_id: str = Field(description="The source report this GEO plan was derived from.")
+    participation_targets: list[ParticipationTarget] = Field(
+        default_factory=list[ParticipationTarget],
+        description="Real threads/communities to engage, from the report's permalinks.",
+    )
+    citability_probes: list[CitabilityProbe] = Field(
+        default_factory=list[CitabilityProbe],
+        description="Conversational queries to test citation, from the cluster claims.",
+    )
+    answer_briefs: list[AnswerBrief] = Field(
+        default_factory=list[AnswerBrief],
+        description="Answer-first grounded briefs; each resolves against report.evidence.",
+    )

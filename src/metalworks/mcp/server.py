@@ -96,6 +96,11 @@ async def distribution_strategy(report_id: str, store_path: str | None = None) -
     return tools.distribution_strategy(report_id, store_path)
 
 
+async def distribution_geo(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. GEO/citability — participation targets + probes + grounded answer briefs (chat)."""
+    return tools.distribution_geo(report_id, store_path)
+
+
 async def distribution_data_report(
     report_id: str, kind: str = "complaint_index", store_path: str | None = None
 ) -> dict[str, Any]:
@@ -233,6 +238,7 @@ _TOOL_WRAPPERS = (
     research_plan_brief,
     positioning_from_report,
     distribution_strategy,
+    distribution_geo,
     distribution_data_report,
     distribution_assets,
     landscape_from_report,
