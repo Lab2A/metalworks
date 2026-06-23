@@ -386,6 +386,48 @@ def distribution_assets(report_id: str, store_path: str | None = None) -> ToolRe
 
 @guard
 @guard
+def distribution_data_report(
+    report_id: str,
+    kind: str = "complaint_index",
+    store_path: str | None = None,
+) -> ToolResult:
+    """TIER 2 (chat key). Project a stored report into a corpus-derived DATA REPORT (D5) —
+    the on-brand flagship asset: a deterministic ranking of the report's clusters carrying
+    their REAL distinct-author / mention counts, real permalinks, and a verbatim quote per
+    row. The LLM writes only the title + each row's framing label; counts/links/quotes are
+    never invented, and methodology discloses the honest base. ``kind`` is one of
+    'complaint_index' | 'feature_ranking' | 'state_of'. Needs a chat-model key."""
+    from metalworks import config
+    from metalworks.research import build_data_asset
+
+    allowed = ("complaint_index", "feature_ranking", "state_of")
+    if kind not in allowed:
+        return {
+            "error": {
+                "error_code": "invalid_argument",
+                "message": f"Unknown kind {kind!r}; expected one of {', '.join(allowed)}.",
+                "fix": "Pass kind='complaint_index' | 'feature_ranking' | 'state_of'.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    store = config.default_store(store_path)
+    report = store.get_report(report_id)
+    if report is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No report with id {report_id!r} in the local store.",
+                "fix": "Check the id from research_list_runs, or wait for the run to complete.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    asset = build_data_asset(deps, report, kind)
+    return {"data_report": asset.model_dump(mode="json")}
+
+
+@guard
+@guard
 def landscape_from_report(report_id: str, store_path: str | None = None) -> ToolResult:
     """TIER 2 (chat + embedding keys). Map the full landscape for a stored report —
     the competitor map PLUS an empirical existing-solutions scan (real shipped

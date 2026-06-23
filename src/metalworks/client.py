@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         BuildSpec,
         ChannelAsset,
         ChannelStrategy,
+        DataReportAsset,
         DemandReport,
         DesignReview,
         DesignSystem,
@@ -376,6 +377,23 @@ class Metalworks:
         from metalworks.research import build_channel_strategy
 
         return build_channel_strategy(self.deps, _demand(research), positioning)
+
+    def data_asset(
+        self,
+        research: Research | DemandReport,
+        kind: Literal["complaint_index", "feature_ranking", "state_of"] = "complaint_index",
+    ) -> DataReportAsset:
+        """Distribution (D5) — project the report into a corpus-derived **data report**, the
+        on-brand flagship asset: a deterministic ranking of the report's clusters carrying their
+        REAL distinct-author / mention counts, real permalinks, and a verbatim quote per row. The
+        LLM only writes the title + each row's framing label, grounded in the cluster's claim; the
+        numbers/links/quotes are never invented, and ``methodology`` discloses the honest base (N
+        threads, distinct-author counting, date range). ``kind`` picks the framing —
+        ``complaint_index`` (pain points), ``feature_ranking`` (requested features), or
+        ``state_of`` (the overall state)."""
+        from metalworks.research import build_data_asset
+
+        return build_data_asset(self.deps, _demand(research), kind)
 
     def channel_assets(
         self,

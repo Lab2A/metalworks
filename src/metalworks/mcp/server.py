@@ -96,6 +96,14 @@ async def distribution_strategy(report_id: str, store_path: str | None = None) -
     return tools.distribution_strategy(report_id, store_path)
 
 
+async def distribution_data_report(
+    report_id: str, kind: str = "complaint_index", store_path: str | None = None
+) -> dict[str, Any]:
+    """TIER 2. Project a stored report into a corpus-derived data report (D5) — a deterministic
+    ranking of its clusters with REAL counts, real permalinks, and verbatim quotes (chat key)."""
+    return tools.distribution_data_report(report_id, kind, store_path)
+
+
 async def distribution_assets(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Draft channel-SHAPED, drafting-only distribution assets per channel (chat key)."""
     return tools.distribution_assets(report_id, store_path)
@@ -225,6 +233,7 @@ _TOOL_WRAPPERS = (
     research_plan_brief,
     positioning_from_report,
     distribution_strategy,
+    distribution_data_report,
     distribution_assets,
     landscape_from_report,
     ideate_from_idea,

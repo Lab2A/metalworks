@@ -52,6 +52,8 @@ from metalworks.contract import (  # noqa: E402
     ComplianceVerdict,
     CorpusStats,
     CrossReference,
+    DataReportAsset,
+    DataReportItem,
     Decision,
     DecisionLogEntry,
     DemandReport,
@@ -192,6 +194,8 @@ MODELS: list[type[BaseModel]] = [
     ClaimCitation,
     Channel,
     ChannelStrategy,
+    DataReportItem,
+    DataReportAsset,
     AssetPart,
     ChannelAsset,
     # build (Pillar D)

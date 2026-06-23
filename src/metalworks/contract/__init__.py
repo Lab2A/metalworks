@@ -44,6 +44,8 @@ from metalworks.contract.distribution import (
     ChannelStrategy,
     ChannelSurfaceType,
     ClaimCitation,
+    DataReportAsset,
+    DataReportItem,
     ProductType,
 )
 from metalworks.contract.evidence import (
@@ -208,6 +210,8 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "ChannelStrategy",
     "ChannelSurfaceType",
     "ClaimCitation",
+    "DataReportAsset",
+    "DataReportItem",
     "ProductType",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",

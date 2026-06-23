@@ -285,3 +285,80 @@ class ChannelStrategy(BaseModel):
     funnel_note: str = Field(
         description="Coverage note across funnel stages; flags an all-top-of-funnel plan as a leak."
     )
+
+
+# ── Data-as-marketing asset (D5) ─────────────────────────────────────────────
+
+
+class DataReportItem(BaseModel):
+    """One ranked row of a corpus-derived data report — a real cluster, projected.
+
+    The numbers are NOT invented: ``rank`` / ``distinct_authors`` / ``mentions``
+    are copied straight from the source :class:`~metalworks.contract.research.\
+InsightCluster` (``rank`` / ``distinct_author_count`` / ``mention_count``), and
+    ``permalinks`` are the real ``source_url``s of that cluster's verified quotes.
+    ``quote`` is ONE verbatim supporting quote pulled from the cluster (never
+    paraphrased). The LLM only writes ``label`` — a tight, framing-appropriate
+    headline for the cluster's claim (a pain point for a complaint index, a
+    requested feature for a feature ranking) — it never touches the counts,
+    permalinks, or quote text. This is the survey-fabrication trap avoided: real
+    numbers, real links, real words.
+    """
+
+    rank: int = Field(description="1-based rank, copied from the source cluster's rank.")
+    label: str = Field(
+        description="The claim/feature/complaint headline for this row, framed to the report "
+        "kind. LLM-written from the cluster's claim — the only authored prose in the row."
+    )
+    distinct_authors: int = Field(
+        description="DISTINCT authors expressing this — copied from the cluster's "
+        "distinct_author_count, the honest base rate. Never invented."
+    )
+    mentions: int = Field(
+        description="Total mentions (>= distinct_authors) — copied from the cluster's "
+        "mention_count. Kept separate so base-rate honesty stays visible."
+    )
+    permalinks: list[str] = Field(
+        description="Real provenance links — the source_urls of the cluster's verified quotes."
+    )
+    quote: str = Field(
+        description="One verbatim supporting quote from the cluster (exact text, not paraphrased)."
+    )
+
+
+class DataReportAsset(BaseModel):
+    """A corpus-derived original-research data report — the on-brand flagship asset.
+
+    The data-as-marketing surface of the Distribution pillar: it projects a
+    finished :class:`~metalworks.contract.research.DemandReport`'s ranked clusters
+    into a publishable, methodology-first data report — a ranking (the top
+    AI-cited format) over a proprietary Reddit corpus (the #1 AI-cited domain),
+    every row carrying verbatim quotes + real permalinks + the cluster's REAL
+    distinct-author / mention counts. Defensibility is the corpus others can't
+    reproduce; credibility is the disclosed method.
+
+    Honesty is the whole point. The ranking is DETERMINISTIC — items are the
+    report's own ranked clusters with their own numbers, never re-scored or
+    invented. ``methodology`` discloses the real base: the thread count, the
+    distinct-author counting method, and the date range. The LLM writes only the
+    ``title`` and each item's ``label`` prose, grounded in the cluster's claim.
+    The three ``kind``s differ only in framing (``complaint_index`` = pain points,
+    ``feature_ranking`` = requested features, ``state_of`` = the overall state) —
+    all project the same grounded cluster data.
+    """
+
+    report_id: str = Field(description="The source demand report this asset was derived from.")
+    kind: Literal["complaint_index", "feature_ranking", "state_of"] = Field(
+        description="The framing: 'complaint_index' (pain points), 'feature_ranking' (requested "
+        "features), or 'state_of' (the overall state of the category)."
+    )
+    title: str = Field(
+        description="The report headline, LLM-written and grounded in the report's query + kind."
+    )
+    items: list[DataReportItem] = Field(
+        description="The ranked rows, projected deterministically from the report's clusters."
+    )
+    methodology: str = Field(
+        description="The disclosed honest base: N threads analyzed, distinct-author counting, and "
+        "the corpus date range — the rigor that IS the credibility."
+    )
