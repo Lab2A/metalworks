@@ -42,6 +42,8 @@ from metalworks.contract.distribution import (
     AssetPart,
     Channel,
     ChannelAsset,
+    ChannelMetric,
+    ChannelResult,
     ChannelStrategy,
     ChannelSurfaceType,
     CitabilityProbe,
@@ -234,6 +236,9 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "Push",
     "Stream",
     "DistributionPlan",
+    # Closed-loop measurement (D8) — per-channel metric + instrumentation, ingest results.
+    "ChannelMetric",
+    "ChannelResult",
     # Build stage (Pillar D) — the evidence-grounded build spec.
     "BuildPersona",
     "BuildSpec",

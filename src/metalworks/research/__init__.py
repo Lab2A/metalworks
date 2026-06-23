@@ -25,12 +25,14 @@ from metalworks.research.distribution import (
     build_channel_strategy,
     build_data_asset,
     build_geo_plan,
+    channel_metrics,
     citability_probes,
     conversion_surface_requirement,
     distribution_requirements,
     loop_requirements,
     participation_targets,
     plan_distribution,
+    rerank_from_results,
 )
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
@@ -59,6 +61,7 @@ __all__ = [
     "build_geo_plan",
     "build_logo_set",
     "build_positioning_brief",
+    "channel_metrics",
     "citability_probes",
     "conversion_surface_requirement",
     "distribution_requirements",
@@ -70,6 +73,7 @@ __all__ = [
     "render_design_md",
     "render_design_preview_html",
     "render_logo_picker_html",
+    "rerank_from_results",
     "review_design",
     "run_assessment",
     "run_competitor_map",

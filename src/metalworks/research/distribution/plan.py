@@ -28,7 +28,10 @@ edge).
 
 :func:`plan_distribution` is the reusable core the four surfaces call. It is PURE
 and deterministic — no LLM, no network — over the already-selected channels.
-``prior_results`` is accepted for D8's re-rank (unused now; threaded through).
+``prior_results`` closes the loop (D8): pass the prior push's recorded
+:class:`~metalworks.contract.distribution.ChannelResult`\\ s and the channels are
+re-ranked (winners first) before sequencing, so the proven channels lead the next
+push. The default (``prior_results=None``) path is unchanged.
 """
 
 from __future__ import annotations
@@ -43,7 +46,7 @@ from metalworks.contract import (
 )
 
 if TYPE_CHECKING:
-    from metalworks.contract import Channel, DemandReport
+    from metalworks.contract import Channel, ChannelResult, DemandReport
 
 
 # ── The deterministic playbook timing table ──────────────────────────────────
@@ -230,7 +233,7 @@ def _stream_for_channel(channel: Channel) -> Stream:
 def plan_distribution(
     report: DemandReport,
     channels: list[Channel],
-    prior_results: object | None = None,
+    prior_results: list[ChannelResult] | None = None,
 ) -> DistributionPlan:
     """Sequence a report's channels into pushes + streams — the D7 face.
 
@@ -245,10 +248,18 @@ def plan_distribution(
     with pre-launch warming and closes with a 30-day post step, and threads each
     spark-requiring channel's ``spark_channel`` through (the spark→flywheel edge).
 
-    ``prior_results`` is accepted for D8's re-rank (unused now; threaded through for
-    surface parity).
+    ``prior_results`` closes the loop (D8): when the prior push's recorded
+    :class:`~metalworks.contract.distribution.ChannelResult`\\ s are passed, the
+    channels are re-ranked (winners first, via
+    :func:`~metalworks.research.distribution.measure.rerank_from_results`) BEFORE the
+    cadence split, so the proven channels lead the next push's streams (and any
+    re-ordered spikes). The default (``prior_results=None``) path is unchanged — the
+    spike pushes are still ordered deterministically by their playbook day.
     """
-    _ = prior_results  # D8 will re-rank on recorded results; threaded for parity now.
+    if prior_results:
+        from metalworks.research.distribution.measure import rerank_from_results
+
+        channels = rerank_from_results(channels, prior_results)
 
     spike_channels = [c for c in channels if c.cadence == "spike"]
     compounding_channels = [c for c in channels if c.cadence == "compounding"]

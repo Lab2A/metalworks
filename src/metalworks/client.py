@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         Assessment,
         BuildSpec,
         ChannelAsset,
+        ChannelMetric,
         ChannelStrategy,
         ConversionSurfaceRequirement,
         DataReportAsset,
@@ -421,6 +422,28 @@ class Metalworks:
         report = _demand(research)
         strategy = build_channel_strategy(self.deps, report, positioning)
         return plan_distribution(report, strategy.channels)
+
+    def channel_metrics(
+        self,
+        research: Research | DemandReport,
+        positioning: PositioningBrief | None = None,
+    ) -> list[ChannelMetric]:
+        """Distribution (D8) — close the loop: emit the per-channel **success metric** + the
+        **instrumentation** to wire BEFORE the push. Routes the report into its channel strategy
+        (D2), then for each selected channel reads — DETERMINISTICALLY, keyed by ``surface_type`` —
+        what "worked" means (e.g. a launch platform → top-N + attributed signups; a marketplace →
+        installs + WAU; a community → qualified replies + click-through; answer-engine GEO →
+        citation appearances) and exactly how to track it (a UTM tag, an attributed-signup query, a
+        citation check). The human records a
+        :class:`~metalworks.contract.distribution.ChannelResult` against each, then passes them back
+        as ``prior_results`` to :meth:`channel_strategy`'s core (and
+        :func:`~metalworks.research.plan_distribution`) so the next push re-ranks on evidence.
+        Pure + deterministic — no LLM, no network."""
+        from metalworks.research import build_channel_strategy, channel_metrics
+
+        report = _demand(research)
+        strategy = build_channel_strategy(self.deps, report, positioning)
+        return channel_metrics(strategy.channels)
 
     def geo(self, research: Research | DemandReport) -> GeoPlan:
         """Distribution (D6) — the GEO / LLM-citability stream. Turns the report into

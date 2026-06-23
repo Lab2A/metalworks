@@ -33,6 +33,7 @@ from metalworks.research.distribution.geo import (
     citability_probes,
     participation_targets,
 )
+from metalworks.research.distribution.measure import channel_metrics, rerank_from_results
 from metalworks.research.distribution.plan import plan_distribution
 from metalworks.research.distribution.requirements import (
     conversion_surface_requirement,
@@ -46,6 +47,7 @@ __all__ = [
     "build_channel_strategy",
     "build_data_asset",
     "build_geo_plan",
+    "channel_metrics",
     "citability_probes",
     "classify_product",
     "conversion_surface_requirement",
@@ -54,5 +56,6 @@ __all__ = [
     "loop_requirements",
     "participation_targets",
     "plan_distribution",
+    "rerank_from_results",
     "select_channels",
 ]

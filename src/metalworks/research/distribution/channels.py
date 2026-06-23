@@ -17,8 +17,12 @@ the one-line ICP, and may enrich named platforms/media from the corpus language
 — it never invents the communities/permalinks that ground a community channel.
 
 ``build_channel_strategy(deps, report, positioning=None, prior_results=None)`` is
-the reusable core the four surfaces call. ``prior_results`` is accepted for D8's
-re-rank (unused now; threaded through).
+the reusable core the four surfaces call. ``prior_results`` is the closed loop
+(D8): pass the prior push's recorded
+:class:`~metalworks.contract.distribution.ChannelResult`\\ s and the selection is
+re-ordered (via :func:`~metalworks.research.distribution.measure.rerank_from_results`)
+so the channels that actually performed lead the next push. The default
+(``prior_results=None``) path is unchanged.
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ from metalworks.contract import (
 )
 
 if TYPE_CHECKING:
-    from metalworks.contract import PositioningBrief
+    from metalworks.contract import ChannelResult, PositioningBrief
     from metalworks.research.deps import ResearchDeps
 
 
@@ -285,7 +289,7 @@ def select_channels(
     positioning: PositioningBrief | None,
     product_type: ProductType,
     signals: _ChannelSignals,
-    prior_results: object | None = None,
+    prior_results: list[ChannelResult] | None = None,
 ) -> list[Channel]:
     """Route the grounded signals → channel experiments across the channel space.
 
@@ -296,9 +300,13 @@ def select_channels(
     ``spark_channel`` + ``requires_spark=True`` — they don't start their own
     velocity. The set is built to span funnel stages.
 
-    ``prior_results`` is accepted for D8's re-rank (unused now; threaded through).
+    ``prior_results`` closes the loop (D8): when the prior push's recorded
+    :class:`~metalworks.contract.distribution.ChannelResult`\\ s are passed, the
+    selected channels are re-ordered (via
+    :func:`~metalworks.research.distribution.measure.rerank_from_results`) so the
+    ones that actually performed lead the next push and the dead ones fall. The
+    default (``prior_results=None``) path is byte-for-byte unchanged.
     """
-    _ = prior_results  # D8 will re-rank on recorded ChannelResults; threaded for parity now.
     channels: list[Channel] = []
 
     # 1. Community-native — the moat. Routes off a REAL named community + permalink.
@@ -476,6 +484,14 @@ def select_channels(
             )
         )
 
+    # D8 closed loop: when the prior push's results are recorded, re-order the
+    # channels so the proven winners lead the next push. No results → no-op (the
+    # default path is unchanged).
+    if prior_results:
+        from metalworks.research.distribution.measure import rerank_from_results
+
+        channels = rerank_from_results(channels, prior_results)
+
     return channels
 
 
@@ -483,13 +499,15 @@ def build_channel_strategy(
     deps: ResearchDeps,
     report: DemandReport,
     positioning: PositioningBrief | None = None,
-    prior_results: object | None = None,
+    prior_results: list[ChannelResult] | None = None,
 ) -> ChannelStrategy:
     """Orchestrate classify → extract → select into a :class:`ChannelStrategy`.
 
     The reusable core the four surfaces call. Assembles a ``focusing_rule``
     (test→focus) + a ``funnel_note`` that flags an all-top-of-funnel plan as a
-    conversion leak. ``prior_results`` is accepted for D8's re-rank (unused now).
+    conversion leak. ``prior_results`` closes the loop (D8): pass the prior push's
+    recorded :class:`~metalworks.contract.distribution.ChannelResult`\\ s and the
+    channels are re-ordered so the proven winners lead the next push.
     """
     product_type, icp = classify_product(deps, report, positioning)
     signals = extract_channel_signals(deps, report)

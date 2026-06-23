@@ -129,6 +129,14 @@ async def distribution_plan(report_id: str, store_path: str | None = None) -> di
     return tools.distribution_plan(report_id, store_path)
 
 
+async def distribution_measure(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Close the distribution loop (D8) — emit the per-channel success metric +
+    instrumentation to wire BEFORE the push (keyed deterministically by surface type). The human
+    records ChannelResults against these and feeds them back so the next push re-ranks on
+    evidence (chat key)."""
+    return tools.distribution_measure(report_id, store_path)
+
+
 async def landscape_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Map the full landscape — competitors + existing solutions + do-nothing cost."""
     return tools.landscape_from_report(report_id, store_path)
@@ -258,6 +266,7 @@ _TOOL_WRAPPERS = (
     distribution_assets,
     distribution_requirements,
     distribution_plan,
+    distribution_measure,
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,

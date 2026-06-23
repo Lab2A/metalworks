@@ -17,6 +17,8 @@ import pytest
 
 from metalworks.contract import (
     Channel,
+    ChannelMetric,
+    ChannelResult,
     ChannelSurfaceType,
     DataReportAsset,
     DemandReport,
@@ -51,6 +53,10 @@ from metalworks.research.distribution.geo import (
     build_geo_plan,
     citability_probes,
     participation_targets,
+)
+from metalworks.research.distribution.measure import (
+    channel_metrics,
+    rerank_from_results,
 )
 from metalworks.research.distribution.plan import (
     _PLAYBOOK_TIMING_BY_NAME,
@@ -1357,3 +1363,173 @@ def test_mcp_distribution_plan_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res["plan"]["report_id"] == "rpt-d2"
     # The dev_tool strategy emits a show_hn spike → at least one push.
     assert res["plan"]["pushes"]
+
+
+# ── D8: closed-loop measurement — metric + instrumentation, ingest results ────
+
+
+def test_channel_metrics_one_per_channel_with_metric_and_instrumentation() -> None:
+    """channel_metrics emits one ChannelMetric per channel, each non-empty + grounded by surface."""
+    channels = [
+        _spike_channel("product_hunt", ChannelSurfaceType.LAUNCH_PLATFORM),
+        _compounding_channel("r/SideProject", ChannelSurfaceType.COMMUNITY),
+        _compounding_channel("shopify_marketplace", ChannelSurfaceType.MARKETPLACE),
+    ]
+    metrics = channel_metrics(channels)
+    assert len(metrics) == len(channels)
+    assert all(isinstance(m, ChannelMetric) for m in metrics)
+    # One metric per channel, preserving order + name.
+    assert [m.channel_name for m in metrics] == [c.name for c in channels]
+    for m, c in zip(metrics, channels, strict=True):
+        assert m.surface_type == c.surface_type
+        assert m.success_metric.strip()
+        assert m.instrumentation.strip()
+
+
+def test_channel_metrics_keyed_by_surface_type() -> None:
+    """The metric + instrumentation are read from the surface-type table (deterministic)."""
+    launch = channel_metrics([_spike_channel("product_hunt", ChannelSurfaceType.LAUNCH_PLATFORM)])[
+        0
+    ]
+    market = channel_metrics(
+        [_compounding_channel("x_marketplace", ChannelSurfaceType.MARKETPLACE)]
+    )[0]
+    community = channel_metrics([_compounding_channel("r/X", ChannelSurfaceType.COMMUNITY)])[0]
+    # A launch platform measures attributed signups; a marketplace measures installs/WAU.
+    assert "signup" in launch.success_metric.lower()
+    assert "install" in market.success_metric.lower()
+    assert "repl" in community.success_metric.lower() or "click" in community.success_metric.lower()
+    # Reproducible: same channel → same metric.
+    again = channel_metrics([_spike_channel("product_hunt", ChannelSurfaceType.LAUNCH_PLATFORM)])[0]
+    assert again.success_metric == launch.success_metric
+    assert again.instrumentation == launch.instrumentation
+
+
+def test_rerank_moves_a_strong_channel_above_a_weak_one() -> None:
+    """rerank_from_results re-orders so a channel with strong results outranks a weak one."""
+    weak = _spike_channel("product_hunt", ChannelSurfaceType.LAUNCH_PLATFORM)
+    strong = _spike_channel("show_hn", ChannelSurfaceType.LAUNCH_PLATFORM)
+    channels = [weak, strong]  # weak first in the original order
+    results = [
+        ChannelResult(channel_name="product_hunt", metric="signups", value=2.0, period="first 7d"),
+        ChannelResult(channel_name="show_hn", metric="signups", value=50.0, period="first 7d"),
+    ]
+    reranked = rerank_from_results(channels, results)
+    assert [c.name for c in reranked] == ["show_hn", "product_hunt"]
+    # Pure: the input list is not mutated.
+    assert [c.name for c in channels] == ["product_hunt", "show_hn"]
+
+
+def test_rerank_no_results_is_a_noop() -> None:
+    """With no results the channels are returned unchanged (same order) — the default path."""
+    channels = [_spike_channel("product_hunt"), _compounding_channel("r/X")]
+    reranked = rerank_from_results(channels, [])
+    assert [c.name for c in reranked] == [c.name for c in channels]
+
+
+def test_rerank_unmeasured_channels_sit_after_measured_keeping_order() -> None:
+    """Channels with no recorded result keep their order and sit after every measured channel."""
+    a = _spike_channel("a")
+    measured = _spike_channel("measured")
+    b = _spike_channel("b")
+    channels = [a, measured, b]
+    results = [ChannelResult(channel_name="measured", metric="x", value=9.0, period="7d")]
+    reranked = rerank_from_results(channels, results)
+    # The measured channel rises to the front; a, b keep their original relative order after it.
+    assert [c.name for c in reranked] == ["measured", "a", "b"]
+
+
+def test_select_channels_reflects_rerank_while_default_is_unchanged() -> None:
+    """select_channels(prior_results=[...]) re-ranks; the default path is unchanged."""
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote("help", "https://reddit.com/r/SideProject/comments/1/x", "r/SideProject")
+                ],
+            )
+        ]
+    )
+    signals = _ChannelSignals(named_communities=["r/SideProject"])
+    base = select_channels(_deps(_scripted_chat()), report, None, ProductType.DEV_TOOL, signals)
+    # No prior_results → identical to the default (no-results) selection.
+    same = select_channels(
+        _deps(_scripted_chat()),
+        report,
+        None,
+        ProductType.DEV_TOOL,
+        signals,
+        prior_results=[],
+    )
+    assert [c.name for c in same] == [c.name for c in base]
+
+    # Strong results for a non-first channel bias it to the front of the selection.
+    last_name = base[-1].name
+    assert last_name != base[0].name
+    results = [ChannelResult(channel_name=last_name, metric="signups", value=99.0, period="7d")]
+    reranked = select_channels(
+        _deps(_scripted_chat()),
+        report,
+        None,
+        ProductType.DEV_TOOL,
+        signals,
+        prior_results=results,
+    )
+    # Same channels, re-ordered: the strong channel now leads.
+    assert {c.name for c in reranked} == {c.name for c in base}
+    assert reranked[0].name == last_name
+
+
+def test_plan_distribution_reranks_when_prior_results_passed() -> None:
+    """plan_distribution(prior_results=[...]) re-orders the channels before sequencing."""
+    report = _report(clusters=[_cluster(1, quotes=[_quote("x", "https://r/X/1", "r/X")])])
+    first = _compounding_channel("r/First")
+    second = _compounding_channel("r/Second")
+    channels = [first, second]
+    # No results → streams keep their order.
+    plain = plan_distribution(report, channels)
+    assert [s.channel_name for s in plain.streams] == ["r/First", "r/Second"]
+    # Strong result for the second channel pulls it to the front of the streams.
+    results = [ChannelResult(channel_name="r/Second", metric="x", value=10.0, period="7d")]
+    reranked = plan_distribution(report, channels, prior_results=results)
+    assert [s.channel_name for s in reranked.streams] == ["r/Second", "r/First"]
+
+
+def test_mcp_distribution_measure_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_measure("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_measure_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _report(
+        clusters=[
+            _cluster(
+                1,
+                quotes=[
+                    _quote("help", "https://reddit.com/r/SideProject/comments/1/x", "r/SideProject")
+                ],
+            )
+        ]
+    )
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _scripted_chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_measure(report.report_id)
+    assert "metrics" in res
+    assert res["metrics"]
+    # Every emitted metric carries a non-empty success_metric + instrumentation.
+    for m in res["metrics"]:
+        assert m["success_metric"]
+        assert m["instrumentation"]

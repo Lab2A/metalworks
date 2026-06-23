@@ -978,6 +978,28 @@ export interface DistributionPlan {
   streams?: Stream[];
 }
 
+export interface ChannelMetric {
+  /** The channel this metric is for (matches Channel.name). */
+  channel_name: string;
+  /** The channel's surface type — which keyed the metric + instrumentation. */
+  surface_type: ChannelSurfaceType;
+  /** What 'worked' means for this channel, e.g. 'attributed signups in 7d'. */
+  success_metric: string;
+  /** How to track the metric — a UTM tag, an attributed-signup query, a citation check, etc. Concrete enough that a human can wire it before the push. */
+  instrumentation: string;
+}
+
+export interface ChannelResult {
+  /** The channel this result is for (matches Channel.name). */
+  channel_name: string;
+  /** The metric that was measured (mirrors the channel's success_metric). */
+  metric: string;
+  /** The measured value — higher is better (e.g. attributed signups, installs). */
+  value: number;
+  /** The window the value covers, e.g. 'first 7d'. */
+  period: string;
+}
+
 export interface FeatureSpec {
   /** Stable slug for the feature (e.g. 'fade-tracker'). */
   feature_id: string;

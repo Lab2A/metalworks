@@ -10,6 +10,27 @@ contracts may change in any release.
 
 ### Added
 
+- **Closed-loop measurement (D8) — per-channel metric + instrumentation, ingest results, re-rank.**
+  Everything in the Distribution pillar so far PLANS; nothing learns. D8 closes the loop: plan →
+  (human executes) → record `ChannelResult`s → re-rank the next push. metalworks can't watch live
+  traffic, so in its lane it defines the metric + what to instrument and ingests results to re-rank
+  — its falsifiable disposition applied to distribution. Two new contract models: `ChannelMetric`
+  (`channel_name`, `surface_type`, `success_metric`, `instrumentation`) and `ChannelResult`
+  (`channel_name`, `metric`, `value`, `period`). A new `research/distribution/measure.py`:
+  `channel_metrics(channels)` is DETERMINISTIC — one metric per channel with its success metric +
+  instrumentation read from a table keyed by `surface_type` (launch platform → top-N + attributed
+  signups, UTM; marketplace → installs + WAU; community → qualified replies + click-through;
+  answer-engine GEO → citation appearances; …) — and `rerank_from_results(channels, results)` is
+  pure + deterministic: it sums each channel's recorded `value`s and re-orders so the channels that
+  actually performed lead (measured first by descending score, unmeasured after, each group keeping
+  its original order); with no results it is a no-op. `prior_results` is now **meaningful**:
+  `select_channels(..., prior_results=...)` and `plan_distribution(..., prior_results=...)` apply
+  the re-rank when the prior push's results are passed, and the `prior_results=None` path is
+  byte-for-byte unchanged. Available on all four surfaces: `mw.channel_metrics(...)`, `metalworks
+  distribution measure <report-id>`, the `distribution_measure` MCP tool (tool count 33 → 34), and
+  the `distribution-measure` skill. PLANNING ONLY — it defines what to measure; the human measures,
+  records, and feeds the results back to re-rank.
+
 - **Distribution plan (D7) — pushes (sequenced moments) + streams (continuous), deterministically
   sequenced.** A new `distribution plan` surface replaces the old toy even-spacing plan (`T+{i*2}h`
   — an LLM-invented constant masquerading as a schedule). A distribution plan is now **pushes** (the
