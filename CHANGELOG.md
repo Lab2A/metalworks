@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Data-as-marketing data report (D5) — the on-brand flagship asset.** A new `distribution
+  data-report` surface projects a finished demand report into a corpus-derived `DataReportAsset`
+  — a publishable ranking (a `complaint_index`, a `feature_ranking`, or a `state_of` report) over
+  a proprietary Reddit corpus. It stacks every AI-citation driver at once: original research + a
+  ranking + verbatim quotes + permalinks. The ranking is DETERMINISTIC — the items ARE the
+  report's own `ranked_clusters`, in their own order, each `DataReportItem` carrying that
+  cluster's REAL `distinct_author_count` / `mention_count`, the real `source_url` permalinks of
+  its verified quotes, and one verbatim quote — never re-scored, never invented. The LLM writes
+  only the report `title` and each row's framing `label`, grounded in the cluster's claim, and
+  falls back to the claim verbatim on failure. `methodology` discloses the honest base (N threads
+  analyzed, distinct-author counting, the corpus date range) — the survey-fabrication base rate is
+  the trap, so rigor IS the credibility. Available on all four surfaces: `mw.data_asset(...)`,
+  `metalworks distribution data-report <report-id> --kind complaint_index`, the
+  `distribution_data_report` MCP tool (tool count 28 → 29), and the `distribution-data-report`
+  skill. Additive contract: the new `DataReportAsset` + `DataReportItem` models. (#103)
+
 - **Distribution channel strategy (D2) — entity→channel routing, test→focus.** A new
   `distribution strategy` surface routes a finished demand report's *real named entities +
   signals* into the structured channel space and emits a small set of **channel experiments**

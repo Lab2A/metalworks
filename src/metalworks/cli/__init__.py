@@ -2475,6 +2475,77 @@ def distribution_strategy(
     _print_channel_strategy(strategy)
 
 
+def _print_data_report(asset: object) -> None:
+    console.print(
+        f"\n[bold]{getattr(asset, 'title', '')}[/bold] "
+        f"([dim]{getattr(asset, 'kind', '')} · report {getattr(asset, 'report_id', '')}[/dim])"
+    )
+    for item in getattr(asset, "items", []):
+        console.print(
+            f"\n  [bold]{item.rank}. {item.label}[/bold] "
+            f"[dim]({item.distinct_authors} authors, {item.mentions} mentions)[/dim]"
+        )
+        if item.quote:
+            console.print(f'    [italic]"{item.quote}"[/italic]')
+        for link in item.permalinks[:3]:
+            console.print(f"    [dim]{link}[/dim]")
+    console.print(f"\n  [dim]{getattr(asset, 'methodology', '')}[/dim]")
+
+
+@distribution_app.command("data-report")
+def distribution_data_report(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id or prefix; defaults to your latest run."),
+    ] = None,
+    kind: Annotated[
+        str,
+        typer.Option(
+            "--kind",
+            help="Framing: complaint_index | feature_ranking | state_of.",
+        ),
+    ] = "complaint_index",
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the data report JSON here.")
+    ] = None,
+) -> None:
+    """Project a stored report into a corpus-derived data report — a deterministic ranking
+    of its clusters with REAL counts, real permalinks, and a verbatim quote per row."""
+    from metalworks.research import build_data_asset
+    from metalworks.research.arctic import ArcticReader
+    from metalworks.research.deps import ResearchDeps
+
+    allowed = ("complaint_index", "feature_ranking", "state_of")
+    if kind not in allowed:
+        err_console.print(
+            f"[red]Unknown --kind {kind!r}.[/red] Expected one of: {', '.join(allowed)}."
+        )
+        raise typer.Exit(code=1)
+    chat = _resolve_chat_or_exit()
+    store = config.default_store()
+    report_id = _resolve_report_id(store, report_id)
+    report = store.get_report(report_id)
+    if report is None:
+        err_console.print(
+            f"[red]No report {report_id!r} in the local store.[/red] "
+            "Run `metalworks research run` first, or check the id."
+        )
+        raise typer.Exit(code=1)
+    reader = ArcticReader(probe_sleep_s=0.0)
+    deps = ResearchDeps(
+        chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
+    )
+    console.print(f"[bold]Data report[/bold] ({kind}) report {report_id}...")
+    try:
+        asset = build_data_asset(deps, report, kind)
+    finally:
+        reader.close()
+    if out is not None:
+        out.write_text(asset.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote data report[/green] {out}")
+    _print_data_report(asset)
+
+
 # ── reddit sub-app ──────────────────────────────────────────────────────────
 
 

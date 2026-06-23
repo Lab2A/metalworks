@@ -18,6 +18,7 @@ import pytest
 from metalworks.contract import (
     Channel,
     ChannelSurfaceType,
+    DataReportAsset,
     DemandReport,
     Fork,
     InsightCluster,
@@ -37,6 +38,11 @@ from metalworks.research.distribution.channels import (
     classify_product,
     extract_channel_signals,
     select_channels,
+)
+from metalworks.research.distribution.data_asset import (
+    _ItemLabel,
+    _ReportProse,
+    build_data_asset,
 )
 from metalworks.stores import MemoryStores
 
@@ -368,3 +374,158 @@ def test_mcp_distribution_strategy_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "strategy" in res
     assert res["strategy"]["report_id"] == "rpt-d2"
     assert res["strategy"]["channels"]
+
+
+# ── D5: data-as-marketing data report ────────────────────────────────────────
+
+
+def _counted_cluster(
+    rank: int,
+    *,
+    distinct_authors: int,
+    mentions: int,
+    quotes: list[ResolvedCitation],
+) -> InsightCluster:
+    """A cluster with EXPLICIT counts that intentionally differ from len(quotes), so a test
+    can prove the data report copies the real cluster counts rather than re-deriving them."""
+    return InsightCluster(
+        rank=rank,
+        claim=f"consumers struggle with pain point {rank}",
+        demand_score=float(100 - rank),
+        distinct_author_count=distinct_authors,
+        mention_count=mentions,
+        signal=SignalStrength.HIGH,
+        quotes=quotes,
+    )
+
+
+def _data_report() -> DemandReport:
+    return _report(
+        clusters=[
+            _counted_cluster(
+                1,
+                distinct_authors=37,
+                mentions=52,
+                quotes=[
+                    _quote("the jitter ruins my focus", "https://reddit.com/r/A/1", "r/A", "u1"),
+                    _quote("it lags constantly", "https://reddit.com/r/A/2", "r/A", "u2"),
+                ],
+            ),
+            _counted_cluster(
+                2,
+                distinct_authors=21,
+                mentions=24,
+                quotes=[
+                    _quote("too expensive for indie", "https://reddit.com/r/B/9", "r/B", "u3"),
+                ],
+            ),
+        ]
+    )
+
+
+def _data_prose_chat() -> FakeChatModel:
+    chat = FakeChatModel()
+    chat.script(
+        _ReportProse,
+        _ReportProse(
+            title="State of Indie Focus Tools: the top complaints",
+            labels=[
+                _ItemLabel(rank=1, label="Audio jitter breaks concentration"),
+                _ItemLabel(rank=2, label="Pricing is out of reach for indies"),
+            ],
+        ),
+    )
+    return chat
+
+
+def test_data_report_items_are_ranked_and_carry_real_counts() -> None:
+    report = _data_report()
+    asset = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    assert isinstance(asset, DataReportAsset)
+    assert asset.kind == "complaint_index"
+    assert asset.report_id == "rpt-d2"
+    # One row per cluster, in rank order.
+    assert [it.rank for it in asset.items] == [1, 2]
+    first, second = asset.items
+    # Counts copied from the REAL cluster numbers — NOT len(quotes), not invented.
+    assert (first.distinct_authors, first.mentions) == (37, 52)
+    assert (second.distinct_authors, second.mentions) == (21, 24)
+    # The LLM-written labels are used.
+    assert first.label == "Audio jitter breaks concentration"
+    # methodology is disclosed and non-empty, naming the real base.
+    assert asset.methodology
+    assert "42" in asset.methodology  # total_threads from the fixture
+    assert "88" in asset.methodology  # total_distinct_authors from the fixture
+
+
+def test_data_report_items_carry_real_permalinks_and_verbatim_quote() -> None:
+    report = _data_report()
+    asset = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    first = asset.items[0]
+    # Permalinks are the real source_urls of the cluster's quotes, deduped, in order.
+    assert first.permalinks == ["https://reddit.com/r/A/1", "https://reddit.com/r/A/2"]
+    # The quote is one verbatim quote from the cluster (exact text, not paraphrased).
+    assert first.quote == "the jitter ruins my focus"
+    assert asset.items[1].permalinks == ["https://reddit.com/r/B/9"]
+
+
+def test_data_report_falls_back_to_claim_when_llm_fails() -> None:
+    # Nothing scripted → the prose pass raises → labels fall back to the cluster claim verbatim,
+    # but the deterministic counts / permalinks / quotes still ship.
+    report = _data_report()
+    asset = build_data_asset(_deps(FakeChatModel()), report, "feature_ranking")
+    assert asset.kind == "feature_ranking"
+    assert asset.items[0].label == "consumers struggle with pain point 1"
+    assert asset.items[0].distinct_authors == 37
+    assert asset.items[0].permalinks == ["https://reddit.com/r/A/1", "https://reddit.com/r/A/2"]
+    assert asset.title  # a deterministic title is always produced
+
+
+def test_data_report_kinds_share_grounded_data() -> None:
+    report = _data_report()
+    complaint = build_data_asset(_deps(_data_prose_chat()), report, "complaint_index")
+    state_of = build_data_asset(_deps(_data_prose_chat()), report, "state_of")
+    # Different framing, same grounded numbers + permalinks per row.
+    assert complaint.kind == "complaint_index" and state_of.kind == "state_of"
+    assert [it.distinct_authors for it in complaint.items] == [
+        it.distinct_authors for it in state_of.items
+    ]
+    assert [it.permalinks for it in complaint.items] == [it.permalinks for it in state_of.items]
+
+
+def test_mcp_distribution_data_report_invalid_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_data_report("nope", kind="bogus")
+    assert res["error"]["error_code"] == "invalid_argument"
+
+
+def test_mcp_distribution_data_report_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: MemoryStores())
+    res = tools.distribution_data_report("nope")
+    assert res["error"]["error_code"] == "not_found"
+
+
+def test_mcp_distribution_data_report_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+
+    store = MemoryStores()
+    report = _data_report()
+    store.save_report(report)
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _data_prose_chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+    res = tools.distribution_data_report(report.report_id, kind="complaint_index")
+    assert "data_report" in res
+    assert res["data_report"]["report_id"] == "rpt-d2"
+    assert res["data_report"]["items"][0]["distinct_authors"] == 37
+    assert res["data_report"]["items"][0]["permalinks"]
+    assert res["data_report"]["methodology"]

@@ -25,9 +25,11 @@ from metalworks.research.distribution.channels import (
     extract_channel_signals,
     select_channels,
 )
+from metalworks.research.distribution.data_asset import build_data_asset
 
 __all__ = [
     "build_channel_strategy",
+    "build_data_asset",
     "classify_product",
     "extract_channel_signals",
     "select_channels",

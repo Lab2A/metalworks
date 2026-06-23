@@ -19,7 +19,7 @@ from metalworks.research.design import (
     render_design_preview_html,
 )
 from metalworks.research.design_review import review_design
-from metalworks.research.distribution import build_channel_strategy
+from metalworks.research.distribution import build_channel_strategy, build_data_asset
 from metalworks.research.ideate import ideate_from_idea, ideate_from_report
 from metalworks.research.landscape import run_competitor_map, run_landscape
 from metalworks.research.logo import build_logo_set, render_logo_picker_html
@@ -40,6 +40,7 @@ __all__ = [
     "CorpusReader",
     "ResearchDeps",
     "build_channel_strategy",
+    "build_data_asset",
     "build_design_system",
     "build_logo_set",
     "build_positioning_brief",

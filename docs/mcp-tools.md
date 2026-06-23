@@ -10,7 +10,7 @@ bodies own the error-envelope contract. The authoritative registered set is the
 `metalworks.mcp.tools` begins with `TIER 1` or `TIER 2` — that prefix is the
 source of truth for its tier.
 
-**30 tools** are registered.
+**29 tools** are registered.
 
 ## The tier model
 
@@ -49,6 +49,7 @@ source of truth for its tier.
 | `research_plan_brief` | Walk the D1-D8 planner with default answers → an assembled `ResearchBrief` (chat key). | `prompt`, `store_path` |
 | `positioning_from_report` | Derive grounded positioning from a stored report — one LLM call, synchronous (chat key). | `report_id`, `store_path` |
 | `distribution_strategy` | Route a stored report's named entities + signals into **test→focus** channel experiments (D2) — one classify call + deterministic routing, synchronous; every `routing_signal` traces to a real corpus entity (chat key). | `report_id`, `store_path` |
+| `distribution_data_report` | Project a stored report into a corpus-derived **data report** (D5) — a deterministic ranking of its clusters carrying their REAL distinct-author / mention counts, real permalinks, and a verbatim quote per row; the LLM writes only the title + framing labels, and methodology discloses the honest base (chat key). | `report_id`, `kind` (`complaint_index`), `store_path` |
 | `landscape_from_report` | The full "what exists today" — direct/adjacent/status-quo rivals (each gap cited, each tagged with the clusters it competes for) **plus** an empirical existing-solutions scan, synchronous (chat + embedding keys). | `report_id`, `store_path` |
 | `ideate_from_idea` | Idea-first: sharpen a raw idea into a testable hypothesis + a brief (chat key). | `idea`, `store_path` |
 | `ideate_from_report` | Evidence-first: surface a stored report's forks as grounded idea sketches (chat key). | `report_id`, `store_path` |
