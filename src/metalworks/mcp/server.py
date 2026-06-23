@@ -104,6 +104,11 @@ async def distribution_data_report(
     return tools.distribution_data_report(report_id, kind, store_path)
 
 
+async def distribution_assets(report_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Draft channel-SHAPED, drafting-only distribution assets per channel (chat key)."""
+    return tools.distribution_assets(report_id, store_path)
+
+
 async def landscape_from_report(report_id: str, store_path: str | None = None) -> dict[str, Any]:
     """TIER 2. Map the full landscape — competitors + existing solutions + do-nothing cost."""
     return tools.landscape_from_report(report_id, store_path)
@@ -229,6 +234,7 @@ _TOOL_WRAPPERS = (
     positioning_from_report,
     distribution_strategy,
     distribution_data_report,
+    distribution_assets,
     landscape_from_report,
     ideate_from_idea,
     ideate_from_report,

@@ -529,3 +529,251 @@ def test_mcp_distribution_data_report_ok(monkeypatch: pytest.MonkeyPatch) -> Non
     assert res["data_report"]["items"][0]["distinct_authors"] == 37
     assert res["data_report"]["items"][0]["permalinks"]
     assert res["data_report"]["methodology"]
+
+
+# ── D4: channel-shaped assets ────────────────────────────────────────────────
+
+
+def _channel(
+    *,
+    name: str,
+    surface_type: ChannelSurfaceType,
+    funnel_stage: str = "awareness",
+) -> Channel:
+    return Channel(
+        surface_type=surface_type,
+        name=name,
+        motion="push",
+        cadence="spike",
+        discovery="algorithmic",
+        role="lead_gen",
+        funnel_stage=funnel_stage,  # type: ignore[arg-type]
+        routing_signal="grounded in the corpus",
+    )
+
+
+def _asset_chat(drafts: list[Any]) -> FakeChatModel:
+    """A FakeChatModel that returns the given _AssetDraft list FIFO (one per channel)."""
+    from metalworks.research.distribution.assets import _AssetDraft
+
+    chat = FakeChatModel()
+    chat.script(_AssetDraft, drafts)
+    return chat
+
+
+def _grounding_report() -> DemandReport:
+    """A report whose quote carries a substring a demand claim can ground against."""
+    quote = _quote(
+        "I would honestly pay for a focus tool that just works without the jitter",
+        "https://reddit.com/r/SideProject/comments/1/x",
+        "r/SideProject",
+    )
+    return _report(clusters=[_cluster(1, quotes=[quote])])
+
+
+def test_build_channel_assets_shapes_product_hunt() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tagline", text="Focus that just works."),
+            _DraftedPart(
+                role="maker_comment",
+                text="I built this after months of jitter. People want a focus tool "
+                "that just works without the jitter, so that's what I shipped.",
+            ),
+            _DraftedPart(role="gallery_caption", text="The one-tap focus screen."),
+        ],
+        offer="Try it free today — no card needed.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="product_hunt", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    assets = build_channel_assets(_deps(chat), report, [channel])
+
+    assert len(assets) == 1
+    asset = assets[0]
+    assert asset.channel_name == "product_hunt"
+    roles = [p.role for p in asset.parts]
+    assert "maker_comment" in roles  # PH has a maker_comment part
+    assert "tagline" in roles
+    # parts concatenate into body, in order.
+    for part in asset.parts:
+        assert part.text in asset.body
+    assert asset.offer  # the CTA is free (not grounded)
+
+
+def test_build_channel_assets_shapes_x_thread() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tweet", text="Shipping a focus tool I wish existed."),
+            _DraftedPart(role="tweet", text="It kills the jitter that broke my flow."),
+            _DraftedPart(role="tweet", text="Built solo over a winter. Here's how."),
+        ],
+        offer="Link in the reply below.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="x_thread", surface_type=ChannelSurfaceType.SOCIAL)
+    assets = build_channel_assets(_deps(chat), report, [channel])
+
+    assert len(assets) == 1
+    tweets = [p for p in assets[0].parts if p.role == "tweet"]
+    assert len(tweets) >= 2  # X has ≥2 tweet parts
+
+
+def test_demand_claims_ground_but_hooks_are_free() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _ClaimDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    # A grounded demand claim (verbatim slice of the quote) + an UNGROUNDED claim
+    # whose supporting_quote isn't in the corpus → dropped. The persuasive tagline
+    # carries no quote and is NOT a claim → it survives un-grounded.
+    grounded_text = "People want a focus tool that just works without the jitter"
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="tagline", text="Finally, focus that sticks."),
+            _DraftedPart(
+                role="maker_comment",
+                text=f"{grounded_text}. I built exactly that.",
+            ),
+        ],
+        offer="Start your first session now.",
+        claims=[
+            _ClaimDraft(
+                text=grounded_text,
+                supporting_quote="pay for a focus tool that just works without the jitter",
+            ),
+            _ClaimDraft(
+                text="Thousands of teams switched last month",
+                supporting_quote="this number was never said by anyone in the corpus at all",
+            ),
+        ],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="product_hunt", surface_type=ChannelSurfaceType.LAUNCH_PLATFORM)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    # Exactly the grounded demand claim survives; the ungrounded one is dropped.
+    assert len(asset.claim_citations) == 1
+    cite = asset.claim_citations[0]
+    assert cite.claim_text == grounded_text
+    # The span resolves verbatim against the body (no-cite-no-claim contract).
+    assert asset.body[cite.span_start : cite.span_end] == cite.claim_text
+    # The citation's evidence resolves against the report's evidence by id.
+    assert cite.evidence_ref.evidence_id in {e.id for e in report.evidence}
+    # The persuasive tagline survived without any citation backing it.
+    assert any(p.role == "tagline" for p in asset.parts)
+
+
+def test_no_asset_contains_an_upvote_ask() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    draft = _AssetDraft(
+        parts=[
+            _DraftedPart(role="title", text="Show HN: a jitter-free focus tool"),
+            _DraftedPart(
+                role="first_comment",
+                text="I built this solo. It works offline. Please upvote us if you like it! "
+                "Feedback welcome.",
+            ),
+        ],
+        offer="Smash that upvote button to support the launch.",
+        claims=[],
+    )
+    chat = _asset_chat([draft])
+    channel = _channel(name="show_hn", surface_type=ChannelSurfaceType.EARNED_MEDIA)
+    asset = build_channel_assets(_deps(chat), report, [channel])[0]
+
+    # The deterministic guard stripped every upvote ask — body, parts AND offer.
+    assert "upvote" not in asset.body.lower()
+    assert "upvote" not in asset.offer.lower()
+    for part in asset.parts:
+        assert "upvote" not in part.text.lower()
+    # The non-offending copy survived the strip.
+    assert "Feedback welcome." in asset.body
+
+
+def test_unknown_roles_dropped_and_empty_channel_skipped() -> None:
+    from metalworks.research.distribution.assets import (
+        _AssetDraft,
+        _DraftedPart,
+        build_channel_assets,
+    )
+
+    report = _grounding_report()
+    # First channel: every part has a role not in its shape → no parts → skipped.
+    bad = _AssetDraft(
+        parts=[_DraftedPart(role="not_a_real_role", text="orphaned copy")],
+        offer="",
+        claims=[],
+    )
+    good = _AssetDraft(
+        parts=[_DraftedPart(role="title", text="A plain, honest post about the tool.")],
+        offer="Try it.",
+        claims=[],
+    )
+    chat = _asset_chat([bad, good])
+    channels = [
+        _channel(name="show_hn", surface_type=ChannelSurfaceType.EARNED_MEDIA),
+        _channel(name="state_of_x", surface_type=ChannelSurfaceType.DATA_ASSET),
+    ]
+    assets = build_channel_assets(_deps(chat), report, channels)
+    # The all-bad-roles channel is skipped; only the usable one survives.
+    assert [a.channel_name for a in assets] == ["state_of_x"]
+
+
+def test_mcp_distribution_assets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from metalworks import config
+    from metalworks.mcp import tools
+    from metalworks.research.distribution.assets import _AssetDraft, _DraftedPart
+
+    store = MemoryStores()
+    report = _grounding_report()
+    store.save_report(report)
+
+    draft = _AssetDraft(
+        parts=[_DraftedPart(role="tagline", text="Focus that just works.")],
+        offer="Try it free.",
+        claims=[],
+    )
+
+    def _chat() -> FakeChatModel:
+        # One chat scripts BOTH the strategy's classify/enrich calls and the asset
+        # drafts — script each output_model the run will touch.
+        chat = _scripted_chat()
+        chat.script(_AssetDraft, [draft] * 12)
+        return chat
+
+    monkeypatch.setattr(config, "default_store", lambda *_a, **_k: store)
+    monkeypatch.setattr(config, "resolve_chat", lambda *_a, **_k: _chat())
+    monkeypatch.setattr(config, "resolve_embeddings", lambda *_a, **_k: FakeEmbedding())
+    monkeypatch.setattr(config, "resolve_search", lambda *_a, **_k: None)
+    monkeypatch.setattr("metalworks.research.arctic.ArcticReader", lambda *a, **k: _NullReader())
+
+    assert tools.distribution_assets("nope")["error"]["error_code"] == "not_found"
+    res = tools.distribution_assets(report.report_id)
+    assert "assets" in res
+    assert all("parts" in a for a in res["assets"])

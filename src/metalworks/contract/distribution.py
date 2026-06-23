@@ -184,6 +184,74 @@ class Channel(BaseModel):
     )
 
 
+class AssetPart(BaseModel):
+    """One channel-SHAPED span of a distribution asset.
+
+    A launch asset for a real surface is not a flat string — a Product Hunt post
+    is a tagline + an authentic maker comment + gallery captions; a Show HN is a
+    plain title + a technical first comment; an X thread is N numbered tweets; a
+    LinkedIn post is carousel slides. ``role`` names which span this is (e.g.
+    ``tagline`` | ``maker_comment`` | ``gallery_caption`` | ``title`` |
+    ``first_comment`` | ``tweet`` | ``carousel_slide``) and ``text`` is its copy.
+    The owning :class:`ChannelAsset` concatenates its parts into ``body`` for
+    back-compat; a part's text always appears verbatim inside that body.
+    """
+
+    role: str = Field(
+        description="Which channel-shaped span this is — tagline | maker_comment | "
+        "gallery_caption | title | first_comment | tweet | carousel_slide | …"
+    )
+    text: str = Field(description="The copy for this span (appears verbatim in the asset body).")
+
+
+class ChannelAsset(BaseModel):
+    """One channel-SHAPED, drafting-only distribution asset for a single channel.
+
+    Replaces the flat ``LaunchAsset.body: str`` of the retired Launch pillar: a
+    thread isn't a string and PH's maker comment matters more than the tagline, so
+    the copy is broken into channel-native :class:`AssetPart`\\ s while ``body``
+    keeps the concatenated copy for back-compat (and as the span space the
+    ``claim_citations`` index into).
+
+    Grounding here is RELAXED versus the rest of the library — the
+    generate-site (#67) over-grounding correction. The *demand / factual* claims
+    an asset makes (that people want this, that they resent the incumbent) are
+    still held to no-cite-no-claim: each carries a :class:`ClaimCitation` whose
+    span satisfies ``body[span_start:span_end] == claim_text`` and whose
+    ``evidence_ref`` resolves against the source report's ``evidence`` by id;
+    unresolved ones are DROPPED. But the persuasive hooks, taglines and the
+    ``offer`` (the per-channel CTA) are FREE — they are craft, not factual claims,
+    and forcing a Reddit quote behind every persuasive sentence was the category
+    error. Platform invariants are enforced at assembly: never a "please upvote"
+    ask, native-first (no link in the hook), founder-voiced. DRAFTING ONLY.
+    """
+
+    channel_name: str = Field(description="The channel this asset is for (matches Channel.name).")
+    surface_type: ChannelSurfaceType = Field(
+        description="The channel's surface type — which shaped the parts."
+    )
+    funnel_stage: FunnelStage = Field(
+        description="Where in the funnel this asset acts (carried from the channel)."
+    )
+    body: str = Field(
+        description="The concatenated/back-compat copy; parts' text + claim spans index into it."
+    )
+    parts: list[AssetPart] = Field(
+        default_factory=list[AssetPart],
+        description="The channel-shaped spans (e.g. PH: tagline + maker_comment + captions).",
+    )
+    offer: str = Field(
+        default="",
+        description="The per-channel CTA / conversion ask — persuasive, not grounded. Never an "
+        "'upvote us' ask.",
+    )
+    claim_citations: list[ClaimCitation] = Field(
+        default_factory=list[ClaimCitation],
+        description="Grounded DEMAND/factual claims only — each resolves against report.evidence; "
+        "persuasive hooks/CTAs are free and not listed here.",
+    )
+
+
 class ChannelStrategy(BaseModel):
     """The channel-strategy output — entity→channel routing as test→focus experiments.
 
