@@ -10,7 +10,6 @@ contracts may change in any release.
 
 ### Added
 
-<<<<<<< HEAD
 - **Data-as-marketing data report (D5) — the on-brand flagship asset.** A new `distribution
   data-report` surface projects a finished demand report into a corpus-derived `DataReportAsset`
   — a publishable ranking (a `complaint_index`, a `feature_ranking`, or a `state_of` report) over
@@ -26,7 +25,6 @@ contracts may change in any release.
   `metalworks distribution data-report <report-id> --kind complaint_index`, the
   `distribution_data_report` MCP tool (tool count 28 → 29), and the `distribution-data-report`
   skill. Additive contract: the new `DataReportAsset` + `DataReportItem` models. (#103)
-=======
 - **Channel-shaped distribution assets (D4) — relaxed grounding, platform invariants, offer/CTA.**
   A new `distribution assets` surface drafts channel-SHAPED, drafting-only launch copy off a
   finished report and its channel strategy: one `ChannelAsset` per selected channel, broken into
@@ -42,7 +40,6 @@ contracts may change in any release.
   `mw.channel_assets(...)`, `metalworks distribution assets <report-id>`, the `distribution_assets`
   MCP tool (tool count 28 → 29), and the `distribution-assets` skill. Additive contract: the new
   `AssetPart` + `ChannelAsset` models. (#102)
->>>>>>> origin/main
 
 - **Distribution channel strategy (D2) — entity→channel routing, test→focus.** A new
   `distribution strategy` surface routes a finished demand report's *real named entities +
