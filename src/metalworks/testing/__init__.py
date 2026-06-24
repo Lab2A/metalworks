@@ -46,7 +46,7 @@ from metalworks.contract import (
     TargetSubreddit,
 )
 from metalworks.embeddings import FakeEmbedding, IndexIdentity
-from metalworks.errors import EmbeddingModelMismatch, StyleAuditUnsupported
+from metalworks.errors import EmbeddingModelMismatch, MissingExtraError, StyleAuditUnsupported
 from metalworks.llm.fake import FakeChatModel
 from metalworks.render import ComputedStyle, PageRenderer, RenderedPage, RendererCapabilities
 from metalworks.render.fake import FakeRenderer
@@ -471,9 +471,15 @@ def check_grounding_constructible(
     if spec.lane != "grounding":
         return
     assert spec.source_id in sources, f"grounding spec {spec.source_id!r} has no factory in SOURCES"
-    source = get_source(spec.source_id, **fixture_kwargs)
-    win = window if window is not None else source.latest_window()
-    records = list(source.pull(query=query, window=win, limit=limit))
+    try:
+        source = get_source(spec.source_id, **fixture_kwargs)
+        win = window if window is not None else source.latest_window()
+        records = list(source.pull(query=query, window=win, limit=limit))
+    except MissingExtraError:
+        # The source is validly registered; its optional extra (e.g. ``arctic``/duckdb)
+        # just isn't installed — the CI ``bare`` matrix. Quotability is exercised in the
+        # ``all`` matrix where the extra is present. Registration conformance still holds.
+        return
     _is_quotable_grounding(source, records=records)
 
 
