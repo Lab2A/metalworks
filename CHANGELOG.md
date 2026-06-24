@@ -10,6 +10,22 @@ contracts may change in any release.
 
 ### Added
 
+- **Sources 0.5 — lane conformance sweep (#124).** The last Phase-0 chassis piece: a parametrized
+  conformance sweep over `SOURCE_SPECS` + `MAGNITUDE_SPECS` that turns the single-fake source check
+  into the registry-level backstop keeping lane discipline honest as the source count grows.
+  `metalworks.testing` gains `check_lane_conformance` (plus per-rule helpers) asserting, across every
+  registered source + magnitude provider: (1) every `grounding` id is constructible via `get_source`
+  with offline fixture deps and yields ≥1 quotable record (text + url + pseudonymizable author, or
+  `yields_units` + domain breadth); (2) no `magnitude` lane id appears in `SOURCES`; (3) no
+  `access=="blocked"` id appears in `SOURCES` or `MAGNITUDE_PROVIDERS`; (4) every kind in a spec's
+  `signals` is registered in `SIGNAL_SPECS` (catches the silent magnitude-drop); (5) a `grounding`
+  lane declares ≥1 non-`is_magnitude` signal; (6) the default/empty stub spec fails (spec effectively
+  required); (7) every non-`none` `targeting` has a registered target picker — plus a keys-env-only
+  declaration guard (env entries are UPPER_SNAKE names, never literal secrets). New
+  `tests/test_conformance_sweep.py` runs the sweep on the real shipped registries (all offline — stub
+  clients / fake readers, no network) plus one NEGATIVE fixture per rule. The sweep runs under pytest,
+  which IS the CI gate, so no `ci.yml` change is needed. No connector / selector / provider behavior
+  changed — this only adds the guardrail (the shipped sources/providers already pass).
 - **Sources 0.7 — DX: scaffold + spec-driven `sources list` + generated catalog (#125).** Adding a
   source is now a fill-in-the-bodies job, not a 7-step edit across 6 files, and the catalog stays
   honest because it's generated from each source's `SourceSpec`. New `metalworks sources scaffold

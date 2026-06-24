@@ -125,20 +125,27 @@ def test_fakesource_satisfies_protocol() -> None:
 
 
 def test_registry_is_append_friendly() -> None:
-    # A connector self-registers without editing a shared inline list.
-    register_source("fake", lambda **_: FakeSource())
-    src = get_source("fake")
-    assert isinstance(src, FakeSource)
+    from metalworks.research.sources import SOURCE_SPECS, SOURCES
 
-    # The built-in Reddit/Arctic connector self-registers on its import — the
-    # registry is a shared dict, so a new connector and a built-in coexist with
-    # no edit to a shared inline list.
-    import metalworks.research.sources.arctic  # noqa: F401
-    from metalworks.research.sources import SOURCES
+    # A connector self-registers without editing a shared inline list. Clean up the
+    # global registry afterward so the 'fake' stub spec doesn't leak into the
+    # process-wide registry the 0.5 conformance sweep walks (test isolation).
+    try:
+        register_source("fake", lambda **_: FakeSource())
+        src = get_source("fake")
+        assert isinstance(src, FakeSource)
 
-    assert "fake" in SOURCES
-    assert "reddit" in SOURCES
-    assert "arctic" in SOURCES
+        # The built-in Reddit/Arctic connector self-registers on its import — the
+        # registry is a shared dict, so a new connector and a built-in coexist with
+        # no edit to a shared inline list.
+        import metalworks.research.sources.arctic  # noqa: F401
+
+        assert "fake" in SOURCES
+        assert "reddit" in SOURCES
+        assert "arctic" in SOURCES
+    finally:
+        SOURCES.pop("fake", None)
+        SOURCE_SPECS.pop("fake", None)
 
 
 def test_ingest_source_is_idempotent() -> None:

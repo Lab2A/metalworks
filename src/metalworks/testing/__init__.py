@@ -29,7 +29,8 @@ returns `CorpusComment`s parented to pulled record ids (or `None`), and
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import re
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
@@ -49,8 +50,10 @@ from metalworks.errors import EmbeddingModelMismatch, StyleAuditUnsupported
 from metalworks.llm.fake import FakeChatModel
 from metalworks.render import ComputedStyle, PageRenderer, RenderedPage, RendererCapabilities
 from metalworks.render.fake import FakeRenderer
-from metalworks.research.sources import ItemSource, SourceWindow
-from metalworks.research.sources.magnitude import MagnitudeProvider
+from metalworks.research.sources import ItemSource, SourceFactory, SourceWindow, get_source
+from metalworks.research.sources.magnitude import MagnitudeFactory, MagnitudeProvider, MagnitudeSpec
+from metalworks.research.sources.spec import SourceSpec
+from metalworks.research.synthesis.signals import SignalSpec
 from metalworks.stores.repos import (
     AccountRepo,
     BriefRepo,
@@ -373,6 +376,308 @@ def check_magnitude_provider(
     )
 
 
+# ── 0.5 lane conformance sweep ───────────────────────────────────────────────
+#
+# ``check_item_source`` / ``check_magnitude_provider`` (above) verify ONE connector
+# or provider against its protocol. The sweep below is the registry-level backstop:
+# it walks the whole :data:`~metalworks.research.sources.spec.SOURCE_SPECS` +
+# :data:`~metalworks.research.sources.magnitude.MAGNITUDE_SPECS` and asserts the
+# cross-source lane discipline that going wide must never break — a magnitude number
+# can never masquerade as grounding, a blocked source can never become a scraper, and
+# every declared signal/targeting actually resolves. ``SourceSpec.__post_init__``
+# enforces the per-spec matrix (0.1); these are the rules that live BETWEEN the
+# registries, which a single spec can't see.
+
+# An env var name is "env-only" shaped: an UPPER_SNAKE identifier (a name the
+# ``resolve_*`` pattern reads off ``os.environ``), never a literal secret value.
+_ENV_VAR_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
+# The ``auth`` values that require an ``env`` declaration (mirrors the spec matrix).
+_AUTHED_KINDS = frozenset({"key", "oauth", "paid"})
+
+
+def _is_quotable_grounding(source: ItemSource, *, records: Sequence[CorpusRecord]) -> None:
+    """Assert a grounding source's pull yields ≥1 *quotable* record.
+
+    Two legal shapes (see the :class:`ItemSource` docstring):
+
+    * **comment-bearing** — each record has ``text``/``title`` + ``url``, and a real
+      quote with a pseudonymizable author is recoverable: either the record itself
+      carries an ``author_hash`` (HN/PH stories) OR a comment under it does (Reddit
+      posts are authorless on the spine but their comments carry the author).
+    * **unit-yielding** (``yields_units = True``, e.g. a web-style page source whose
+      records ARE the synthesis units) — each record has text + url and the pull
+      shows DOMAIN breadth (≥1 distinct registrable domain), the breadth axis the
+      ranker uses in place of distinct authors.
+    """
+    quotable = [r for r in records if (r.text or r.title) and r.url]
+    assert quotable, (
+        f"source {source.source_id!r}: pull yielded no quotable record "
+        "(a grounding record needs body/title text AND a resolvable url)"
+    )
+
+    if getattr(source, "yields_units", False):
+        domains = {_record_domain(r) for r in quotable} - {""}
+        assert domains, (
+            f"unit source {source.source_id!r}: records carry no registrable domain — "
+            "a yields_units source's breadth axis is distinct domains"
+        )
+        return
+
+    # Comment-bearing: authorship must be recoverable from the record or its comments.
+    if any(r.author_hash for r in quotable):
+        return
+    ids = [r.id for r in quotable]
+    batches = source.comments_for(ids)
+    assert batches is not None, (
+        f"source {source.source_id!r}: no record carries an author_hash and the source "
+        "has no comment layer — a grounding quote has no pseudonymizable author "
+        "(set yields_units=True if records are self-representing units)"
+    )
+    has_author = any(c.author_hash for batch in batches for c in batch)
+    assert has_author, (
+        f"source {source.source_id!r}: neither records nor comments carry an author_hash — "
+        "a grounding quote must trace to a pseudonymizable author"
+    )
+
+
+def _record_domain(record: CorpusRecord) -> str:
+    """The registrable domain a unit source records (``extra['domain']`` or host)."""
+    domain = record.extra.get("domain")
+    if isinstance(domain, str) and domain:
+        return domain
+    from urllib.parse import urlsplit
+
+    host = urlsplit(record.url).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def check_grounding_constructible(
+    spec: SourceSpec,
+    *,
+    sources: Mapping[str, SourceFactory],
+    fixture_kwargs: Mapping[str, object],
+    window: SourceWindow | None = None,
+    query: str = "focus",
+    limit: int | None = 25,
+) -> None:
+    """Rule 1 — a grounding source is constructible via ``get_source`` and quotable.
+
+    Constructs the source through the real :func:`get_source` registry path (with the
+    caller's offline ``fixture_kwargs`` injected — a stub client / fake reader), pulls
+    over ``window``, and asserts ≥1 quotable record (see :func:`_is_quotable_grounding`).
+    A non-``grounding`` lane spec is a no-op (web/magnitude lanes are not held to the
+    grounding-quote shape).
+    """
+    if spec.lane != "grounding":
+        return
+    assert spec.source_id in sources, f"grounding spec {spec.source_id!r} has no factory in SOURCES"
+    source = get_source(spec.source_id, **fixture_kwargs)
+    win = window if window is not None else source.latest_window()
+    records = list(source.pull(query=query, window=win, limit=limit))
+    _is_quotable_grounding(source, records=records)
+
+
+def check_no_magnitude_in_sources(
+    *,
+    source_specs: Mapping[str, SourceSpec],
+    sources: Mapping[str, SourceFactory],
+) -> None:
+    """Rules 2 + 3 (source side) — no ``magnitude`` lane and no ``blocked`` id in SOURCES.
+
+    A magnitude number is a lane-② overlay, NEVER a cluster-building source, so it must
+    not appear in the ``SOURCES`` factory registry (and ``SourceSpec.__post_init__``
+    already forbids ``lane == "magnitude"`` outright). A ``blocked`` source can only
+    contribute web-style context, so it must never be a registered scraper either.
+    """
+    for sid, spec in source_specs.items():
+        assert spec.lane != "magnitude", (
+            f"source {sid!r}: lane 'magnitude' must never appear in SOURCE_SPECS "
+            "(magnitude is a lane-② overlay, not a cluster-building source)"
+        )
+        if spec.access == "blocked":
+            assert sid not in sources, (
+                f"source {sid!r}: access 'blocked' must not be a registered SOURCES "
+                "factory (blocked ⇒ web-lane context only, never a scraper)"
+            )
+
+
+def check_no_blocked_magnitude(*, magnitude_specs: Mapping[str, MagnitudeSpec]) -> None:
+    """Rule 3 (magnitude side) — no ``blocked`` provider in MAGNITUDE_PROVIDERS.
+
+    A blocked provider can never be reached, so registering one as a magnitude factory
+    would silently never measure; it must be dropped, not shipped behind the registry.
+    """
+    for pid, spec in magnitude_specs.items():
+        assert spec.access != "blocked", (
+            f"magnitude provider {pid!r}: access 'blocked' must not be registered "
+            "(a blocked provider can never measure — drop it, don't register it)"
+        )
+
+
+def check_signals_registered(
+    spec: SourceSpec | MagnitudeSpec,
+    *,
+    signal_specs: Mapping[str, SignalSpec],
+) -> None:
+    """Rule 4 — every kind in a spec's ``signals`` tuple is a registered SignalSpec.
+
+    Catches the silent magnitude-drop (DX-F2): a source that declares ``signals=("foo",)``
+    with no ``register_signal`` for ``"foo"`` would have that kind score as zero
+    forever. The kind must exist in ``SIGNAL_SPECS`` so the deterministic scorer can
+    weight it.
+    """
+    sid = getattr(spec, "source_id", None) or getattr(spec, "provider_id", "?")
+    for kind in spec.signals:
+        assert kind in signal_specs, (
+            f"spec {sid!r}: signal kind {kind!r} is not registered in SIGNAL_SPECS "
+            "(register it with register_signal so the scorer can weight it)"
+        )
+
+
+def check_grounding_has_grounding_signal(
+    spec: SourceSpec,
+    *,
+    signal_specs: Mapping[str, SignalSpec],
+) -> None:
+    """Rule 5 — a ``grounding`` lane declares ≥1 NON-``is_magnitude`` signal.
+
+    A grounding source ranks on a real endorsement/breadth signal (upvotes, points,
+    votes) — a magnitude-only signal vector would let an absolute-volume number stand
+    in for grounded demand. A ``web`` lane is exempt (it ranks by domain breadth, not a
+    signal vector, so an empty ``signals`` is legal there). The default/empty stub spec
+    has no signals at all and is caught here too.
+    """
+    if spec.lane != "grounding":
+        return
+    grounding_kinds = [
+        k for k in spec.signals if (s := signal_specs.get(k)) is not None and not s.is_magnitude
+    ]
+    assert grounding_kinds, (
+        f"grounding source {spec.source_id!r}: declares no non-magnitude signal "
+        f"(signals={spec.signals!r}) — a grounding lane must rank on a real endorsement "
+        "signal, not a magnitude number alone"
+    )
+
+
+def check_spec_not_stub(spec: SourceSpec) -> None:
+    """Rule 6 — ``spec`` is effectively required: the bare grounding stub fails.
+
+    ``register_source(id, factory)`` with no ``spec=`` lands the signal-less,
+    hint-less :func:`~metalworks.research.sources.spec._grounding_default`. That stub
+    is a back-compat landing pad, NOT a shippable declaration — a real source must
+    declare its signals and a relevance hint. This rule fails any source still on the
+    stub (the same condition rule 5's no-signal check catches, asserted directly).
+    """
+    is_stub = (
+        spec.lane == "grounding"
+        and not spec.signals
+        and not spec.relevance_hint
+        and spec.targeting == "none"
+        and spec.auth == "none"
+        and not spec.env
+        and spec.access == "open"
+    )
+    assert not is_stub, (
+        f"source {spec.source_id!r}: still on the default/empty grounding stub spec "
+        "(no signals, no relevance_hint) — declare a real SourceSpec at register_source"
+    )
+
+
+def check_targeting_has_picker(
+    spec: SourceSpec,
+    *,
+    registered_targetings: frozenset[str],
+) -> None:
+    """Rule 7 — every non-``none`` targeting a source declares has a registered picker.
+
+    A source that says it targets by ``subreddit`` / ``slug`` / ``keyword`` / ``instance``
+    needs a picker in the 0.4 registry to turn a brief into per-target knobs; a declared
+    targeting with no picker would have nothing to vary on at selection time.
+    """
+    if spec.targeting == "none":
+        return
+    assert spec.targeting in registered_targetings, (
+        f"source {spec.source_id!r}: targeting {spec.targeting!r} has no registered "
+        f"target picker (registered: {sorted(registered_targetings)})"
+    )
+
+
+def check_keys_env_only(spec: SourceSpec | MagnitudeSpec) -> None:
+    """Keys-env-only — an authed spec names UPPER_SNAKE env var(s), never a secret value.
+
+    ``SourceSpec.__post_init__`` already requires an authed spec to declare a non-empty
+    ``env`` (so the catalog can name what to set); this adds that each declared entry is
+    an env-var *name* (the shape the ``config.py`` ``resolve_*`` pattern reads off
+    ``os.environ``), not a literal credential pasted into the spec. The actual read path
+    is env-only by construction (``resolve_search`` / ``_has_key`` only touch
+    ``os.environ``); this guards the declaration against a config-file-secret smell.
+    """
+    sid = getattr(spec, "source_id", None) or getattr(spec, "provider_id", "?")
+    if spec.auth in _AUTHED_KINDS:
+        assert spec.env, f"authed spec {sid!r}: must declare env var(s)"
+    for var in spec.env:
+        assert _ENV_VAR_NAME.match(var), (
+            f"spec {sid!r}: env entry {var!r} is not an UPPER_SNAKE env-var name — "
+            "declare the variable NAME the resolve_* pattern reads, never a secret value"
+        )
+
+
+def check_lane_conformance(
+    *,
+    source_specs: Mapping[str, SourceSpec],
+    magnitude_specs: Mapping[str, MagnitudeSpec],
+    sources: Mapping[str, SourceFactory],
+    magnitude_providers: Mapping[str, MagnitudeFactory],
+    signal_specs: Mapping[str, SignalSpec],
+    registered_targetings: frozenset[str],
+    source_fixtures: Mapping[str, Mapping[str, object]],
+) -> None:
+    """Run the full 0.5 lane-conformance sweep over both registries.
+
+    The registry-level backstop for going wide. Asserts, across every registered
+    source + magnitude provider, the cross-source lane discipline ``SourceSpec.__post_init__``
+    can't see (it validates one spec; these are the rules BETWEEN registries):
+
+    1. Every ``grounding`` id is constructible via :func:`get_source` (with the
+       caller's offline ``source_fixtures[id]`` deps) and yields ≥1 quotable record.
+    2. No ``magnitude`` lane id appears in ``SOURCES``.
+    3. No ``blocked`` id appears in ``SOURCES`` or ``MAGNITUDE_PROVIDERS``.
+    4. Every kind in a spec's ``signals`` is registered in ``SIGNAL_SPECS``.
+    5. A ``grounding`` lane declares ≥1 non-``is_magnitude`` signal.
+    6. ``spec`` is effectively required — the default/empty stub fails.
+    7. Every non-``none`` targeting a source declares has a registered picker.
+
+    Plus the keys-env-only declaration guard. ``source_fixtures`` maps each grounding
+    ``source_id`` to the offline ``get_source`` kwargs (stub client / fake reader) that
+    let rule 1 pull without a network — a grounding source with no fixture fails loudly
+    (the sweep must cover every shipped grounding id, not silently skip one).
+    """
+    assert source_specs, "SOURCE_SPECS is empty — import the built-in connectors first"
+    assert magnitude_specs, "MAGNITUDE_SPECS is empty — import the magnitude module first"
+
+    check_no_magnitude_in_sources(source_specs=source_specs, sources=sources)
+    check_no_blocked_magnitude(magnitude_specs=magnitude_specs)
+
+    for spec in source_specs.values():
+        check_signals_registered(spec, signal_specs=signal_specs)
+        check_grounding_has_grounding_signal(spec, signal_specs=signal_specs)
+        check_spec_not_stub(spec)
+        check_targeting_has_picker(spec, registered_targetings=registered_targetings)
+        check_keys_env_only(spec)
+        if spec.lane == "grounding":
+            assert spec.source_id in source_fixtures, (
+                f"grounding source {spec.source_id!r} has no offline fixture in the sweep "
+                "— add its get_source kwargs to source_fixtures so rule 1 can pull it"
+            )
+            check_grounding_constructible(
+                spec, sources=sources, fixture_kwargs=source_fixtures[spec.source_id]
+            )
+
+    for mspec in magnitude_specs.values():
+        check_signals_registered(mspec, signal_specs=signal_specs)
+        check_keys_env_only(mspec)
+
+
 def check_all_repos(backend: AllRepos, *, corpus_rows: int = 1500) -> None:
     """Run every repo conformance check against one backend instance.
 
@@ -448,10 +753,19 @@ __all__ = [
     "check_all_repos",
     "check_brief_repo",
     "check_corpus_repo",
+    "check_grounding_constructible",
+    "check_grounding_has_grounding_signal",
     "check_inbox_repo",
     "check_item_source",
+    "check_keys_env_only",
+    "check_lane_conformance",
     "check_magnitude_provider",
+    "check_no_blocked_magnitude",
+    "check_no_magnitude_in_sources",
     "check_opportunity_repo",
     "check_page_renderer",
     "check_run_repo",
+    "check_signals_registered",
+    "check_spec_not_stub",
+    "check_targeting_has_picker",
 ]
