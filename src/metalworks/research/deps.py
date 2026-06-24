@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.research.sources import ItemSource
+    from metalworks.research.sources.magnitude import MagnitudeProvider
     from metalworks.research.types import MonthRef
     from metalworks.search import SearchProvider
     from metalworks.stores.repos import CorpusRepo
@@ -88,6 +89,7 @@ class ResearchDeps:
     search: SearchProvider | None = None
     comments: CommentSource | None = None
     sources: list[ItemSource] | None = None
+    magnitude_providers: list[MagnitudeProvider] | None = None
     clock: Callable[[], datetime] = default_clock
     emit: Callable[[str], None] = _noop_emit
     author_salt: str = "metalworks-local"
@@ -159,3 +161,26 @@ class ResearchDeps:
             return get_source(source_id, **kwargs)
         except TypeError:
             return get_source(source_id)
+
+    def effective_magnitude_providers(self) -> list[MagnitudeProvider]:
+        """The lane-② magnitude providers this run measures with, in order.
+
+        Precedence mirrors :meth:`effective_sources`:
+
+        1. **Explicit override** — ``self.magnitude_providers`` set (a test or a
+           caller wiring providers directly). Returned verbatim.
+        2. **Config** — the opt-in ``[sources].magnitude`` id list, each constructed
+           from the :data:`~metalworks.research.sources.magnitude.MAGNITUDE_PROVIDERS`
+           registry.
+        3. **Empty** — the default. With nothing overridden and nothing configured,
+           the magnitude hook is a no-op and the run is byte-for-byte unchanged.
+
+        Magnitude is opt-in and OFF by default, so this returns ``[]`` unless a
+        caller or config asks for it — the determinism / no-surprise posture.
+        """
+        if self.magnitude_providers is not None:
+            return self.magnitude_providers
+        from metalworks import config
+        from metalworks.research.sources.magnitude import get_magnitude_provider
+
+        return [get_magnitude_provider(pid) for pid in config.magnitude_provider_ids()]

@@ -32,6 +32,7 @@ from metalworks.contract import (
     CorpusStats,
     DemandReport,
     Fork,
+    InsightCluster,
     SourceMapEntry,
     SourceSelection,
     WebFinding,
@@ -158,6 +159,92 @@ def _pull_corpus(
                     )
                 )
     return items, records_by_id
+
+
+def _apply_magnitude_overlay(
+    deps: ResearchDeps,
+    *,
+    slot_plan_product: str | None,
+    clusters: list[InsightCluster],
+    web_findings: list[WebFinding],
+    months: list[MonthRef],
+    stage_errors: list[str],
+) -> str | None:
+    """Lane-② overlay: attach magnitude numbers to existing clusters, then rescore.
+
+    Deterministic by construction (the determinism non-negotiable): the entities
+    handed to providers are EXTRACTED from grounded artifacts — cluster quote source
+    names, the brief slot-plan product, web-finding domains — never an LLM guess.
+    Active providers (``deps.effective_magnitude_providers()``; empty by default, so
+    a default run skips this entirely) measure those entities; matches merge into the
+    owning cluster's ``demand_signals`` and rescore via the existing
+    ``compute_demand_score`` path (RANKING only — the verdict band never sees it).
+    Re-banding + re-ranking follow because a rescore can reorder.
+
+    Best-effort: a provider that raises degrades the stage (``stage_errors`` +
+    a returned caveat string) but never aborts the run — the ``web_research``
+    posture. A provider can NEVER create a cluster; with no clusters to attach to,
+    this is a no-op.
+    """
+    from metalworks.research.sources.magnitude import (
+        extract_entities,
+        merge_magnitude_into_clusters,
+    )
+    from metalworks.research.synthesis.cluster_ranker import (
+        compute_demand_score,
+        signal_from_breadth,
+    )
+
+    providers = deps.effective_magnitude_providers()
+    if not providers or not clusters:
+        return None  # off by default / nothing to attach to — no-op, no cluster created.
+
+    entities = extract_entities(
+        clusters=clusters,
+        slot_plan_product=slot_plan_product,
+        web_finding_urls=[f.source_url for f in web_findings],
+    )
+    if not entities:
+        return None
+
+    window = SourceWindow(
+        months=tuple(months),
+        start=_month_to_dt(months[0]),
+        end=_month_to_dt(months[-1], end_of_month=True),
+    )
+
+    measurements: dict[str, dict[str, float]] = {}
+    error: str | None = None
+    for provider in providers:
+        try:
+            got = provider.measure(entities=entities, window=window)
+        except Exception as e:  # best-effort, like web_research
+            error = f"{type(e).__name__}: {str(e)[:120]}"
+            if "magnitude" not in stage_errors:
+                stage_errors.append("magnitude")
+            continue
+        for entity, kinds in got.items():
+            bucket = measurements.setdefault(entity, {})
+            for kind, value in kinds.items():
+                bucket[kind] = bucket.get(kind, 0.0) + float(value)
+
+    if not measurements:
+        return error
+
+    changed = merge_magnitude_into_clusters(
+        clusters,
+        measurements,
+        rescore=lambda breadth, signals: compute_demand_score(breadth, signals),
+    )
+    if changed:
+        # A rescore can reorder; re-sort and re-band exactly like build_clusters
+        # (the badge is relative to the report's breadth distribution).
+        clusters.sort(key=lambda c: c.demand_score, reverse=True)
+        population = [c.breadth_count for c in clusters]
+        for i, c in enumerate(clusters, start=1):
+            c.rank = i
+            c.signal = signal_from_breadth(c.breadth_count, population)
+    return error
 
 
 def _build_corpus_stats(items: Iterable[ExplorationItem]) -> CorpusStats:
@@ -343,6 +430,24 @@ def run_research(
             web_error = f"{type(e).__name__}: {str(e)[:120]}"
             stage_errors.append("web_research")
 
+    # Lane-② magnitude overlay (issue #122). Deterministically extract measurable
+    # entities from the already-grounded artifacts (cluster quote names, slot-plan
+    # product, web-finding domains — NO LLM), call any active magnitude providers,
+    # and merge their numbers into the matching clusters' demand_signals + rescore
+    # (RANKING only). Best-effort, exactly like web research: a provider failure
+    # degrades to partial + caveat, never aborts. A provider can NEVER create a
+    # cluster — it only attaches to existing ones. Off by default (no providers).
+    magnitude_error = _apply_magnitude_overlay(
+        deps,
+        slot_plan_product=(
+            synthesis_out.slot_plan.product if synthesis_out.slot_plan is not None else None
+        ),
+        clusters=synthesis_out.ranked_clusters,
+        web_findings=web_findings,
+        months=months,
+        stage_errors=stage_errors,
+    )
+
     corpus_stats = _build_corpus_stats(relevant_items)
     exploration_report.threads_synthesized = synthesis_out.n_synthesized
     # Surface the near-dup merge rate (breadth-collapse observability, issue #82).
@@ -377,6 +482,8 @@ def run_research(
         caveat_parts.append(selection.caveat)
     if web_error:
         caveat_parts.append(f"Web research failed: {web_error}")
+    if magnitude_error:
+        caveat_parts.append(f"Magnitude overlay failed: {magnitude_error}")
     if comments_error:
         caveat_parts.append(f"Comments unavailable: {comments_error}")
     if triangulation_error:
