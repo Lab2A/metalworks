@@ -416,6 +416,62 @@ class SourceMapEntry(BaseModel):
     skew: str | None = None
 
 
+class SkippedSource(BaseModel):
+    """A source the selector ranked but couldn't reach — its auth key is unset.
+
+    Carries the same ``env_var`` / ``fix`` shape as
+    :class:`~metalworks.errors.MissingKeyError` so a pre-flight line can tell the
+    operator exactly which variable to set to unlock the source on the next run.
+    """
+
+    source_id: str = Field(description="The registered source id that was skipped.")
+    reason: str = Field(
+        default="no key",
+        description="Why it was skipped (e.g. 'no key' — its auth env var is unset).",
+    )
+    env_var: str = Field(
+        default="",
+        description="The environment variable(s) to set to unlock it (MissingKeyError shape).",
+    )
+    fix: str = Field(
+        default="",
+        description="The actionable remediation line (e.g. 'Set the TRUSTPILOT_API_KEY ...').",
+    )
+
+
+class SourceSelection(BaseModel):
+    """The brief-aware source pick — surfaced so a run is never a silent black box.
+
+    ``selected`` is the ordered, access-gated, relevance-ranked source id list the
+    run actually pulled from. ``skipped`` names sources the selector wanted but
+    couldn't reach (no key), each with its env var so the operator can unlock it.
+    ``floor_applied`` is the non-removable-floor flag: when the gated ranking
+    yielded nothing the run fell back to ``reddit`` (or the configured default)
+    rather than producing an empty corpus, and ``caveat`` says so.
+    """
+
+    selected: list[str] = Field(
+        default_factory=list[str],
+        description="Ordered source ids the run pulled from (access-gated, relevance-ranked).",
+    )
+    skipped: list[SkippedSource] = Field(
+        default_factory=list[SkippedSource],
+        description="Sources the selector wanted but couldn't reach (no key).",
+    )
+    rationale: str = Field(
+        default="",
+        description="One-line human rationale for the pick (selector reasoning).",
+    )
+    floor_applied: bool = Field(
+        default=False,
+        description="True ⇒ the gated ranking yielded nothing and the run fell back to the floor.",
+    )
+    caveat: str | None = Field(
+        default=None,
+        description="A distinct caveat when the floor was applied or a source was skipped.",
+    )
+
+
 class MarketSizing(BaseModel):
     reddit_floor: int
     penetration: dict[str, float]
@@ -794,6 +850,11 @@ class DemandReport(BaseModel):
     market_sizing: MarketSizing | None = None
     price_finding: PriceFinding | None = None
     source_map: list[SourceMapEntry] = Field(default_factory=list[SourceMapEntry])
+    source_selection: SourceSelection | None = Field(
+        default=None,
+        description="The brief-aware source pick + skipped/floor rationale, when the selector ran. "
+        "None ⇒ the run used the configured/default sources without the selector.",
+    )
 
     # ── Two-stream additions ──
     brief: ResearchBrief | None = Field(

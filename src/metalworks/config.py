@@ -264,6 +264,21 @@ def default_source_id() -> str:
     return enabled_source_ids()[0]
 
 
+def source_selector_enabled() -> bool:
+    """Whether the brief-aware source SELECTOR is opt-in enabled (``[sources].select``).
+
+    The selector (``planner.source_picker``) is **opt-in by default**: with
+    ``select`` unset or false, runs use the configured ``[sources].enabled`` /
+    ``reddit`` default exactly as before — default behavior is unchanged. Set
+    ``select = true`` to let the picker choose brief-relevant, access-gated
+    sources per run. An explicit source override (CLI ``--source`` /
+    ``[sources].enabled`` passed as the override) always wins over the selector:
+    the precedence is **explicit override > selector (when enabled) > default**.
+    """
+    value = load_sources_config().get("select")
+    return value is True
+
+
 def resolve_sources(override: list[str] | None = None, **source_kwargs: Any) -> list[ItemSource]:
     """Construct the active :class:`ItemSource` connectors, in order.
 
@@ -602,4 +617,5 @@ __all__ = [
     "save_config",
     "save_sources_config",
     "setting",
+    "source_selector_enabled",
 ]
