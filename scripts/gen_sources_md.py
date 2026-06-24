@@ -28,39 +28,24 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "src"))
 
-from metalworks.research.sources import SOURCE_SPECS, SourceSpec  # noqa: E402
+from metalworks.research.sources import (  # noqa: E402
+    SOURCE_SPECS,
+    SourceSpec,
+    builtin_connector_modules,
+    builtin_source_ids,
+)
 
-# Connector modules whose import self-registers a source (the same map the CLI's
-# lazy ``get_source`` and the spec conformance test use). Importing — not
+# Connector modules whose import self-registers a source, and the built-in ids
+# the shipped catalog documents — both DERIVED from the single
+# ``BUILTIN_SOURCE_MODULES`` source of truth in ``research.sources`` (a new
+# connector is registered there, not in any list here). Importing — not
 # constructing — is enough: ``register_source(..., spec=...)`` runs at module
-# scope, populating ``SOURCE_SPECS`` without needing live readers/keys.
-_CONNECTOR_MODULES: tuple[str, ...] = (
-    "metalworks.research.sources.ats",
-    "metalworks.research.sources.arctic",
-    "metalworks.research.sources.hackernews",
-    "metalworks.research.sources.hn_archive",
-    "metalworks.research.sources.producthunt",
-    "metalworks.research.sources.stackexchange",
-    "metalworks.research.sources.discourse",
-    "metalworks.research.sources.web",
-)
-
-# The built-in source ids the shipped catalog documents (every id the modules
-# above register). Pinning the set keeps the generated file independent of any
-# third-party source registered in the same process — the drift gate stays
-# deterministic. When a new built-in connector lands, add its id(s) here.
-_BUILTIN_IDS: tuple[str, ...] = (
-    "arctic",
-    "ats",
-    "discourse",
-    "hackernews",
-    "hackernews_archive",
-    "hn_archive",
-    "producthunt",
-    "reddit",
-    "stackexchange",
-    "web",
-)
+# scope, populating ``SOURCE_SPECS`` without needing live readers/keys. Deriving
+# the id set from the built-in map (not the live registry) keeps the generated
+# file independent of any third-party source registered in-process — the drift
+# gate stays deterministic.
+_CONNECTOR_MODULES: tuple[str, ...] = builtin_connector_modules()
+_BUILTIN_IDS: tuple[str, ...] = builtin_source_ids()
 
 _OUT = _REPO / "docs" / "sources.md"
 

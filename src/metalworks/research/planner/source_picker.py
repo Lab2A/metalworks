@@ -440,18 +440,6 @@ def _rank(deps: ResearchDeps, brief: ResearchBrief, specs: list[SourceSpec]) -> 
 # calls ``register_source`` at module scope), and a bare ``import metalworks``
 # imports none of them (lean-core). The selector must see the full registry, so it
 # triggers these imports once before reading the specs.
-_BUILTIN_SPEC_MODULES = (
-    "metalworks.research.sources.ats",
-    "metalworks.research.sources.arctic",
-    "metalworks.research.sources.hackernews",
-    "metalworks.research.sources.hn_archive",
-    "metalworks.research.sources.producthunt",
-    "metalworks.research.sources.stackexchange",
-    "metalworks.research.sources.discourse",
-    "metalworks.research.sources.web",
-)
-
-
 def _ensure_specs_registered() -> None:
     """Import the built-in connectors so their ``SourceSpec``s are in the registry.
 
@@ -459,10 +447,15 @@ def _ensure_specs_registered() -> None:
     can't import (a missing optional dep at module top — there are none today, the
     SDKs are lazy-imported inside functions) is skipped rather than crashing the
     selector, so a partially-installed environment still selects over what it has.
+
+    The module list is derived from the single :data:`BUILTIN_SOURCE_MODULES`
+    source of truth — adding a connector touches that one map, not this list.
     """
     import importlib
 
-    for mod in _BUILTIN_SPEC_MODULES:
+    from metalworks.research.sources import builtin_connector_modules
+
+    for mod in builtin_connector_modules():
         try:
             importlib.import_module(mod)
         except Exception as exc:  # pragma: no cover - lean-core keeps tops import-free

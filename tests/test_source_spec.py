@@ -17,30 +17,25 @@ from datetime import date
 import pytest
 
 from metalworks.research.sources import (
+    BUILTIN_SOURCE_MODULES,
     SOURCE_SPECS,
     SourceSpec,
+    builtin_connector_modules,
+    builtin_source_ids,
     register_source,
 )
 from metalworks.research.sources.spec import _grounding_default
 from metalworks.research.synthesis.signals import SIGNAL_SPECS
 
-# id → module that self-registers it (importing runs ``register_source`` at module
-# scope). We import to trigger registration without constructing — the factories
-# need real readers/clients we don't have in a unit test.
-_BUILTIN_MODULES = {
-    "reddit": "metalworks.research.sources.arctic",
-    "arctic": "metalworks.research.sources.arctic",
-    "hackernews": "metalworks.research.sources.hackernews",
-    "hackernews_archive": "metalworks.research.sources.hn_archive",
-    "hn_archive": "metalworks.research.sources.hn_archive",
-    "producthunt": "metalworks.research.sources.producthunt",
-    "web": "metalworks.research.sources.web",
-}
-
 
 def _ensure_registered(source_id: str) -> None:
-    """Import the connector module so its module-scope ``register_source`` runs."""
-    importlib.import_module(_BUILTIN_MODULES[source_id])
+    """Import the connector module so its module-scope ``register_source`` runs.
+
+    Reads the single :data:`BUILTIN_SOURCE_MODULES` source of truth — we import to
+    trigger registration without constructing (factories need real readers/clients
+    we don't have in a unit test).
+    """
+    importlib.import_module(BUILTIN_SOURCE_MODULES[source_id])
 
 
 def _valid_spec(**overrides: object) -> SourceSpec:
@@ -186,3 +181,53 @@ def test_register_spec_id_mismatch_raises() -> None:
             _factory,  # type: ignore[arg-type]
             spec=_valid_spec(source_id="other"),
         )
+
+
+# ── single registration point (issue #139): no half-registered connector ─────
+
+
+def test_builtin_connector_modules_are_distinct_and_alias_dedup() -> None:
+    """The derived module list dedups aliases (Arctic backs reddit AND arctic)."""
+    modules = builtin_connector_modules()
+    assert len(modules) == len(set(modules)), "module list has duplicates"
+    # reddit + arctic are two ids → one module; the dedup must collapse them.
+    assert BUILTIN_SOURCE_MODULES["reddit"] == BUILTIN_SOURCE_MODULES["arctic"]
+    assert list(modules).count(BUILTIN_SOURCE_MODULES["reddit"]) == 1
+
+
+def test_every_builtin_id_resolves_to_a_registered_spec() -> None:
+    """The core #139 guard: after importing the single built-in module list, every
+    id in :func:`builtin_source_ids` registers a spec — so a connector added to the
+    map but not actually self-registering (or vice-versa) fails CI, not silently."""
+    for module in builtin_connector_modules():
+        importlib.import_module(module)
+    for sid in builtin_source_ids():
+        assert sid in SOURCE_SPECS, (
+            f"built-in id {sid!r} is in BUILTIN_SOURCE_MODULES but registered no spec — "
+            "its module didn't self-register it (half-registration)"
+        )
+
+
+def test_no_builtin_spec_id_is_missing_from_the_map() -> None:
+    """The converse guard: every shipped built-in spec id is reachable from the single
+    map, so a connector that self-registers but wasn't added to BUILTIN_SOURCE_MODULES
+    (the silent-omission bug #139 fixes — CLI/catalog would skip it) fails here."""
+    for module in builtin_connector_modules():
+        importlib.import_module(module)
+    builtin_ids = set(builtin_source_ids())
+    # Only assert over the shipped built-ins (ignore any third-party/test-registered
+    # id that other tests leak into the process-wide registry).
+    shipped = {
+        "reddit",
+        "arctic",
+        "hackernews",
+        "hackernews_archive",
+        "hn_archive",
+        "producthunt",
+        "stackexchange",
+        "discourse",
+        "ats",
+        "web",
+    }
+    missing = shipped - builtin_ids
+    assert not missing, f"shipped built-in ids absent from BUILTIN_SOURCE_MODULES: {missing}"
