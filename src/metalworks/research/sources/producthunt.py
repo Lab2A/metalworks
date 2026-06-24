@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from metalworks.contract import CorpusComment, CorpusRecord
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -372,7 +372,23 @@ def _factory(**kwargs: Any) -> ProductHuntSource:
     return ProductHuntSource(**kwargs)
 
 
-register_source("producthunt", _factory)
+# The Product Hunt GraphQL API needs a developer token (free to obtain), read from
+# PRODUCT_HUNT_TOKEN — so auth "key" / access "free_key" / env names the var. Votes
+# are the supply-side endorsement signal.
+register_source(
+    "producthunt",
+    _factory,
+    spec=SourceSpec(
+        source_id="producthunt",
+        lane="grounding",
+        signals=("votes",),
+        targeting="slug",
+        auth="key",
+        env=("PRODUCT_HUNT_TOKEN",),
+        access="free_key",
+        relevance_hint="shipped products in the category and how much traction they got",
+    ),
+)
 
 
 __all__ = ["ProductHuntSource"]

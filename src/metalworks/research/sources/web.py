@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit, urlunsplit
 
 from metalworks.contract import CorpusRecord
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -237,8 +237,25 @@ def _factory(**kwargs: Any) -> WebItemSource:
     return WebItemSource(**kwargs)
 
 
-# Self-register on import (append-friendly registry; mirrors hackernews.py).
-register_source("web", _factory)
+# Self-register on import (append-friendly registry; mirrors hackernews.py). The
+# web is context, not endorsement: lane "web", no native signal (engagement is
+# always 0 — we never fabricate one). It resolves a search provider from the first
+# present key (Exa / Tavily / Parallel / Firecrawl), so auth "key" / access
+# "free_key" and ``env`` names that candidate set.
+register_source(
+    "web",
+    _factory,
+    spec=SourceSpec(
+        source_id="web",
+        lane="web",
+        signals=(),
+        targeting="keyword",
+        auth="key",
+        env=("EXA_API_KEY", "TAVILY_API_KEY", "PARALLEL_API_KEY", "FIRECRAWL_API_KEY"),
+        access="free_key",
+        relevance_hint="open-web context and existing-solution pages for a topic",
+    ),
+)
 
 
 __all__ = ["WebItemSource"]

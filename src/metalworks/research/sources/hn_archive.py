@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any
 
 from metalworks.contract import CorpusComment, CorpusRecord
 from metalworks.errors import MissingExtraError
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 from metalworks.research.types import MonthRef
 
 if TYPE_CHECKING:
@@ -602,8 +602,24 @@ def _factory(**kwargs: Any) -> HackerNewsArchiveSource:
 
 
 # Self-register on import (append-friendly registry; mirrors arctic.py / hackernews.py).
-register_source("hackernews_archive", _factory)
-register_source("hn_archive", _factory)
+# The default reader is the open HF bulk mirror — keyless (HF_TOKEN only loosens
+# rate limits, never required), so auth is "none" and access "open". HN points are
+# the endorsement signal, same as the live HN connector.
+def _archive_spec(source_id: str) -> SourceSpec:
+    return SourceSpec(
+        source_id=source_id,
+        lane="grounding",
+        signals=("points",),
+        targeting="keyword",
+        auth="none",
+        env=(),
+        access="open",
+        relevance_hint="historical Hacker News demand for a topic (bulk archive)",
+    )
+
+
+register_source("hackernews_archive", _factory, spec=_archive_spec("hackernews_archive"))
+register_source("hn_archive", _factory, spec=_archive_spec("hn_archive"))
 
 
 __all__ = [

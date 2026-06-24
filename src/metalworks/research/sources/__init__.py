@@ -36,6 +36,16 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from metalworks.research.sources.spec import (
+    SOURCE_SPECS,
+    Access,
+    Auth,
+    Lane,
+    SourceSpec,
+    Targeting,
+    _grounding_default,
+)
+
 if TYPE_CHECKING:
     from metalworks.contract import CorpusComment, CorpusRecord
     from metalworks.research.types import MonthRef
@@ -118,13 +128,26 @@ SourceFactory = Callable[..., ItemSource]
 SOURCES: dict[str, SourceFactory] = {}
 
 
-def register_source(source_id: str, factory: SourceFactory) -> None:
+def register_source(
+    source_id: str, factory: SourceFactory, *, spec: SourceSpec | None = None
+) -> None:
     """Register ``factory`` under ``source_id`` (idempotent on re-import).
 
     Re-registering the same id overwrites — module re-imports under pytest must
     not raise, and a downstream override of a built-in is intentional.
+
+    ``spec`` declares the source's lane / auth / signal metadata in the parallel
+    :data:`SOURCE_SPECS` registry. It is optional for runtime back-compat: a bare
+    ``register_source(id, factory)`` still works and lands a minimal grounding
+    default (signal-less, which the 0.5 conformance guardrail then flags). A
+    passed ``spec.source_id`` must match ``source_id``.
     """
+    if spec is not None and spec.source_id != source_id:
+        raise ValueError(
+            f"spec.source_id {spec.source_id!r} does not match register id {source_id!r}"
+        )
     SOURCES[source_id] = factory
+    SOURCE_SPECS[source_id] = spec if spec is not None else _grounding_default(source_id)
 
 
 def get_source(source_id: str, **kwargs: object) -> ItemSource:
@@ -159,9 +182,15 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
 
 __all__ = [
     "SOURCES",
+    "SOURCE_SPECS",
+    "Access",
+    "Auth",
     "ItemSource",
+    "Lane",
     "SourceFactory",
+    "SourceSpec",
     "SourceWindow",
+    "Targeting",
     "get_source",
     "register_source",
 ]

@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from metalworks.contract import CorpusComment, CorpusRecord
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -318,7 +318,21 @@ def _factory(**kwargs: Any) -> HackerNewsSource:
 
 
 # Self-register on import (append-friendly registry; mirrors arctic.py).
-register_source("hackernews", _factory)
+# The Algolia HN Search API is open + keyless; HN points are its endorsement signal.
+register_source(
+    "hackernews",
+    _factory,
+    spec=SourceSpec(
+        source_id="hackernews",
+        lane="grounding",
+        signals=("points",),
+        targeting="keyword",
+        auth="none",
+        env=(),
+        access="open",
+        relevance_hint="builder/early-adopter demand for a topic on Hacker News",
+    ),
+)
 
 
 __all__ = ["HackerNewsSource"]

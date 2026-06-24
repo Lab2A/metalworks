@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from metalworks.contract import CorpusComment, CorpusRecord, RedditComment, RedditPost
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 from metalworks.research.types import MonthRef
 
 if TYPE_CHECKING:
@@ -195,8 +195,33 @@ def _factory(**kwargs: Any) -> ArcticItemSource:
 
 
 # Self-register on import (append-friendly registry). Alias the legacy id too.
-register_source("reddit", _factory)
-register_source("arctic", _factory)
+# Open bulk mirror, no auth; emits Reddit upvotes as its endorsement signal. The
+# grounding lane and "subreddit" targeting drive the selector's per-community fan-out.
+_SPEC_REDDIT = SourceSpec(
+    source_id="reddit",
+    lane="grounding",
+    signals=("upvotes",),
+    targeting="subreddit",
+    auth="none",
+    env=(),
+    access="open",
+    relevance_hint="real consumer pain in a topic's subreddits — the grounding spine",
+)
+register_source("reddit", _factory, spec=_SPEC_REDDIT)
+register_source(
+    "arctic",
+    _factory,
+    spec=SourceSpec(
+        source_id="arctic",
+        lane="grounding",
+        signals=("upvotes",),
+        targeting="subreddit",
+        auth="none",
+        env=(),
+        access="open",
+        relevance_hint="real consumer pain in a topic's subreddits — the grounding spine",
+    ),
+)
 
 
 __all__ = ["ArcticItemSource"]
