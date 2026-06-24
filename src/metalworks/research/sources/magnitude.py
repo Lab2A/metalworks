@@ -161,12 +161,13 @@ def register_magnitude(provider_id: str, factory: MagnitudeFactory, *, spec: Mag
 def get_magnitude_provider(provider_id: str, **kwargs: object) -> MagnitudeProvider:
     """Construct the registered magnitude provider for ``provider_id``.
 
-    Triggers a lazy import of the built-in ``npm`` provider so a bare ``import`` of
-    this package stays free of ``httpx``. Unknown ids raise ``KeyError``.
+    Triggers a lazy import of the built-in providers so a bare ``import`` of this
+    package stays free of ``httpx``. Unknown ids raise ``KeyError``.
     """
     _BUILTIN_MODULES = {
         "npm": "metalworks.research.sources.magnitude",
         "wikipedia": "metalworks.research.sources.magnitude_wikipedia",
+        "pypi": "metalworks.research.sources.magnitude_pypi",
     }
     if provider_id not in MAGNITUDE_PROVIDERS and provider_id in _BUILTIN_MODULES:
         import importlib

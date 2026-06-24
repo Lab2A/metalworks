@@ -22,6 +22,21 @@ contracts may change in any release.
   `auth="none"`; registered via `register_magnitude` + the `get_magnitude_provider._BUILTIN_MODULES`
   lazy map. The `pageviews` signal kind was already `is_magnitude=True` (no new `register_signal`).
   Title disambiguation / fuzzy search and non-en wikis are out of scope (kept deterministic).
+- **Sources P2 — PyPI downloads magnitude provider (#143).** New
+  `metalworks.research.sources.magnitude_pypi.PyPIDownloadsProvider` — the second worked **free**
+  lane-② magnitude provider after npm. `measure` maps each entity that looks like a PyPI package
+  name to its last-month download count via the keyless pypistats.org `recent` endpoint
+  (`GET pypistats.org/api/packages/<pkg>/recent`, normalizing to the PEP 503 form), emitting the
+  `downloads` kind already registered `is_magnitude=True` — no new `register_signal`. A package
+  pypistats has no data for (404 / null `last_month`) is **omitted** (unknown, never `0.0` — the
+  #122 contract); non-package handles (free text, path/URL shapes) are skipped outright. Registers
+  at module scope via `register_magnitude("pypi", …)` with a `MagnitudeSpec(provider_id="pypi",
+  signals=("downloads",), auth="none")`, and adds `"pypi"` to `get_magnitude_provider`'s lazy
+  `_BUILTIN_MODULES` map. Magnitude providers are not connectors, so the #139 source module-lists
+  and the source catalog (`docs/sources.md`) are untouched. New `tests/test_source_magnitude_pypi.py`
+  (offline stub-client unit tests for measure → downloads, 404 omission, non-package skipping +
+  name normalization, `check_magnitude_provider` conformance, registry resolution, plus a
+  `network`-marked live smoke).
 
 - **Consolidated built-in connector registration into one list (#139).** A new source was
   registered in four scattered places (`get_source` lazy map, the selector's spec-import, the
