@@ -10,6 +10,26 @@ contracts may change in any release.
 
 ### Added
 
+- **Sources P1 — Stack Exchange connector (#134).** The first connector on the Phase-0 chassis (and
+  its end-to-end validation: scaffold → `instance` picker → generated catalog). New
+  `metalworks.research.sources.stackexchange.StackExchangeSource` — a keyless `ItemSource` over the
+  Stack Exchange API 2.3 (`/search/advanced` for questions → `CorpusRecord`, `/questions/{ids}/answers`
+  for answers → `CorpusComment`), paged with a `withbody` filter that carries the body, `score`, and
+  `view_count`. It spans 170+ B2B/role sites (Server Fault, DBA, Security, Salesforce, …) over one API
+  — the `instance` target is the SE `site` (default `stackoverflow`). It emits
+  `{"votes": score, "views": view_count}`, adding a real **magnitude** signal (`views`) Reddit upvotes
+  can't express ("47k views, no accepted answer" = quantified unmet demand) — both kinds already
+  registered, so no new `register_signal`. Auth is keyless (`auth="none"`, `access="open"`); an
+  optional `STACKEXCHANGE_KEY` is passed through when set to raise the quota but is never required.
+  Content is CC BY-SA, so the connector is framed as **evidence retrieval / quoting under CC BY-SA**
+  (attribution = question permalink + pseudonymized author profile), NOT corpus ingestion for model
+  training. The `instance` target picker (`planner/source_picker.py`) is fleshed out for SE — append-
+  only over a non-removable `stackoverflow` default, LLM-ranking role/topic sites, degrading to the
+  default on any failure. Registered in `SOURCE_SPECS`, the lazy `get_source` map, the CLI/catalog
+  connector lists, and `_BUILTIN_IDS`; `docs/sources.md` regenerated. New
+  `tests/test_source_stackexchange.py` (offline stub-client unit tests for the record/answer mapping,
+  the `views` magnitude lifting the ranking score, plus a `network`-marked live smoke), and the source
+  is wired into the 0.5 conformance sweep with an offline stub-client fixture.
 - **Sources 0.5 — lane conformance sweep (#124).** The last Phase-0 chassis piece: a parametrized
   conformance sweep over `SOURCE_SPECS` + `MAGNITUDE_SPECS` that turns the single-fake source check
   into the registry-level backstop keeping lane discipline honest as the source count grows.

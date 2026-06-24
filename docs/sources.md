@@ -21,6 +21,7 @@ more evidence behind every report.
 | `hn_archive` | Alias of `hackernews_archive` (the offline Hacker News archive) | grounding | No | — |
 | `producthunt` | Product Hunt launches + their comments | grounding | A free key | `PRODUCT_HUNT_TOKEN` |
 | `reddit` | Public Reddit posts and comments | grounding | No | — |
+| `stackexchange` | Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …) | grounding | No | — |
 | `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | web | A free key | `EXA_API_KEY`, `TAVILY_API_KEY`, `PARALLEL_API_KEY`, `FIRECRAWL_API_KEY` |
 
 ## Pick what to read from
