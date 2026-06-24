@@ -256,6 +256,23 @@ def enabled_source_ids() -> list[str]:
     return [_DEFAULT_SOURCE]
 
 
+def magnitude_provider_ids() -> list[str]:
+    """The ordered active lane-② magnitude provider ids from ``[sources].magnitude``.
+
+    Magnitude providers (search volume, package downloads, funding) run AFTER
+    clustering and attach numbers to existing themes — they are **opt-in** and OFF
+    by default: with ``[sources].magnitude`` unset, this returns ``[]`` and the
+    pipeline's magnitude hook is a no-op, so the default run is byte-for-byte
+    unchanged. Set ``magnitude = ["npm"]`` to enable the npm-downloads provider.
+    Non-string / empty entries are dropped so a malformed config degrades to "off".
+    """
+    enabled = load_sources_config().get("magnitude")
+    if isinstance(enabled, list):
+        items = cast("list[object]", enabled)
+        return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+    return []
+
+
 def default_source_id() -> str:
     """The preferred source id from ``[sources].default`` (else the first enabled)."""
     configured = load_sources_config().get("default")
@@ -607,6 +624,7 @@ __all__ = [
     "enabled_source_ids",
     "load_config",
     "load_sources_config",
+    "magnitude_provider_ids",
     "resolve_chat",
     "resolve_chat_chain",
     "resolve_embeddings",

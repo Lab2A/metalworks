@@ -29,6 +29,7 @@ returns `CorpusComment`s parented to pulled record ids (or `None`), and
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
@@ -49,6 +50,7 @@ from metalworks.llm.fake import FakeChatModel
 from metalworks.render import ComputedStyle, PageRenderer, RenderedPage, RendererCapabilities
 from metalworks.render.fake import FakeRenderer
 from metalworks.research.sources import ItemSource, SourceWindow
+from metalworks.research.sources.magnitude import MagnitudeProvider
 from metalworks.stores.repos import (
     AccountRepo,
     BriefRepo,
@@ -276,6 +278,101 @@ def check_item_source(
                 )
 
 
+class FakeMagnitudeProvider:
+    """A deterministic, offline :class:`MagnitudeProvider` for tests.
+
+    Constructed with a fixed ``entity -> {kind: value}`` table and the ``signals``
+    kinds it emits. :meth:`measure` returns ONLY the requested entities present in
+    the table — an absent entity is omitted (unknown, never ``0.0``), exactly the
+    contract a real provider honors. Set ``raises=True`` to simulate a transport
+    failure so a caller can exercise the best-effort (caveat + ``partial``) path.
+    """
+
+    def __init__(
+        self,
+        table: dict[str, dict[str, float]] | None = None,
+        *,
+        provider_id: str = "fake_magnitude",
+        signals: tuple[str, ...] = ("downloads",),
+        raises: bool = False,
+    ) -> None:
+        self.provider_id = provider_id
+        self.signals = signals
+        self._table = table or {}
+        self._raises = raises
+        self.calls: list[tuple[tuple[str, ...], SourceWindow]] = []
+
+    def measure(
+        self, *, entities: Sequence[str], window: SourceWindow
+    ) -> dict[str, dict[str, float]]:
+        self.calls.append((tuple(entities), window))
+        if self._raises:
+            raise RuntimeError("FakeMagnitudeProvider: simulated transport failure")
+        # Omission = unknown: only return entities we actually have data for.
+        return {e: dict(self._table[e]) for e in entities if e in self._table}
+
+
+def check_magnitude_provider(
+    provider: MagnitudeProvider,
+    *,
+    entities: Sequence[str],
+    window: SourceWindow | None = None,
+) -> None:
+    """Assert that ``provider`` honors the :class:`MagnitudeProvider` contract.
+
+    A third-party magnitude provider self-verifies with this before shipping. Give
+    it a small entity list it has data for. It checks the contract the lane-②
+    overlay relies on:
+
+    * ``provider_id`` is a non-empty string and ``signals`` is a non-empty tuple.
+    * ``measure`` returns a ``dict[str, dict[str, float]]`` — entity → kind → value.
+    * Every returned entity is one of the REQUESTED entities (a provider never
+      invents an entity it wasn't asked about).
+    * Every value is a real, finite, non-negative number — and OMISSION is the only
+      "unknown": a returned entity must carry at least one real value, never an
+      empty/zero stand-in for missing data.
+    * Re-measuring the same entities/window is idempotent (same entity key set), so
+      a re-run of the overlay attaches the same numbers.
+    """
+    import math
+
+    assert isinstance(provider.provider_id, str) and provider.provider_id, (
+        "provider_id must be a non-empty string"
+    )
+    assert isinstance(provider.signals, tuple) and provider.signals, (
+        "signals must be a non-empty tuple of magnitude kinds"
+    )
+
+    win = window if window is not None else SourceWindow()
+    result = provider.measure(entities=entities, window=win)
+    assert isinstance(result, dict), "measure() must return a dict[str, dict[str, float]]"
+
+    requested = set(entities)
+    for entity, kinds in result.items():
+        assert entity in requested, (
+            f"measure() returned entity {entity!r} that was not requested "
+            "(a provider never invents an entity)"
+        )
+        assert isinstance(kinds, dict) and kinds, (
+            f"measure()[{entity!r}] must be a non-empty kind→value map — omit the entity "
+            "entirely for 'unknown', never return an empty/zero stand-in"
+        )
+        for kind, value in kinds.items():
+            assert isinstance(kind, str) and kind, "every signal kind must be a non-empty string"
+            assert isinstance(value, (int, float)) and not isinstance(value, bool), (
+                f"measure()[{entity!r}][{kind!r}] must be a number, got {type(value)!r}"
+            )
+            assert math.isfinite(value) and value >= 0.0, (
+                f"measure()[{entity!r}][{kind!r}] must be finite and non-negative, got {value!r}"
+            )
+
+    again = provider.measure(entities=entities, window=win)
+    assert set(again) == set(result), (
+        "measure() is not idempotent: re-measuring the same entities/window changed "
+        "the entity key set"
+    )
+
+
 def check_all_repos(backend: AllRepos, *, corpus_rows: int = 1500) -> None:
     """Run every repo conformance check against one backend instance.
 
@@ -345,6 +442,7 @@ __all__ = [
     "AllRepos",
     "FakeChatModel",
     "FakeEmbedding",
+    "FakeMagnitudeProvider",
     "FakeRenderer",
     "check_account_repo",
     "check_all_repos",
@@ -352,6 +450,7 @@ __all__ = [
     "check_corpus_repo",
     "check_inbox_repo",
     "check_item_source",
+    "check_magnitude_provider",
     "check_opportunity_repo",
     "check_page_renderer",
     "check_run_repo",
