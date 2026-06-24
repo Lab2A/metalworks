@@ -26,6 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from metalworks.contract import SynthesisThresholds
+from metalworks.research.synthesis.signals import native_kind
 from metalworks.research.types import LoadedComment, LoadedPost
 
 if TYPE_CHECKING:
@@ -55,6 +56,21 @@ def _source_label(source: str, subreddit: str) -> str:
 def _engagement_unit(source: str) -> str:
     """Source-native engagement unit for display (Reddit: upvotes)."""
     return "upvotes" if source == "reddit" else "engagements"
+
+
+def _load_signals(
+    spine_signals: dict[str, float], source: str, engagement: int
+) -> dict[str, float]:
+    """The member's demand-signal vector for scoring.
+
+    Prefer the explicit `signals` the source put on the spine; fall back to
+    synthesizing `{native_kind(source): engagement}` so a source not yet emitting
+    a vector (or an older payload) scores exactly as it did when `engagement` was
+    the only signal — the back-compat path.
+    """
+    if spine_signals:
+        return dict(spine_signals)
+    return {native_kind(source): float(engagement)}
 
 
 def load_posts(deps: ResearchDeps, post_ids: Sequence[str]) -> list[LoadedPost]:
@@ -133,6 +149,7 @@ def load_comments(
                 engagement=upvotes,
                 engagement_unit=_engagement_unit(c.source),
                 source_url=permalink,
+                signals=_load_signals(c.signals, c.source, upvotes),
             )
         )
 
@@ -200,6 +217,7 @@ def load_commentless_records_as_units(
                 engagement=engagement,
                 engagement_unit=_engagement_unit(r.source),
                 source_url=url,
+                signals=_load_signals(r.signals, r.source, engagement),
             )
         )
     return out

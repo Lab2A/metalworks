@@ -133,6 +133,11 @@ class LoadedComment:
     engagement: int = 0
     engagement_unit: str = "upvotes"
     source_url: str = ""
+    # Open, source-declared demand signals (additive). The loader fills this from
+    # the generic `CorpusComment.signals`, or synthesizes `{native_kind: engagement}`
+    # for sources not yet emitting a vector. The cluster ranker aggregates and
+    # spec-weights it — the de-Reddit'd successor to a lone `upvotes` int.
+    signals: dict[str, float] = field(default_factory=dict[str, float])
 
     @property
     def post_url(self) -> str:
