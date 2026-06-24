@@ -41,6 +41,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
     "metalworks.research.sources.stackexchange",
+    "metalworks.research.sources.discourse",
     "metalworks.research.sources.web",
 )
 
@@ -51,6 +52,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
 _BUILTIN_IDS: tuple[str, ...] = (
     "arctic",
     "ats",
+    "discourse",
     "hackernews",
     "hackernews_archive",
     "hn_archive",
@@ -222,6 +224,7 @@ _READS: dict[str, str] = {
     "producthunt": "Product Hunt launches + their comments",
     "stackexchange": "Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …)",
     "ats": "Public company job boards (Greenhouse, Lever, Ashby) — the JD states the hiring need",
+    "discourse": "Public Discourse community forums (vendor/product/practitioner boards) + their replies",  # noqa: E501
 }
 
 

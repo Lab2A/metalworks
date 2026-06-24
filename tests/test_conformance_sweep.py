@@ -33,6 +33,7 @@ import pytest
 # sweep must trigger each module's module-scope ``register_source`` first.
 import metalworks.research.sources.arctic
 import metalworks.research.sources.ats
+import metalworks.research.sources.discourse
 import metalworks.research.sources.hackernews
 import metalworks.research.sources.hn_archive
 import metalworks.research.sources.magnitude
@@ -318,6 +319,61 @@ class _StubAtsClient:
     def get(self, url: str, params: dict[str, Any] | None = None) -> _StubResponse:
         if "/jobs" in url:
             return _StubResponse(_ATS_GREENHOUSE)
+
+
+_DISCOURSE_SEARCH = {
+    "topics": [
+        {
+            "id": 800,
+            "title": "stim-free focus aid for builders?",
+            "slug": "stim-free-focus-aid",
+            "views": 47000,
+            "like_count": 42,
+            "posts_count": 2,
+            "created_at": "2026-05-15T10:00:00Z",
+            "last_poster_username": "alice",
+        }
+    ],
+    "posts": [{"id": 9001, "topic_id": 800, "blurb": "I want focus without jitters."}],
+}
+_DISCOURSE_TOPIC_800 = {
+    "id": 800,
+    "slug": "stim-free-focus-aid",
+    "post_stream": {
+        "posts": [
+            {
+                "id": 9001,
+                "post_number": 1,
+                "username": "alice",
+                "cooked": "<p>I want focus without jitters.</p>",
+                "like_count": 42,
+                "created_at": "2026-05-15T10:00:00Z",
+            },
+            {
+                "id": 9002,
+                "post_number": 2,
+                "username": "carol",
+                "cooked": "<p>L-theanine works for me.</p>",
+                "like_count": 3,
+                "created_at": "2026-05-15T11:00:00Z",
+            },
+        ]
+    },
+}
+
+
+class _StubDiscourseResponse(_StubResponse):
+    status_code = 200
+
+
+class _StubDiscourseClient:
+    """A minimal httpx.Client stand-in for the Discourse JSON API. No network."""
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> _StubResponse:
+        if "/search.json" in url:
+            return _StubDiscourseResponse(_DISCOURSE_SEARCH)
+        if "/t/800.json" in url:
+            return _StubDiscourseResponse(_DISCOURSE_TOPIC_800)
         raise AssertionError(f"unexpected URL {url}")
 
     def close(self) -> None:
@@ -364,6 +420,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
         "hn_archive": {"reader": _FakeHnArchiveReader()},
         "producthunt": {"token": "dev-token", "client": _StubPhClient()},
         "stackexchange": {"client": _StubSeClient(), "author_salt": "t"},
+        "discourse": {"client": _StubDiscourseClient(), "author_salt": "t"},
         # 'web' is a web lane, not grounding — rule 1 skips it (no fixture needed).
     }
 
@@ -385,6 +442,7 @@ SHIPPED_SOURCE_IDS = frozenset(
         "hn_archive",
         "producthunt",
         "stackexchange",
+        "discourse",
         "web",
     }
 )
