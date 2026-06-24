@@ -9,6 +9,20 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources P2 — Wikipedia pageviews magnitude provider (#144).** New
+  `metalworks.research.sources.magnitude_wikipedia.WikipediaPageviewsProvider` — a keyless lane-②
+  magnitude provider over the Wikimedia REST pageviews API
+  (`wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/<title>/monthly/<start>/<end>`).
+  Where npm/PyPI give *dev-demand* volume, Wikipedia pageviews give a **broad, domain-neutral
+  interest-magnitude** denominator — how many people look something up. Each entity is treated
+  directly as an English-Wikipedia article title (spaces → underscores, URL-encoded); `measure`
+  sums the window's monthly views → `{entity: {"pageviews": <total>}}`. An entity with no article
+  (404) is OMITTED — omission is unknown, never `0.0`. The descriptive `User-Agent` Wikimedia
+  requires is set on the owned client. `provider_id="wikipedia"`, `signals=("pageviews",)`,
+  `auth="none"`; registered via `register_magnitude` + the `get_magnitude_provider._BUILTIN_MODULES`
+  lazy map. The `pageviews` signal kind was already `is_magnitude=True` (no new `register_signal`).
+  Title disambiguation / fuzzy search and non-en wikis are out of scope (kept deterministic).
+
 - **Consolidated built-in connector registration into one list (#139).** A new source was
   registered in four scattered places (`get_source` lazy map, the selector's spec-import, the
   catalog generator, the CLI's own discovery) — miss one (the CLI's was the easy miss) and

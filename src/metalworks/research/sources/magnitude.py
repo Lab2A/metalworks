@@ -164,7 +164,10 @@ def get_magnitude_provider(provider_id: str, **kwargs: object) -> MagnitudeProvi
     Triggers a lazy import of the built-in ``npm`` provider so a bare ``import`` of
     this package stays free of ``httpx``. Unknown ids raise ``KeyError``.
     """
-    _BUILTIN_MODULES = {"npm": "metalworks.research.sources.magnitude"}
+    _BUILTIN_MODULES = {
+        "npm": "metalworks.research.sources.magnitude",
+        "wikipedia": "metalworks.research.sources.magnitude_wikipedia",
+    }
     if provider_id not in MAGNITUDE_PROVIDERS and provider_id in _BUILTIN_MODULES:
         import importlib
 
