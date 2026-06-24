@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, Field
@@ -51,6 +52,8 @@ from metalworks.errors import MissingKeyError
 from metalworks.research.sources.spec import SOURCE_SPECS, Targeting
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
     from metalworks.contract import ResearchBrief
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.sources.spec import SourceSpec
@@ -209,6 +212,59 @@ def _instance_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
     return ranked
 
 
+# A small, seeded set of well-known public Discourse forums the picker ranks over
+# until the web-discovery lane can answer "which Discourse discusses X" (Phase 4,
+# out of scope here). ``meta.discourse.org`` is the non-removable default (always
+# first) — Discourse's own forum, always public. The connector reads the first
+# entry as its ``instance=`` host per source; brief-named hosts append after these.
+_DISCOURSE_DEFAULT_INSTANCE = "meta.discourse.org"
+_DISCOURSE_SEED_INSTANCES: tuple[str, ...] = (
+    "meta.discourse.org",
+    "community.openai.com",
+    "discuss.huggingface.co",
+    "forum.obsidian.md",
+    "community.home-assistant.io",
+    "forums.docker.com",
+    "discourse.julialang.org",
+    "forum.rclone.org",
+)
+
+# A loose host shape: ``label.label[.label…]`` with no scheme/path/whitespace. Used
+# to accept a brief-named forum host the model surfaces without trusting arbitrary
+# free text as a URL.
+_HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9-]+\.)+[a-z]{2,}$")
+
+
+def discourse_instances(brief_hosts: Sequence[str] | None = None) -> list[str]:
+    """Candidate Discourse hosts for a brief: the seed list plus any brief-named hosts.
+
+    Append-only over the seeded default (the same posture as the SE site picker):
+    the list ALWAYS leads with ``meta.discourse.org`` (the non-removable floor host,
+    Discourse's own public forum), then the rest of the seed list, then any
+    brief-named hosts that look like a real host — deduped, normalized to a bare
+    lowercase host (scheme / path / ``www.`` stripped). The connector reads the
+    first entry as its ``instance=`` per source. Host discovery proper (which
+    Discourse discusses X) is the web-discovery lane's job (Phase 4); for now this
+    is the curated seed + brief-named hosts.
+    """
+    ranked: list[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: str) -> None:
+        host = raw.strip().lower()
+        host = host.partition("://")[2] or host  # drop a scheme if present
+        host = host.split("/", 1)[0].removeprefix("www.").rstrip(".")
+        if host and host not in seen and _HOST_RE.match(host):
+            seen.add(host)
+            ranked.append(host)
+
+    for host in _DISCOURSE_SEED_INSTANCES:
+        _add(host)
+    for host in brief_hosts or ():
+        _add(host)
+    return ranked or [_DISCOURSE_DEFAULT_INSTANCE]
+
+
 def _slug_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
     """Pick which company board / Product Hunt slug to pull (stub).
 
@@ -361,6 +417,7 @@ _BUILTIN_SPEC_MODULES = (
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
     "metalworks.research.sources.stackexchange",
+    "metalworks.research.sources.discourse",
     "metalworks.research.sources.web",
 )
 
@@ -492,6 +549,7 @@ __all__ = [
     "FLOOR_SOURCE",
     "TargetPicker",
     "candidate_specs",
+    "discourse_instances",
     "pick_sources",
     "preflight_lines",
     "preflight_skipped",
