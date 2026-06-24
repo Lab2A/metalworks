@@ -131,6 +131,39 @@ existing `.metalworks/` project triggers a clear `EmbeddingModelMismatch` rather
 degrading retrieval. Re-run research to rebuild the index under the new model.
 </Note>
 
+## Sources
+
+Which connectors a research run pulls from is resolved by a fixed precedence —
+**explicit override > brief-aware selector (opt-in) > the `reddit` default** — so
+default behavior never changes unless you ask for it:
+
+| Layer | How you set it | Wins when |
+| --- | --- | --- |
+| **Explicit override** | CLI `--source reddit --source hackernews`, or `[sources].enabled` in config | Always — the operator chose the connectors, so neither the selector nor the default second-guesses it |
+| **Selector (opt-in)** | `[sources].select = true` | No override given. The selector ranks every *reachable* source for the brief and pulls the relevant ones |
+| **Default** | nothing configured | No override and the selector is off — the run uses `reddit` (the Arctic connector) |
+
+```toml
+# .metalworks/config.toml
+[sources]
+enabled = ["reddit", "hackernews"]   # explicit override — exactly these, in order
+default = "reddit"                    # the floor the selector falls back to
+select  = true                        # opt in to the brief-aware selector (default: false)
+```
+
+The **selector is opt-in by default** (`select` unset/false): with it off, runs
+behave exactly as before. When on, it applies a deterministic **access gate** —
+a source is only pickable if it needs no key or its key is set — then an LLM
+relevance rank over what's reachable. A source it wants but can't reach (no key)
+is reported in a pre-flight line naming the env var to set, e.g.
+`Skipped (no key): producthunt — Set the PRODUCT_HUNT_TOKEN environment variable.`
+
+The selector has a **non-removable floor**: if nothing is reachable for the brief
+(e.g. it matched only paid sources and no keys are set), the run falls back to
+`reddit` (or `[sources].default`) with a distinct caveat — it never produces an
+empty corpus. The pick, the skipped sources, and any floor caveat are surfaced on
+the report's `source_selection` field.
+
 ## Check the resolution
 
 ```bash

@@ -20,6 +20,7 @@ to `partial=True` with a concrete caveat. An empty corpus returns a
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -32,10 +33,15 @@ from metalworks.contract import (
     DemandReport,
     Fork,
     SourceMapEntry,
+    SourceSelection,
     WebFinding,
 )
 from metalworks.research.exploration import run_exploration_triage
-from metalworks.research.planner import pick_target_subreddits
+from metalworks.research.planner import (
+    pick_target_subreddits,
+    preflight_lines,
+    select_sources,
+)
 from metalworks.research.sources import SourceWindow
 from metalworks.research.sources.ingest import ingest_comments_for, ingest_records
 from metalworks.research.synthesis import synthesize
@@ -54,7 +60,35 @@ if TYPE_CHECKING:
     from metalworks.research.deps import ResearchDeps
 
 
+logger = logging.getLogger(__name__)
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────
+
+
+def _maybe_select_sources(deps: ResearchDeps, *, brief: ResearchBrief) -> SourceSelection | None:
+    """Run the brief-aware selector when it is opt-in enabled, else ``None``.
+
+    Two short-circuits keep the default path unchanged:
+
+    * An explicit ``deps.sources`` override means the operator already chose the
+      connectors — the selector must not second-guess it, so we skip selection and
+      ``effective_sources`` returns the override verbatim.
+    * The selector is opt-in via ``[sources].select`` (config-explicit). With it
+      off — the default — we return ``None`` and the configured/Reddit path runs
+      exactly as before.
+
+    Returning ``None`` (not a selection over the default) is deliberate: a ``None``
+    selection leaves every ``effective_sources(None)`` call on its prior behavior,
+    so enabling the selector is the *only* thing that changes a run.
+    """
+    if deps.sources is not None:
+        return None
+    from metalworks import config
+
+    if not config.source_selector_enabled():
+        return None
+    return select_sources(deps, brief=brief, configured_floor=config.default_source_id())
 
 
 def _window_months(deps: ResearchDeps, brief: ResearchBrief) -> list[MonthRef]:
@@ -66,14 +100,14 @@ def _window_months(deps: ResearchDeps, brief: ResearchBrief) -> list[MonthRef]:
 _SOURCE_LABELS = {"reddit": "reddit_arctic_shift", "arctic": "reddit_arctic_shift"}
 
 
-def _source_label(deps: ResearchDeps) -> str:
+def _source_label(deps: ResearchDeps, selection: SourceSelection | None = None) -> str:
     """The honest provenance label for this run, from the sources actually configured.
 
     One source → its label (reddit/arctic → ``reddit_arctic_shift``, else the source id
     verbatim, e.g. ``hackernews``); more than one → ``mixed``. Falls back to
     ``reddit_arctic_shift`` only when no source is configured.
     """
-    ids = sorted({s.source_id for s in deps.effective_sources()})
+    ids = sorted({s.source_id for s in deps.effective_sources(selection)})
     if not ids:
         return "reddit_arctic_shift"
     if len(ids) > 1:
@@ -87,6 +121,7 @@ def _pull_corpus(
     *,
     months: list[MonthRef],
     per_sub_limit: int | None,
+    selection: SourceSelection | None = None,
 ) -> tuple[list[ExplorationItem], dict[str, CorpusRecord]]:
     """Pull candidate records from every configured source for triage.
 
@@ -104,7 +139,7 @@ def _pull_corpus(
     window = SourceWindow(months=tuple(months))
     items: list[ExplorationItem] = []
     records_by_id: dict[str, CorpusRecord] = {}
-    for source in deps.effective_sources():
+    for source in deps.effective_sources(selection):
         for sub in brief.target_subreddits:
             for r in source.pull(query=sub.name, window=window, limit=per_sub_limit):
                 if not r.id:
@@ -162,14 +197,20 @@ def _month_to_dt(m: MonthRef, *, end_of_month: bool = False) -> datetime:
 
 
 def _empty_report(
-    *, deps: ResearchDeps, report_id: str, brief: ResearchBrief, months: list[MonthRef], caveat: str
+    *,
+    deps: ResearchDeps,
+    report_id: str,
+    brief: ResearchBrief,
+    months: list[MonthRef],
+    caveat: str,
+    selection: SourceSelection | None = None,
 ) -> DemandReport:
     return DemandReport(
         report_id=report_id,
         client_id=brief.workspace_id,
         query=brief.question,
         fork=Fork.PRODUCT_PINNED,
-        source=_source_label(deps),
+        source=_source_label(deps, selection),
         date_range_start=_month_to_dt(months[0]),
         date_range_end=_month_to_dt(months[-1], end_of_month=True),
         total_threads=0,
@@ -180,6 +221,7 @@ def _empty_report(
         created_by="library",
         generated_at=deps.clock(),
         brief=brief,
+        source_selection=selection,
     )
 
 
@@ -200,6 +242,19 @@ def run_research(
     """
     report_id = str(uuid.uuid4())
 
+    # Brief-aware source selection (opt-in). With the selector disabled — the
+    # default — ``selection`` stays ``None`` and every ``effective_sources(None)``
+    # call below is byte-for-byte the prior configured/Reddit path. An explicit
+    # ``deps.sources`` override still wins inside ``effective_sources``, so a
+    # ``--source`` run is unaffected even with the selector on. The selector's own
+    # non-removable floor guarantees ``selection.selected`` is never empty (it
+    # falls back to ``reddit`` with a distinct caveat), so this can't yield an
+    # empty corpus blamed on the picker.
+    selection = _maybe_select_sources(deps, brief=brief)
+    if selection is not None:
+        for line in preflight_lines(selection):
+            logger.info("source_selector: %s", line)
+
     # Effective subreddits: the LLM appends on-topic subs to the user's D5
     # list without mutating the persisted brief (immutability).
     effective_subs = pick_target_subreddits(deps, brief=brief)
@@ -209,7 +264,7 @@ def run_research(
 
     deps.emit("pulling")
     items, records_by_id = _pull_corpus(
-        deps, effective_brief, months=months, per_sub_limit=per_sub_limit
+        deps, effective_brief, months=months, per_sub_limit=per_sub_limit, selection=selection
     )
     if not items:
         return _empty_report(
@@ -218,6 +273,7 @@ def run_research(
             brief=brief,
             months=months,
             caveat="No threads pulled from the brief's subreddits in the window.",
+            selection=selection,
         )
 
     deps.emit("triaging")
@@ -244,7 +300,7 @@ def run_research(
     n_comments = 0
     any_comment_layer = False
     unit_source_ids: set[str] = set()
-    for source in deps.effective_sources():
+    for source in deps.effective_sources(selection):
         written, has_comments = ingest_comments_for(deps.corpus, source, post_ids)
         n_comments += written
         any_comment_layer = any_comment_layer or has_comments
@@ -315,6 +371,10 @@ def run_research(
         stage_errors.append("triangulating")
 
     caveat_parts: list[str] = []
+    if selection is not None and selection.caveat:
+        # Surface the selector's floor / skipped-key caveat alongside stage
+        # caveats so a reader sees WHY the source set is what it is.
+        caveat_parts.append(selection.caveat)
     if web_error:
         caveat_parts.append(f"Web research failed: {web_error}")
     if comments_error:
@@ -336,7 +396,7 @@ def run_research(
         client_id=brief.workspace_id,
         query=brief.question,
         fork=Fork.PRODUCT_PINNED,
-        source=_source_label(deps),
+        source=_source_label(deps, selection),
         date_range_start=_month_to_dt(months[0]),
         date_range_end=_month_to_dt(months[-1], end_of_month=True),
         total_threads=len(relevant_items),
@@ -360,6 +420,7 @@ def run_research(
         corpus_shape=exploration_report,
         cross_references=cross_references,
         must_address_resolution=must_address_resolution,
+        source_selection=selection,
     )
 
 

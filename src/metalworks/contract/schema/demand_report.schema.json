@@ -917,6 +917,39 @@
       "title": "SignalStrength",
       "type": "string"
     },
+    "SkippedSource": {
+      "description": "A source the selector ranked but couldn't reach \u2014 its auth key is unset.\n\nCarries the same ``env_var`` / ``fix`` shape as\n:class:`~metalworks.errors.MissingKeyError` so a pre-flight line can tell the\noperator exactly which variable to set to unlock the source on the next run.",
+      "properties": {
+        "env_var": {
+          "default": "",
+          "description": "The environment variable(s) to set to unlock it (MissingKeyError shape).",
+          "title": "Env Var",
+          "type": "string"
+        },
+        "fix": {
+          "default": "",
+          "description": "The actionable remediation line (e.g. 'Set the TRUSTPILOT_API_KEY ...').",
+          "title": "Fix",
+          "type": "string"
+        },
+        "reason": {
+          "default": "no key",
+          "description": "Why it was skipped (e.g. 'no key' \u2014 its auth env var is unset).",
+          "title": "Reason",
+          "type": "string"
+        },
+        "source_id": {
+          "description": "The registered source id that was skipped.",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id"
+      ],
+      "title": "SkippedSource",
+      "type": "object"
+    },
     "SlotPlan": {
       "properties": {
         "audience": {
@@ -1018,6 +1051,54 @@
         }
       },
       "title": "SourceMapEntry",
+      "type": "object"
+    },
+    "SourceSelection": {
+      "description": "The brief-aware source pick \u2014 surfaced so a run is never a silent black box.\n\n``selected`` is the ordered, access-gated, relevance-ranked source id list the\nrun actually pulled from. ``skipped`` names sources the selector wanted but\ncouldn't reach (no key), each with its env var so the operator can unlock it.\n``floor_applied`` is the non-removable-floor flag: when the gated ranking\nyielded nothing the run fell back to ``reddit`` (or the configured default)\nrather than producing an empty corpus, and ``caveat`` says so.",
+      "properties": {
+        "caveat": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A distinct caveat when the floor was applied or a source was skipped.",
+          "title": "Caveat"
+        },
+        "floor_applied": {
+          "default": false,
+          "description": "True \u21d2 the gated ranking yielded nothing and the run fell back to the floor.",
+          "title": "Floor Applied",
+          "type": "boolean"
+        },
+        "rationale": {
+          "default": "",
+          "description": "One-line human rationale for the pick (selector reasoning).",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "selected": {
+          "description": "Ordered source ids the run pulled from (access-gated, relevance-ranked).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Selected",
+          "type": "array"
+        },
+        "skipped": {
+          "description": "Sources the selector wanted but couldn't reach (no key).",
+          "items": {
+            "$ref": "#/$defs/SkippedSource"
+          },
+          "title": "Skipped",
+          "type": "array"
+        }
+      },
+      "title": "SourceSelection",
       "type": "object"
     },
     "SynthesisThresholds": {
@@ -1442,6 +1523,18 @@
       },
       "title": "Source Map",
       "type": "array"
+    },
+    "source_selection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The brief-aware source pick + skipped/floor rationale, when the selector ran. None \u21d2 the run used the configured/default sources without the selector."
     },
     "total_distinct_authors": {
       "title": "Total Distinct Authors",
