@@ -1064,36 +1064,28 @@ def models_warm() -> None:
 
 # ── sources sub-app ─────────────────────────────────────────────────────────
 
+
 # Connector modules whose import self-registers a source AND lands its
 # ``SourceSpec`` in ``SOURCE_SPECS`` (the same map the gen script + spec test
 # use). Importing — not constructing — is enough: ``register_source(..., spec=)``
 # runs at module scope, so a freshly-imported CLI sees every built-in's metadata
 # without needing live readers/keys. The catalog (`sources list`, scaffold-row
 # hints, `doctor`) reads ``SOURCE_SPECS`` — never a hand-kept reachability dict.
-_CONNECTOR_MODULES: tuple[str, ...] = (
-    "metalworks.research.sources.ats",
-    "metalworks.research.sources.arctic",
-    "metalworks.research.sources.hackernews",
-    "metalworks.research.sources.hn_archive",
-    "metalworks.research.sources.producthunt",
-    "metalworks.research.sources.stackexchange",
-    "metalworks.research.sources.discourse",
-    "metalworks.research.sources.web",
-)
-
-
 def _discover_sources() -> list[str]:
     """All known source ids: the registry, plus the built-ins that self-register
     on import. Triggers those imports (best-effort) so a freshly-imported CLI sees
     Reddit/Arctic and every other built-in spec, then any third-party connector
     already registered in-process.
+
+    The module list derives from the single :data:`BUILTIN_SOURCE_MODULES` source
+    of truth — a new connector is registered there, not in a CLI-local list.
     """
     import contextlib
     import importlib
 
-    from metalworks.research.sources import SOURCES
+    from metalworks.research.sources import SOURCES, builtin_connector_modules
 
-    for module in _CONNECTOR_MODULES:
+    for module in builtin_connector_modules():
         # Best-effort: a connector module may need an extra that isn't installed.
         with contextlib.suppress(Exception):
             importlib.import_module(module)

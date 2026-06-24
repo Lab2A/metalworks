@@ -127,6 +127,45 @@ SourceFactory = Callable[..., ItemSource]
 # connector streams (e.g. a Hacker News adapter) can land without colliding.
 SOURCES: dict[str, SourceFactory] = {}
 
+# ── Built-in connectors: the SINGLE registration point ───────────────────────
+# source id → module path. This is the ONE place a built-in connector is listed.
+# ``get_source`` (lazy import), the selector's spec-import (``source_picker``),
+# the CLI source discovery, and the catalog generator (``gen_sources_md``) all
+# derive from this map via :func:`builtin_connector_modules` /
+# :func:`builtin_source_ids` — so adding a connector touches exactly one list.
+# Aliases (``reddit``/``arctic``, ``hn_archive``/``hackernews_archive``) map to the
+# same module.
+BUILTIN_SOURCE_MODULES: dict[str, str] = {
+    "ats": "metalworks.research.sources.ats",
+    "reddit": "metalworks.research.sources.arctic",
+    "arctic": "metalworks.research.sources.arctic",
+    "hackernews": "metalworks.research.sources.hackernews",
+    "hackernews_archive": "metalworks.research.sources.hn_archive",
+    "hn_archive": "metalworks.research.sources.hn_archive",
+    "producthunt": "metalworks.research.sources.producthunt",
+    "stackexchange": "metalworks.research.sources.stackexchange",
+    "discourse": "metalworks.research.sources.discourse",
+    "web": "metalworks.research.sources.web",
+}
+
+
+def builtin_connector_modules() -> tuple[str, ...]:
+    """Distinct built-in connector module paths, in stable first-seen order.
+
+    The import target for any caller that needs ``SOURCES`` / ``SOURCE_SPECS``
+    populated (the selector, the CLI discovery, the catalog generator). Deduplicated
+    so an aliased module (Arctic backs both ``reddit`` and ``arctic``) imports once.
+    """
+    seen: dict[str, None] = {}
+    for module in BUILTIN_SOURCE_MODULES.values():
+        seen.setdefault(module, None)
+    return tuple(seen)
+
+
+def builtin_source_ids() -> tuple[str, ...]:
+    """Every built-in source id, aliases included — the ids the shipped catalog documents."""
+    return tuple(BUILTIN_SOURCE_MODULES)
+
 
 def register_source(
     source_id: str, factory: SourceFactory, *, spec: SourceSpec | None = None
@@ -159,23 +198,11 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
     ``"hackernews"``, the web-search connector for ``"web"``. Unknown ids raise
     ``KeyError``.
     """
-    _BUILTIN_MODULES = {
-        "ats": "metalworks.research.sources.ats",
-        "reddit": "metalworks.research.sources.arctic",
-        "arctic": "metalworks.research.sources.arctic",
-        "hackernews": "metalworks.research.sources.hackernews",
-        "hackernews_archive": "metalworks.research.sources.hn_archive",
-        "hn_archive": "metalworks.research.sources.hn_archive",
-        "producthunt": "metalworks.research.sources.producthunt",
-        "stackexchange": "metalworks.research.sources.stackexchange",
-        "discourse": "metalworks.research.sources.discourse",
-        "web": "metalworks.research.sources.web",
-    }
-    if source_id not in SOURCES and source_id in _BUILTIN_MODULES:
+    if source_id not in SOURCES and source_id in BUILTIN_SOURCE_MODULES:
         # Lazy self-registration: importing the module runs its register_source.
         import importlib
 
-        importlib.import_module(_BUILTIN_MODULES[source_id])
+        importlib.import_module(BUILTIN_SOURCE_MODULES[source_id])
     try:
         factory = SOURCES[source_id]
     except KeyError as exc:
@@ -184,6 +211,7 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
 
 
 __all__ = [
+    "BUILTIN_SOURCE_MODULES",
     "SOURCES",
     "SOURCE_SPECS",
     "Access",
@@ -194,6 +222,8 @@ __all__ = [
     "SourceSpec",
     "SourceWindow",
     "Targeting",
+    "builtin_connector_modules",
+    "builtin_source_ids",
     "get_source",
     "register_source",
 ]

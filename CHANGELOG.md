@@ -9,6 +9,12 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Consolidated built-in connector registration into one list (#139).** A new source was
+  registered in four scattered places (`get_source` lazy map, the selector's spec-import, the
+  catalog generator, the CLI's own discovery) — miss one (the CLI's was the easy miss) and
+  `sources list` silently omitted it. All four now derive from a single `BUILTIN_SOURCE_MODULES`
+  map in `research.sources` via `builtin_connector_modules()` / `builtin_source_ids()`; a guard
+  test fails CI if a built-in id half-registers. No behavior change (catalog byte-identical).
 
 - **Sources P1 — ATS connector (Greenhouse/Lever/Ashby) (#136).** New
   `metalworks.research.sources.ats.ATSItemSource` — one keyless `ItemSource` over the three public
