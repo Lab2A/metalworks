@@ -1075,6 +1075,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
     "metalworks.research.sources.hackernews",
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
+    "metalworks.research.sources.stackexchange",
     "metalworks.research.sources.web",
 )
 

@@ -118,14 +118,95 @@ def _keyword_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
     return [brief.question]
 
 
-def _instance_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
-    """Pick which Discourse / StackExchange host to pull from (stub).
+# A small, well-known set of Stack Exchange site api-params the picker ranks over.
+# Not exhaustive (SE has 170+); these are the B2B/role-bearing sites a demand brief
+# most often wants. ``stackoverflow`` is the non-removable default (always first).
+_SE_DEFAULT_SITE = "stackoverflow"
+_SE_KNOWN_SITES: tuple[str, ...] = (
+    "stackoverflow",
+    "serverfault",
+    "superuser",
+    "dba",
+    "security",
+    "softwareengineering",
+    "devops",
+    "salesforce",
+    "sharepoint",
+    "magento",
+    "wordpress",
+    "datascience",
+    "ai",
+    "stats",
+    "networkengineering",
+    "webmasters",
+    "ux",
+    "sysadmin",
+)
 
-    No instance-targeted connector ships in 0.4, so this returns an empty list:
-    the registry entry exists only so the conformance guardrail is total the day
-    such a connector lands. Wiring the real host registry is out of scope (#126).
+
+class _SiteSuggestion(BaseModel):
+    site: str = Field(
+        description="A Stack Exchange site api-param (e.g. 'serverfault', 'dba', 'security')."
+    )
+
+
+class _SitePickerOutput(BaseModel):
+    sites: list[_SiteSuggestion] = Field(
+        default_factory=list["_SiteSuggestion"],
+        description="Candidate Stack Exchange sites for the brief, most relevant first.",
+    )
+
+
+_SE_SITE_SYSTEM = (
+    "You are a Stack Exchange research scout. Given a research brief, name the Stack Exchange "
+    "sites (by their api site-param, e.g. 'serverfault', 'dba', 'security', 'salesforce', "
+    "'softwareengineering') whose Q&A is most likely to discuss THIS brief's topic.\n"
+    "\n"
+    "Hard rules:\n"
+    "1. Return only real Stack Exchange api site-params (the subdomain before "
+    "'.stackexchange.com', or 'stackoverflow' / 'serverfault' / 'superuser').\n"
+    "2. Order most-relevant first. Prefer the role/topic site over the catch-all: a sysadmin/"
+    "cloud brief favors 'serverfault' or 'devops'; a database brief 'dba'; a security brief "
+    "'security'; a generic programming brief 'stackoverflow'.\n"
+    "3. Return 1-4 sites; fewer is better than padding with weak picks."
+)
+
+
+def _instance_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
+    """Pick which Stack Exchange site(s) to pull from for ``brief``.
+
+    Append-only over the default (the same posture as the subreddit picker): the
+    list ALWAYS leads with ``stackoverflow`` (the non-removable floor site), then
+    appends LLM-suggested role/topic sites (``serverfault`` / ``dba`` / ``security``
+    …) deduped, in the model's relevance order. On any LLM failure — or no key — it
+    degrades to ``[stackoverflow]`` so a run never has an empty instance list. The
+    connector reads the first entry as its ``site=`` per source.
     """
-    return []
+    ranked: list[str] = [_SE_DEFAULT_SITE]
+    seen = {_SE_DEFAULT_SITE}
+    known = set(_SE_KNOWN_SITES)
+    try:
+        out = deps.chat.complete_structured(
+            system=_SE_SITE_SYSTEM,
+            user=(
+                f"RESEARCH QUESTION:\n{brief.question}\n\n"
+                f"DECISION CONTEXT:\n{brief.decision_context}\n\n"
+                "Name the Stack Exchange sites whose Q&A best covers this topic."
+            ),
+            output_model=_SitePickerOutput,
+            max_tokens=512,
+            temperature=0.2,
+        )
+    except Exception as exc:
+        logger.debug("source_picker: SE instance ranking failed (%s); default site only", exc)
+        return ranked
+    for s in out.sites:
+        site = (s.site or "").strip().lower().removesuffix(".stackexchange.com")
+        # Only accept known site-params — the model occasionally invents one.
+        if site in known and site not in seen:
+            seen.add(site)
+            ranked.append(site)
+    return ranked
 
 
 def _slug_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
@@ -279,6 +360,7 @@ _BUILTIN_SPEC_MODULES = (
     "metalworks.research.sources.hackernews",
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
+    "metalworks.research.sources.stackexchange",
     "metalworks.research.sources.web",
 )
 

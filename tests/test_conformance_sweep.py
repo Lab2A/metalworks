@@ -36,6 +36,7 @@ import metalworks.research.sources.hackernews
 import metalworks.research.sources.hn_archive
 import metalworks.research.sources.magnitude
 import metalworks.research.sources.producthunt
+import metalworks.research.sources.stackexchange
 import metalworks.research.sources.web  # noqa: F401
 
 # Importing the planner package registers the ``subreddit`` target picker at its scope.
@@ -247,6 +248,53 @@ class _StubPhClient:
         return _StubResponse(_PH_POSTS)
 
 
+_SE_SEARCH = {
+    "items": [
+        {
+            "question_id": 700,
+            "title": "stim-free focus aid for sysadmins?",
+            "body": "<p>I want focus without jitters.</p>",
+            "link": "https://stackoverflow.com/q/700",
+            "score": 42,
+            "view_count": 47000,
+            "answer_count": 1,
+            "creation_date": 1_700_000_000,
+            "owner": {"user_id": 9, "display_name": "alice"},
+        }
+    ],
+    "has_more": False,
+}
+_SE_ANSWERS = {
+    "items": [
+        {
+            "answer_id": 701,
+            "question_id": 700,
+            "body": "<p>L-theanine works for me.</p>",
+            "link": "https://stackoverflow.com/a/701",
+            "score": 5,
+            "is_accepted": True,
+            "creation_date": 1_700_000_200,
+            "owner": {"user_id": 10, "display_name": "carol"},
+        }
+    ],
+    "has_more": False,
+}
+
+
+class _StubSeClient:
+    """A minimal httpx.Client stand-in for the Stack Exchange API. No network."""
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> _StubResponse:
+        if "/search/advanced" in url:
+            return _StubResponse(_SE_SEARCH)
+        if "/answers" in url:
+            return _StubResponse(_SE_ANSWERS)
+        raise AssertionError(f"unexpected URL {url}")
+
+    def close(self) -> None:
+        return None
+
+
 class _FakeSearchProvider:
     """A canned ``SearchProvider`` — distinct domains, no network."""
 
@@ -285,6 +333,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
         "hackernews_archive": {"reader": _FakeHnArchiveReader()},
         "hn_archive": {"reader": _FakeHnArchiveReader()},
         "producthunt": {"token": "dev-token", "client": _StubPhClient()},
+        "stackexchange": {"client": _StubSeClient(), "author_salt": "t"},
         # 'web' is a web lane, not grounding — rule 1 skips it (no fixture needed).
     }
 
@@ -297,7 +346,16 @@ _GROUNDING_WINDOW = SourceWindow(months=(_MONTH,), start=_NOW, end=_NOW)
 # SAME process-wide registry; the sweep validates the SHIPPED set, so it reads the real
 # registries but scopes to these ids — robust to whatever order pytest runs the suite in.
 SHIPPED_SOURCE_IDS = frozenset(
-    {"reddit", "arctic", "hackernews", "hackernews_archive", "hn_archive", "producthunt", "web"}
+    {
+        "reddit",
+        "arctic",
+        "hackernews",
+        "hackernews_archive",
+        "hn_archive",
+        "producthunt",
+        "stackexchange",
+        "web",
+    }
 )
 SHIPPED_MAGNITUDE_IDS = frozenset({"npm"})
 

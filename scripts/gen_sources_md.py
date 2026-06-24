@@ -39,6 +39,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
     "metalworks.research.sources.hackernews",
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
+    "metalworks.research.sources.stackexchange",
     "metalworks.research.sources.web",
 )
 
@@ -53,6 +54,7 @@ _BUILTIN_IDS: tuple[str, ...] = (
     "hn_archive",
     "producthunt",
     "reddit",
+    "stackexchange",
     "web",
 )
 
@@ -216,6 +218,7 @@ _READS: dict[str, str] = {
     "hn_archive": "Alias of `hackernews_archive` (the offline Hacker News archive)",
     "web": "Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl)",
     "producthunt": "Product Hunt launches + their comments",
+    "stackexchange": "Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …)",
 }
 
 
