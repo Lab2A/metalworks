@@ -52,6 +52,8 @@ export interface ResolvedCitation {
   author_hash: string;
   /** Source-native engagement signal (Reddit upvotes, HN points, …), for context. */
   engagement?: number;
+  /** Open, source-declared demand signals for this quote, keyed by kind (e.g. {'upvotes': 12}). The generalization of `engagement`: the deterministic scorer reads known kinds via the SignalSpec registry, unknown kinds are context. */
+  signals?: Record<string, number>;
   /** Source-specific fields that don't earn a spine column. */
   extra?: Record<string, unknown>;
   /** Stable content-addressed evidence id (``q:<hash of source_url|text>``). */
@@ -73,6 +75,8 @@ export interface InsightCluster {
   breadth_unit?: string;
   /** Total mentions (>= distinct_author_count). Kept separate so base-rate honesty is visible. */
   mention_count: number;
+  /** Aggregated source-declared signal vector behind this cluster, summed across members and keyed by kind (e.g. {'upvotes': 312}). Surfaced so a report shows WHY the cluster scored — the de-Reddit'd successor to a lone upvote total. The spec-weighted sum of these feeds `demand_score` above breadth. */
+  demand_signals?: Record<string, number>;
   /** Confidence chip, derived from distinct_author_count. */
   signal: SignalStrength;
   /** 2-3 verified quotes (materialized, portable). A cluster with zero verified quotes is never shipped (no-quote-no-theme). */

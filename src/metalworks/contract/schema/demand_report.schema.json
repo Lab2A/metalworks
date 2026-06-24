@@ -452,6 +452,14 @@
           "title": "Demand Score",
           "type": "number"
         },
+        "demand_signals": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Aggregated source-declared signal vector behind this cluster, summed across members and keyed by kind (e.g. {'upvotes': 312}). Surfaced so a report shows WHY the cluster scored \u2014 the de-Reddit'd successor to a lone upvote total. The spec-weighted sum of these feeds `demand_score` above breadth.",
+          "title": "Demand Signals",
+          "type": "object"
+        },
         "demographic_match": {
           "anyOf": [
             {
@@ -797,6 +805,14 @@
           "description": "Corpus-wide id of the backing record/comment, for live re-resolution.",
           "title": "Record Id",
           "type": "string"
+        },
+        "signals": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Open, source-declared demand signals for this quote, keyed by kind (e.g. {'upvotes': 12}). The generalization of `engagement`: the deterministic scorer reads known kinds via the SignalSpec registry, unknown kinds are context.",
+          "title": "Signals",
+          "type": "object"
         },
         "source": {
           "default": "reddit",

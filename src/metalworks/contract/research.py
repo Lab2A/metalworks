@@ -168,6 +168,12 @@ class ResolvedCitation(BaseModel):
         default=0,
         description="Source-native engagement signal (Reddit upvotes, HN points, …), for context.",
     )
+    signals: dict[str, float] = Field(
+        default_factory=dict,
+        description="Open, source-declared demand signals for this quote, keyed by kind "
+        "(e.g. {'upvotes': 12}). The generalization of `engagement`: the deterministic "
+        "scorer reads known kinds via the SignalSpec registry, unknown kinds are context.",
+    )
     extra: dict[str, Any] = Field(
         default_factory=dict,
         description="Source-specific fields that don't earn a spine column.",
@@ -213,6 +219,13 @@ class InsightCluster(BaseModel):
     mention_count: int = Field(
         description="Total mentions (>= distinct_author_count). Kept separate so base-rate "
         "honesty is visible."
+    )
+    demand_signals: dict[str, float] = Field(
+        default_factory=dict,
+        description="Aggregated source-declared signal vector behind this cluster, summed "
+        "across members and keyed by kind (e.g. {'upvotes': 312}). Surfaced so a report "
+        "shows WHY the cluster scored — the de-Reddit'd successor to a lone upvote total. "
+        "The spec-weighted sum of these feeds `demand_score` above breadth.",
     )
     signal: SignalStrength = Field(
         description="Confidence chip, derived from distinct_author_count."

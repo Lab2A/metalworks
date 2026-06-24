@@ -43,6 +43,14 @@ class CorpusRecord(BaseModel):
     engagement: int = Field(
         default=0, description="Source-native engagement signal (Reddit score, HN points, …)."
     )
+    signals: dict[str, float] = Field(
+        default_factory=dict,
+        description="Open, source-declared demand signals keyed by kind (e.g. "
+        "{'upvotes': 12} for Reddit, {'rating': 1, 'verified_purchase': 1} for a "
+        "review). The deterministic scorer reads known kinds via the SignalSpec "
+        "registry; unknown kinds are context-only. Empty ⇒ synthesized from "
+        "`engagement` at load (the back-compat path).",
+    )
     created_at: datetime | None = None
     extra: dict[str, Any] = Field(
         default_factory=dict, description="Source-specific fields that don't earn a spine column."
@@ -60,6 +68,7 @@ class CorpusRecord(BaseModel):
             text=post.selftext,
             author_hash=None,
             engagement=post.score,
+            signals={"upvotes": float(post.score)},
             created_at=post.created_utc,
             extra={
                 "subreddit": post.subreddit,
@@ -89,6 +98,11 @@ class CorpusComment(BaseModel):
     engagement: int = Field(
         default=0, description="Source-native engagement signal (Reddit upvotes, HN points, …)."
     )
+    signals: dict[str, float] = Field(
+        default_factory=dict,
+        description="Open, source-declared demand signals keyed by kind (see "
+        "`CorpusRecord.signals`). Empty ⇒ synthesized from `engagement` at load.",
+    )
     created_at: datetime | None = None
     extra: dict[str, Any] = Field(
         default_factory=dict, description="Source-specific fields that don't earn a spine column."
@@ -105,6 +119,7 @@ class CorpusComment(BaseModel):
             text=comment.body,
             author_hash=comment.author_hash,
             engagement=comment.score,
+            signals={"upvotes": float(comment.score)},
             created_at=comment.created_utc,
             extra={
                 "subreddit": comment.subreddit,

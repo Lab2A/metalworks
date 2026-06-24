@@ -16,9 +16,9 @@ string; ranking is straight demand_score.
 
 from __future__ import annotations
 
-import math
 import re
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from metalworks.contract import InsightCluster, ResolvedCitation, SignalStrength
 from metalworks.research.synthesis.demand import relative_band
+from metalworks.research.synthesis.signals import aggregate_signals, score_signals
 from metalworks.research.types import LoadedComment
 
 if TYPE_CHECKING:
@@ -84,14 +85,24 @@ def signal_from_breadth(breadth: int, population: list[int]) -> SignalStrength:
 signal_from_author_count = signal_from_breadth
 
 
-def compute_demand_score(breadth: int, total_engagement: int) -> float:
+def compute_demand_score(breadth: int, signals: Mapping[str, float] | float) -> float:
     """Rank by breadth of voices, not virality (50x2 outranks 1x200).
 
     ``breadth`` is the source-neutral count of distinct independent voices —
     distinct authors for authored sources, distinct domains for authorless web,
     summed for mixed clusters — so every source ranks on the same axis.
+
+    ``signals`` is the cluster's aggregated source-declared signal vector (e.g.
+    ``{"upvotes": 312}``); each known kind contributes via its registered
+    ``SignalSpec`` (unknown kinds are context-only). A bare number is accepted as
+    the legacy ``{"upvotes": n}`` engagement total — so the back-compat invariant
+    holds: a Reddit-only cluster's ``{"upvotes": sum}`` yields ``log1p(sum)``,
+    exactly the pre-signals ``log1p(total_engagement)``.
     """
-    return breadth * AUTHOR_WEIGHT + math.log1p(max(total_engagement, 0))
+    vec: Mapping[str, float] = (
+        {"upvotes": float(signals)} if isinstance(signals, int | float) else signals
+    )
+    return breadth * AUTHOR_WEIGHT + score_signals(vec)
 
 
 def _domain(url: str) -> str:
@@ -240,6 +251,7 @@ def _build_cluster(
                 text=m.body,
                 author_hash=m.author_hash,
                 engagement=m.engagement or m.upvotes,
+                signals=dict(m.signals),
             )
         )
         if len(quotes) >= MAX_QUOTES_PER_CLUSTER:
@@ -249,14 +261,20 @@ def _build_cluster(
 
     distinct_authors = {m.author_hash for m in members if m.author_hash}
     breadth, distinct_count, breadth_unit = cluster_breadth(members)
+    # Aggregate the source-declared signal vector across members, then score it
+    # spec-weighted. For a Reddit-only cluster this is {"upvotes": sum} →
+    # log1p(sum), identical to the old sum(m.upvotes) path (the back-compat
+    # invariant); a review/search cluster carries its own kinds.
+    demand_signals = aggregate_signals(members)
     cluster = InsightCluster(
         rank=rank,
         claim=candidate.claim,
-        demand_score=compute_demand_score(breadth, sum(m.upvotes for m in members)),
+        demand_score=compute_demand_score(breadth, demand_signals),
         distinct_author_count=distinct_count,
         breadth_count=breadth,
         breadth_unit=breadth_unit,
         mention_count=len(members),
+        demand_signals=demand_signals,
         # Provisional — re-banded relative to ALL clusters' breadths in build_clusters
         # once the full report population is known (the badge is relative, not absolute).
         signal=SignalStrength.LOW,
