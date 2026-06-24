@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from pydantic import BaseModel, Field
 
@@ -266,13 +266,42 @@ def discourse_instances(brief_hosts: Sequence[str] | None = None) -> list[str]:
 
 
 def _slug_picker(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
-    """Pick which company board / Product Hunt slug to pull (stub).
+    """Pick which company-board ``slug``s to pull from for ``brief`` (ATS).
 
-    The Product Hunt connector pulls by category slug; deriving the right slug
-    from a brief is its own content registry, out of 0.4 scope. The stub keeps the
-    dispatch table total and returns an empty list until that lands.
+    HONEST LIMITATION: no ATS vendor exposes a "list all companies" endpoint, so
+    slug *discovery* from a brief is not generically possible — you can only fetch
+    a board whose slug you already know. We therefore seed a **curated** registry
+    as DATA (:data:`metalworks.research.sources.ats.CURATED_SLUGS`) and let a brief
+    name companies; full slug-discovery (crawling, a web-lane lookup) is a later
+    concern. This picker returns the brief-named slugs first (verbatim, in order),
+    then appends the curated seeds it didn't already name, deduped — so a run
+    always has SOMETHING to pull while honoring any explicit company list.
+
+    The brief has no company-slug field today, so this returns the curated seeds
+    (deduped, in registry order). When a future brief carries an explicit company
+    list (a ``company_slugs`` field), this picker names those first, verbatim,
+    then appends the seeds — the same append-only posture as the subreddit picker.
+    The connector validates a slug by fetching its board, so an unknown/typo'd
+    slug simply yields no postings — never an error.
     """
-    return []
+    from metalworks.research.sources.ats import CURATED_SLUGS
+
+    seeds: list[str] = []
+    for vendor_slugs in CURATED_SLUGS.values():
+        seeds.extend(vendor_slugs)
+
+    ranked: list[str] = []
+    seen: set[str] = set()
+    named_raw: object = getattr(brief, "company_slugs", None)
+    named: list[str] = (
+        [str(x) for x in cast("list[object]", named_raw)] if isinstance(named_raw, list) else []
+    )
+    for raw in (*named, *seeds):
+        slug = raw.strip().strip("/").lower()
+        if slug and slug not in seen:
+            seen.add(slug)
+            ranked.append(slug)
+    return ranked
 
 
 # ── Deterministic access gate ────────────────────────────────────────────────
@@ -412,6 +441,7 @@ def _rank(deps: ResearchDeps, brief: ResearchBrief, specs: list[SourceSpec]) -> 
 # imports none of them (lean-core). The selector must see the full registry, so it
 # triggers these imports once before reading the specs.
 _BUILTIN_SPEC_MODULES = (
+    "metalworks.research.sources.ats",
     "metalworks.research.sources.arctic",
     "metalworks.research.sources.hackernews",
     "metalworks.research.sources.hn_archive",

@@ -32,6 +32,7 @@ import pytest
 # registration is lazy (a bare ``import metalworks`` imports none of them), so the
 # sweep must trigger each module's module-scope ``register_source`` first.
 import metalworks.research.sources.arctic
+import metalworks.research.sources.ats
 import metalworks.research.sources.discourse
 import metalworks.research.sources.hackernews
 import metalworks.research.sources.hn_archive
@@ -48,6 +49,7 @@ from metalworks.research.sources import (
     SOURCES,
     SourceSpec,
     SourceWindow,
+    get_source,
     register_source,
 )
 from metalworks.research.sources.magnitude import (
@@ -296,6 +298,29 @@ class _StubSeClient:
         return None
 
 
+_ATS_GREENHOUSE = {
+    "jobs": [
+        {
+            "id": 800,
+            "title": "Staff Engineer, Focus Tooling",
+            "absolute_url": "https://boards.greenhouse.io/acme/jobs/800",
+            "content": "&lt;p&gt;Build focus tools. Caffeine-free.&lt;/p&gt;",
+            # No timestamp: the sweep's zero-width [_NOW, _NOW] window keeps an
+            # un-dated posting (a JD without an updated_at is still quotable).
+            "location": {"name": "Remote"},
+        }
+    ]
+}
+
+
+class _StubAtsClient:
+    """A minimal httpx.Client stand-in for a Greenhouse board. No network."""
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> _StubResponse:
+        if "/jobs" in url:
+            return _StubResponse(_ATS_GREENHOUSE)
+
+
 _DISCOURSE_SEARCH = {
     "topics": [
         {
@@ -387,6 +412,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
     grounding id is constructible and quotable) without a live network call.
     """
     return {
+        "ats": {"provider": "greenhouse", "slug": "acme", "client": _StubAtsClient()},
         "reddit": {"reader": _FakeArcticReader(), "comments": _FakeArcticComments()},
         "arctic": {"reader": _FakeArcticReader(), "comments": _FakeArcticComments()},
         "hackernews": {"client": _StubHnClient(), "author_salt": "t"},
@@ -408,6 +434,7 @@ _GROUNDING_WINDOW = SourceWindow(months=(_MONTH,), start=_NOW, end=_NOW)
 # registries but scopes to these ids — robust to whatever order pytest runs the suite in.
 SHIPPED_SOURCE_IDS = frozenset(
     {
+        "ats",
         "reddit",
         "arctic",
         "hackernews",
@@ -618,12 +645,22 @@ def test_keys_env_only_passes_on_real_env_names() -> None:
 
 
 def test_shipped_grounding_signals_are_registered_non_magnitude() -> None:
-    """Every shipped grounding source ranks on a registered, non-magnitude signal."""
+    """Every shipped grounding source ranks on a registered, non-magnitude signal.
+
+    Exception: a ``yields_units`` grounding source (ATS) ranks by distinct-domain
+    breadth, not a signal vector, so an empty ``signals`` is legal there — the
+    rule-5 helper takes the constructed source's ``yields_units`` flag.
+    """
+    fixtures = _source_fixtures()
     for spec in _shipped_source_specs().values():
         if spec.lane != "grounding":
             continue
         check_signals_registered(spec, signal_specs=SIGNAL_SPECS)
-        check_grounding_has_grounding_signal(spec, signal_specs=SIGNAL_SPECS)
+        source = get_source(spec.source_id, **fixtures[spec.source_id])
+        yields_units = bool(getattr(source, "yields_units", False))
+        check_grounding_has_grounding_signal(
+            spec, signal_specs=SIGNAL_SPECS, yields_units=yields_units
+        )
         # Belt-and-suspenders: each declared kind resolves to a real spec object.
         for kind in spec.signals:
             assert isinstance(SIGNAL_SPECS[kind], SignalSpec)

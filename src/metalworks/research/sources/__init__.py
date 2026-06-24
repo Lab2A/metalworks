@@ -160,6 +160,7 @@ def get_source(source_id: str, **kwargs: object) -> ItemSource:
     ``KeyError``.
     """
     _BUILTIN_MODULES = {
+        "ats": "metalworks.research.sources.ats",
         "reddit": "metalworks.research.sources.arctic",
         "arctic": "metalworks.research.sources.arctic",
         "hackernews": "metalworks.research.sources.hackernews",
