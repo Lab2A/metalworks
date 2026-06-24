@@ -10,6 +10,26 @@ contracts may change in any release.
 
 ### Added
 
+- **Sources P1 — Discourse connector (#135).** The highest *venues-per-build* Phase-1 connector: one
+  adapter over the public Discourse JSON API unlocks the long tail of branded community forums (every
+  `community.X.com`, `meta.*`, vendor/dev/vertical board) that all run the same software and expose the
+  same keyless API. New `metalworks.research.sources.discourse.DiscourseSource` — an `ItemSource`
+  parameterized by `instance` (the forum host, default `meta.discourse.org`): `pull` queries
+  `/search.json` (windowed in-query with Discourse's `after:`/`before:` date operators) → topics →
+  `CorpusRecord` (title + search blurb); `comments_for` reads `/t/<id>.json`'s `post_stream` → each post
+  → `CorpusComment` (cooked HTML → text, a per-post permalink `/t/<slug>/<id>/<post_number>`, a
+  pseudonymized `username`). Signals `{"upvotes": like_count}` (social, the Discourse "like") plus
+  `{"views": topic_views}` (magnitude) — both kinds already registered, so no new `register_signal`.
+  Auth is keyless (`auth="none"`, `access="open"`); a login-gated host that answers 403/redirect is
+  **skipped gracefully** (the pull yields nothing rather than crashing the run). The shared `instance`
+  target picker (`planner/source_picker.py`) gains a `discourse_instances` seed — a curated list of
+  well-known public forums (non-removable `meta.discourse.org` default) plus brief-named hosts,
+  normalized and append-only — until web-lane host discovery lands (Phase 4). Registered in
+  `SOURCE_SPECS`, the lazy `get_source` map, the CLI/catalog connector lists, the planner spec modules,
+  `native_kind`, and `_BUILTIN_IDS`; `docs/sources.md` regenerated. New `tests/test_source_discourse.py`
+  (offline stub-client unit tests for the topic/post mapping, the 403 gated-host skip, instance
+  normalization, the `views` magnitude lifting the ranking score, plus a `network`-marked live smoke),
+  and the source is wired into the 0.5 conformance sweep with an offline stub-client fixture.
 - **Sources P1 — Stack Exchange connector (#134).** The first connector on the Phase-0 chassis (and
   its end-to-end validation: scaffold → `instance` picker → generated catalog). New
   `metalworks.research.sources.stackexchange.StackExchangeSource` — a keyless `ItemSource` over the

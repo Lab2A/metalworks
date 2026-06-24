@@ -138,6 +138,7 @@ _NATIVE_KIND: dict[str, str] = {
     "hackernews_archive": "points",
     "hn_archive": "points",
     "producthunt": "votes",
+    "discourse": "upvotes",
 }
 
 

@@ -40,6 +40,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
     "metalworks.research.sources.hn_archive",
     "metalworks.research.sources.producthunt",
     "metalworks.research.sources.stackexchange",
+    "metalworks.research.sources.discourse",
     "metalworks.research.sources.web",
 )
 
@@ -49,6 +50,7 @@ _CONNECTOR_MODULES: tuple[str, ...] = (
 # deterministic. When a new built-in connector lands, add its id(s) here.
 _BUILTIN_IDS: tuple[str, ...] = (
     "arctic",
+    "discourse",
     "hackernews",
     "hackernews_archive",
     "hn_archive",
@@ -219,6 +221,7 @@ _READS: dict[str, str] = {
     "web": "Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl)",
     "producthunt": "Product Hunt launches + their comments",
     "stackexchange": "Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …)",
+    "discourse": "Public Discourse community forums (vendor/product/practitioner boards) + their replies",  # noqa: E501
 }
 
 
