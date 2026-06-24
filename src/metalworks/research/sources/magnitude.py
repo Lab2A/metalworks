@@ -166,6 +166,7 @@ def get_magnitude_provider(provider_id: str, **kwargs: object) -> MagnitudeProvi
     """
     _BUILTIN_MODULES = {
         "npm": "metalworks.research.sources.magnitude",
+        "wikipedia": "metalworks.research.sources.magnitude_wikipedia",
         "pypi": "metalworks.research.sources.magnitude_pypi",
     }
     if provider_id not in MAGNITUDE_PROVIDERS and provider_id in _BUILTIN_MODULES:
