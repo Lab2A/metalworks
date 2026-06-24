@@ -16,6 +16,7 @@ more evidence behind every report.
 | Name | Reads | Lane | Needs a key? | Env |
 | --- | --- | --- | --- | --- |
 | `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | grounding | No | — |
+| `ats` | Public company job boards (Greenhouse, Lever, Ashby) — the JD states the hiring need | grounding | No | — |
 | `hackernews` | Hacker News stories and comments (live) | grounding | No | — |
 | `hackernews_archive` | A large archive of past Hacker News, read offline — see [Use Hacker News offline](/docs/load-hn-corpus) | grounding | No | — |
 | `hn_archive` | Alias of `hackernews_archive` (the offline Hacker News archive) | grounding | No | — |

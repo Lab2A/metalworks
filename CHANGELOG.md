@@ -10,6 +10,29 @@ contracts may change in any release.
 
 ### Added
 
+- **Sources P1 — ATS connector (Greenhouse/Lever/Ashby) (#136).** New
+  `metalworks.research.sources.ats.ATSItemSource` — one keyless `ItemSource` over the three public
+  ATS job boards (Greenhouse `boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true`, Lever
+  `api.lever.co/v0/postings/<slug>?mode=json`, Ashby `api.ashbyhq.com/posting-api/job-board/<slug>`),
+  parameterized by `provider` + a company `slug`. Public ATS boards are a B2B **pain & spend proxy**
+  nothing else in the corpus reaches: a company hiring for a tool/skill states the explicit need in
+  the job description. `pull` fetches a board, filters its postings to the brief's terms, and maps
+  each to a self-representing `CorpusRecord` (title = role, text = JD, url = posting permalink,
+  company = the "author"). The JD IS the synthesis unit, so this is a `yields_units` **grounding**
+  source (`comments_for` returns `None`): it ranks by distinct company/domain breadth, like the web
+  lane, and declares **no per-record signal** (`signals=()`) — a JD has no upvote/view analogue, and
+  the demand magnitude here is posting frequency, a deferred cluster-level overlay we never
+  fabricate per-item. There is no "list all companies" endpoint, so the `slug` target picker
+  (`planner/source_picker.py`) reads a **curated** slug registry seeded as DATA
+  (`ats.CURATED_SLUGS`) and lets a brief name companies; full slug-discovery is a later concern
+  (stated in the module docstring). Auth is keyless (`auth="none"`, `access="open"`). Registered in
+  `SOURCE_SPECS`, the lazy `get_source` map, the CLI/catalog connector lists, and `_BUILTIN_IDS`;
+  `docs/sources.md` regenerated. The 0.5 conformance sweep's rule 5 (a grounding lane must declare a
+  non-magnitude signal) now exempts `yields_units` sources for the same reason it exempts the web
+  lane — they rank by domain breadth, not a signal vector — so an empty `signals` is legal. New
+  `tests/test_source_ats.py` (offline stub-client unit tests for each provider's board→postings→units
+  mapping, term/window filtering, `yields_units` + domain breadth, conformance + registry, plus a
+  `network`-marked live Greenhouse smoke).
 - **Sources P1 — Stack Exchange connector (#134).** The first connector on the Phase-0 chassis (and
   its end-to-end validation: scaffold → `instance` picker → generated catalog). New
   `metalworks.research.sources.stackexchange.StackExchangeSource` — a keyless `ItemSource` over the

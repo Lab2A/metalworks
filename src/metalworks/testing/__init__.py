@@ -544,16 +544,21 @@ def check_grounding_has_grounding_signal(
     spec: SourceSpec,
     *,
     signal_specs: Mapping[str, SignalSpec],
+    yields_units: bool = False,
 ) -> None:
     """Rule 5 — a ``grounding`` lane declares ≥1 NON-``is_magnitude`` signal.
 
     A grounding source ranks on a real endorsement/breadth signal (upvotes, points,
     votes) — a magnitude-only signal vector would let an absolute-volume number stand
     in for grounded demand. A ``web`` lane is exempt (it ranks by domain breadth, not a
-    signal vector, so an empty ``signals`` is legal there). The default/empty stub spec
-    has no signals at all and is caught here too.
+    signal vector, so an empty ``signals`` is legal there). A ``yields_units`` grounding
+    source is exempt for the SAME reason: its records are self-representing units that
+    the ranker scores by distinct-domain breadth, NOT by a per-record signal vector
+    (the ATS job-board lane), so an empty ``signals`` is legal — the caller passes
+    ``yields_units=True`` after constructing the source. The default/empty stub spec
+    (lane grounding, no signals, no units) is still caught here.
     """
-    if spec.lane != "grounding":
+    if spec.lane != "grounding" or yields_units:
         return
     grounding_kinds = [
         k for k in spec.signals if (s := signal_specs.get(k)) is not None and not s.is_magnitude
@@ -628,6 +633,30 @@ def check_keys_env_only(spec: SourceSpec | MagnitudeSpec) -> None:
         )
 
 
+def _spec_yields_units(
+    spec: SourceSpec,
+    *,
+    sources: Mapping[str, SourceFactory],
+    fixture_kwargs: Mapping[str, object],
+) -> bool:
+    """Whether ``spec``'s connector is a ``yields_units`` source (rule-5 exempt).
+
+    ``yields_units`` is a connector CLASS attribute, not a spec field, so we read it
+    off a constructed instance (via the real factory with the offline ``fixture_kwargs``).
+    A spec with no factory, or one whose optional extra isn't installed (the bare CI
+    matrix), is treated as NOT a unit source — its real signal declaration is then held
+    to rule 5, which is the safe default (a non-unit grounding source must declare one).
+    """
+    factory = sources.get(spec.source_id)
+    if factory is None:
+        return False
+    try:
+        source = factory(**dict(fixture_kwargs))
+    except Exception:
+        return False
+    return bool(getattr(source, "yields_units", False))
+
+
 def check_lane_conformance(
     *,
     source_specs: Mapping[str, SourceSpec],
@@ -666,7 +695,13 @@ def check_lane_conformance(
 
     for spec in source_specs.values():
         check_signals_registered(spec, signal_specs=signal_specs)
-        check_grounding_has_grounding_signal(spec, signal_specs=signal_specs)
+        check_grounding_has_grounding_signal(
+            spec,
+            signal_specs=signal_specs,
+            yields_units=_spec_yields_units(
+                spec, sources=sources, fixture_kwargs=source_fixtures.get(spec.source_id, {})
+            ),
+        )
         check_spec_not_stub(spec)
         check_targeting_has_picker(spec, registered_targetings=registered_targetings)
         check_keys_env_only(spec)

@@ -1071,6 +1071,7 @@ def models_warm() -> None:
 # without needing live readers/keys. The catalog (`sources list`, scaffold-row
 # hints, `doctor`) reads ``SOURCE_SPECS`` — never a hand-kept reachability dict.
 _CONNECTOR_MODULES: tuple[str, ...] = (
+    "metalworks.research.sources.ats",
     "metalworks.research.sources.arctic",
     "metalworks.research.sources.hackernews",
     "metalworks.research.sources.hn_archive",
