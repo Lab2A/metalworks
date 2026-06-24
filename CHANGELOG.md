@@ -10,6 +10,24 @@ contracts may change in any release.
 
 ### Added
 
+- **Generalized source selector + per-target pickers (sources 0.4).** Source selection was
+  config-only; this generalizes it into a **brief-aware selector** that picks which of the N
+  registered sources to trust per run — with a non-removable floor so it can never silently choose
+  zero sources. `research/planner/source_picker.py` adds `pick_sources(deps, brief)` (a deterministic
+  access/auth gate on each `SourceSpec`'s `access`/`auth`/`env` — reachable iff keyless or its key is
+  set — then an **append-only** LLM relevance rank on `relevance_hint`) and `select_sources(...)`
+  (the full `SourceSelection`: the ranked pick, the sources skipped for missing keys with their
+  `MissingKeyError`-shaped env var/fix, and a `floor_applied` caveat). A `register_target_picker`
+  registry makes the existing subreddit picker the `subreddit` entry and adds `keyword` / `instance`
+  / `slug` stubs (their content registries are out of scope). `ResearchDeps.effective_sources()`
+  becomes brief-aware: precedence is **explicit `[sources].enabled` / `--source` override > selector
+  (opt-in) > the `reddit` default**. **The selector is opt-in** via `[sources].select = true`
+  (`config.source_selector_enabled()`) — default behavior is unchanged until a brief→expected-sources
+  eval set lands. Two new additive contract models — `SourceSelection` + `SkippedSource` — surface
+  the pick on `DemandReport.source_selection`, and the pipeline logs a pre-flight
+  `Selected: …; Skipped (no key): X — set ENV` line. **Floor (hard rule):** a brief matching only
+  paid sources with no keys falls back to `reddit` with a distinct caveat, never an empty corpus.
+
 - **Reddit engagement re-homed as Distribution's participation/execution arm (D9).** The Reddit
   engagement module (`metalworks.reddit`: OAuth, search, subreddit rules, rate-limiting, inbox, the
   `heuristic_check` compliance gate, the voice stylebook) + `generate_reply` is the **one channel

@@ -187,6 +187,30 @@ export interface SourceMapEntry {
   skew?: string | null;
 }
 
+export interface SkippedSource {
+  /** The registered source id that was skipped. */
+  source_id: string;
+  /** Why it was skipped (e.g. 'no key' — its auth env var is unset). */
+  reason?: string;
+  /** The environment variable(s) to set to unlock it (MissingKeyError shape). */
+  env_var?: string;
+  /** The actionable remediation line (e.g. 'Set the TRUSTPILOT_API_KEY ...'). */
+  fix?: string;
+}
+
+export interface SourceSelection {
+  /** Ordered source ids the run pulled from (access-gated, relevance-ranked). */
+  selected?: string[];
+  /** Sources the selector wanted but couldn't reach (no key). */
+  skipped?: SkippedSource[];
+  /** One-line human rationale for the pick (selector reasoning). */
+  rationale?: string;
+  /** True ⇒ the gated ranking yielded nothing and the run fell back to the floor. */
+  floor_applied?: boolean;
+  /** A distinct caveat when the floor was applied or a source was skipped. */
+  caveat?: string | null;
+}
+
 export interface MarketSizing {
   reddit_floor: number;
   penetration: Record<string, number>;
@@ -349,6 +373,8 @@ export interface DemandReport {
   market_sizing?: MarketSizing | null;
   price_finding?: PriceFinding | null;
   source_map?: SourceMapEntry[];
+  /** The brief-aware source pick + skipped/floor rationale, when the selector ran. None ⇒ the run used the configured/default sources without the selector. */
+  source_selection?: SourceSelection | null;
   /** The brief this run was produced against (frozen-version FK). */
   brief?: ResearchBrief | null;
   web_findings?: WebFinding[];
