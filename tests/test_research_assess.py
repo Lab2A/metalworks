@@ -21,6 +21,7 @@ from metalworks.contract import (
     EvidenceRef,
     ExistingSolution,
     Fork,
+    InsightCluster,
     Landscape,
     SegmentChoice,
     SignalStrength,
@@ -29,6 +30,7 @@ from metalworks.embeddings import FakeEmbedding
 from metalworks.llm import FakeChatModel
 from metalworks.research.assess import run_assessment
 from metalworks.research.deps import ResearchDeps
+from metalworks.research.synthesis.cluster_ranker import compute_demand_score
 from metalworks.stores import MemoryStores
 
 _CLOCK = datetime(2026, 2, 2, tzinfo=UTC)
@@ -228,6 +230,38 @@ def test_pivot_targets_the_strongest_fork_across_kinds() -> None:
     assert a.pivot_target is not None
     assert a.pivot_target.kind == "segment"
     assert any(s.id == a.pivot_target.target_id for s in report.segments)
+
+
+def test_band_ignores_magnitude_signals() -> None:
+    # 0.2a band-independence guard. Magnitude (search_volume, 0.2a) moves the
+    # RANKING sort key only — it must NEVER reach the verdict band. The forks the
+    # band path scores (CandidateWedge / SegmentChoice) carry breadth/author counts
+    # and NO signal vector, so the only way magnitude could leak into a band is a
+    # future regression that wires demand.strength to signals. Pin it: a low-breadth
+    # wedge whose underlying theme carries a huge search_volume must band exactly as
+    # an identical-breadth wedge with none — the band is breadth-only.
+    clusters = InsightCluster(
+        rank=1,
+        claim="huge volume, few voices",
+        demand_score=compute_demand_score(20, {"upvotes": 5, "search_volume": 500_000}),
+        distinct_author_count=20,
+        breadth_count=20,
+        breadth_unit="authors",
+        mention_count=20,
+        demand_signals={"upvotes": 5.0, "search_volume": 500_000.0},
+        signal=SignalStrength.LOW,
+        quotes=[],
+    )
+    # The magnitude DID move the sort key (ranking) — sanity that 0.2a is live.
+    assert clusters.demand_score > compute_demand_score(20, {"upvotes": 5})
+
+    report = _report(200, wedges=[_wedge("broad", 100), _wedge("narrow", 20)])
+    control = run_assessment(_deps(), report, _landscape(competitors=1))
+    control_bands = {f.label: f.demand_strength for f in control.fork_verdicts}
+    # The narrow fork bands LOW on its 20 authors regardless of any magnitude the
+    # ranking saw — the verdict path never read demand_signals.
+    assert control_bands["narrow"] == SignalStrength.LOW
+    assert control_bands["broad"] == SignalStrength.HIGH
 
 
 def test_confidence_is_low_on_a_band_edge() -> None:

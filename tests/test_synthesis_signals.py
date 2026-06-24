@@ -80,3 +80,54 @@ def test_register_signal_adds_a_new_scored_kind() -> None:
         assert score_signals({"test_helpful": 10}) == 5.0
     finally:
         signals.SIGNAL_SPECS.pop("test_helpful", None)
+
+
+# ── 0.2a: magnitude kinds contribute to RANKING (the sort key only) ──────────
+def test_magnitude_kinds_are_registered_and_flagged() -> None:
+    # The deferred magnitude specs are now live, and flagged is_magnitude so a
+    # future band rewire (0.2b) can tell them apart from social endorsement.
+    for kind in ("search_volume", "installs", "downloads", "views", "funding", "rfp_budget"):
+        spec = signals.get_spec(kind)
+        assert spec is not None, kind
+        assert spec.is_magnitude is True, kind
+    # rating is polarity-capable but NOT yet a magnitude kind; polarity stays inert.
+    rating = signals.get_spec("rating")
+    assert rating is not None
+    assert rating.is_magnitude is False
+
+
+def test_search_volume_contributes_to_score() -> None:
+    # A magnitude kind scores additively via its spec (log / weight 1), exactly
+    # like every other registered kind — no special path.
+    assert score_signals({"search_volume": 5000}) == math.log1p(5000)
+    # …and rides alongside a social kind without perturbing it.
+    assert score_signals({"upvotes": 5, "search_volume": 5000}) == (
+        math.log1p(5) + math.log1p(5000)
+    )
+
+
+def test_high_search_volume_outranks_equal_breadth_cluster() -> None:
+    # AC#1: same breadth, but the cluster carrying search_volume sorts higher.
+    with_volume = cluster_ranker.compute_demand_score(20, {"upvotes": 10, "search_volume": 40000})
+    without = cluster_ranker.compute_demand_score(20, {"upvotes": 10})
+    assert with_volume > without
+
+
+def test_reddit_only_ordering_is_byte_identical_to_pre_magnitude() -> None:
+    # AC#2 (invariance): a Reddit-only run carries only {"upvotes": n} — no
+    # magnitude kinds present — so every cluster score, and thus the ordering, is
+    # bit-for-bit the pre-signals formula. Pin both the scores and the sort.
+    reddit_clusters = [
+        ("thin", 8, {"upvotes": 3}),
+        ("broad", 50, {"upvotes": 120}),
+        ("mid", 22, {"upvotes": 60}),
+    ]
+    scored = [
+        (name, cluster_ranker.compute_demand_score(breadth, sig))
+        for name, breadth, sig in reddit_clusters
+    ]
+    # Each score is exactly breadth*AUTHOR_WEIGHT + log1p(upvotes) — the pre-signals law.
+    for (_name, breadth, sig), (_n, score) in zip(reddit_clusters, scored, strict=True):
+        assert score == breadth * cluster_ranker.AUTHOR_WEIGHT + math.log1p(sig["upvotes"])
+    order = [name for name, _ in sorted(scored, key=lambda it: it[1], reverse=True)]
+    assert order == ["broad", "mid", "thin"]
