@@ -136,6 +136,70 @@ except ImportError as exc:
 
 See [docs/custom-chatmodel.md](docs/custom-chatmodel.md) for a worked example.
 
+## Adding a source connector
+
+A *source* is where research reads conversations from (Reddit, Hacker News, the
+web, your own data). Adding one is a fill-in-the-bodies job — scaffold it, write
+two methods, done. The catalog (`metalworks sources list`, `docs/sources.md`) is
+generated from each source's `SourceSpec`, so you never hand-edit a registry.
+
+**1. Scaffold it.** Pick a lowercase id, a lane (`grounding` for discrete
+pain-bearing items, `web` for context), and an auth mode. Worked example — a
+**Discourse** forum connector (any self-hosted Discourse instance; auth `none`):
+
+```bash
+metalworks sources scaffold discourse --lane grounding --auth none
+```
+
+That writes `src/metalworks/research/sources/discourse.py` (a real `ItemSource`
+carrying a filled `SourceSpec` and a `register_signal` block) and
+`tests/test_source_discourse.py` (a conformance test), then **prints** — never
+auto-applies — the `pyproject.toml` extra to add and the `docs/sources.md` row.
+
+**2. Declare what it is.** The scaffold's `SourceSpec` is already valid; tune it
+to your source. For Discourse, instances vary by hostname, so target by instance
+and emit the forum's "likes" as the endorsement signal:
+
+```python
+register_source(
+    "discourse",
+    lambda **_: DiscourseSource(),
+    spec=SourceSpec(
+        source_id="discourse",
+        lane="grounding",
+        signals=("likes",),       # register_signal(SignalSpec(kind="likes", ...)) above
+        targeting="instance",     # the selector varies on the Discourse host
+        auth="none",
+        env=(),
+        access="open",
+        relevance_hint="real user pain in a product's own support forum",
+    ),
+)
+```
+
+If you emit a signal kind the registry doesn't know yet (here, `likes`), declare
+its semantics so the deterministic scorer can weight it — the scaffold leaves a
+`register_signal(...)` line for exactly this.
+
+**3. Fill in the two bodies.** Implement `pull` (map each Discourse topic onto a
+`CorpusRecord` with a STABLE `id`) and `comments_for` (yield one
+`list[CorpusComment]` per topic id, in input order, dropping deleted posts). See
+[`research/sources/template.py`](src/metalworks/research/sources/template.py) for
+the full field-by-field guide.
+
+**4. Verify.** The scaffolded test skips until `pull` returns records; once it
+does, it runs the published conformance check:
+
+```python
+from metalworks.testing import check_item_source
+check_item_source(DiscourseSource())
+```
+
+`check_item_source` enforces the two non-negotiables: stable ids (the corpus
+upserts by id) and idempotent pulls (re-pulling the same query/window yields the
+same id set). Then `metalworks sources list` shows your source with its lane /
+auth / key-status, and `python scripts/gen_sources_md.py` adds its catalog row.
+
 ## Rules that are not negotiable
 
 - **No module-level singletons.** No constructing clients, repos, or models at

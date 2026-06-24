@@ -3,27 +3,25 @@ title: "Sources"
 description: "Choose where metalworks reads from — Reddit, Hacker News, the web, or your own data. Turn sources on or off, mix several at once, or plug in your own."
 ---
 
+<!-- GENERATED FILE — do not edit by hand.
+     Source of truth: each connector's SourceSpec (metalworks.research.sources).
+     Regenerate: python scripts/gen_sources_md.py -->
+
 **A source is where metalworks reads conversations.** Out of the box it can read from Reddit,
 Hacker News, and the web; you can also plug in your own. Read from more than one and you get
 more evidence behind every report.
 
 ## What's available
 
-| Name | Reads | Needs a key? |
-| --- | --- | --- |
-| `reddit` | Public Reddit posts and comments | No |
-| `hackernews` | Hacker News stories and comments (live) | No |
-| `hackernews_archive` | A large archive of past Hacker News, read offline — see [Use Hacker News offline](/docs/load-hn-corpus) | No |
-| `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | A search key |
-| `producthunt` | Product Hunt launches + their comments | A free developer token |
-| `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | No |
-
-**Product Hunt** is launches and the discussion around them — strongest for sizing up the
-*competitive landscape* (what already exists and how it landed), a complement to the
-unmet-need signal on Reddit and Hacker News. It needs a free, non-expiring **developer token**
-from the [Product Hunt API dashboard](https://api.producthunt.com/v2/docs); set it as
-`PRODUCT_HUNT_TOKEN`. Product Hunt has no keyword search, so the source pulls the top launches
-(by votes) in your time window and lets the relevance step filter them.
+| Name | Reads | Lane | Needs a key? | Env |
+| --- | --- | --- | --- | --- |
+| `arctic` | A large archive of past Reddit posts — see [Use Reddit's archive](/docs/load-reddit-corpus) | grounding | No | — |
+| `hackernews` | Hacker News stories and comments (live) | grounding | No | — |
+| `hackernews_archive` | A large archive of past Hacker News, read offline — see [Use Hacker News offline](/docs/load-hn-corpus) | grounding | No | — |
+| `hn_archive` | Alias of `hackernews_archive` (the offline Hacker News archive) | grounding | No | — |
+| `producthunt` | Product Hunt launches + their comments | grounding | A free key | `PRODUCT_HUNT_TOKEN` |
+| `reddit` | Public Reddit posts and comments | grounding | No | — |
+| `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | web | A free key | `EXA_API_KEY`, `TAVILY_API_KEY`, `PARALLEL_API_KEY`, `FIRECRAWL_API_KEY` |
 
 ## Pick what to read from
 
@@ -33,8 +31,12 @@ By default metalworks reads Reddit. To use others, name them when you run:
 # read both Reddit and Hacker News for this run
 metalworks research run --question "..." --source reddit --source hackernews
 
-# see what's available and reachable
+# see what's available and reachable (lane / auth / key-status from each SourceSpec)
 metalworks sources list
+
+# only sources that need a key, or only one lane
+metalworks sources list --needs-key
+metalworks sources list --lane web
 
 # turn a source on or off for good (saved to your config)
 metalworks sources enable hackernews
@@ -65,12 +67,24 @@ others.
 ## Add your own source
 
 A source is a small piece of code that fetches items and hands them to metalworks in a common
-shape. To add one, copy `research/sources/template.py` and fill in three methods:
+shape. The fastest way in is to scaffold one:
+
+```bash
+metalworks sources scaffold mysource --lane grounding --auth none
+```
+
+That writes a connector module (with a filled `SourceSpec` and a `register_signal` block), a
+conformance test, prints the `pyproject.toml` extra to add, and the `docs/sources.md` row.
+Fill in the `pull` / `comments_for` bodies and you're done — see
+[Adding a source connector](https://github.com/Lab2A/metalworks/blob/main/CONTRIBUTING.md) in
+`CONTRIBUTING.md` for the worked example. To wire one up by hand instead, copy
+`research/sources/template.py`:
 
 ```python
 from collections.abc import Iterator, Sequence
+
 from metalworks.contract import CorpusComment, CorpusRecord
-from metalworks.research.sources import SourceWindow, register_source
+from metalworks.research.sources import SourceSpec, SourceWindow, register_source
 
 
 class MySource:
@@ -89,7 +103,20 @@ class MySource:
         ...
 
 
-register_source("mysource", lambda **_: MySource())
+register_source(
+    "mysource",
+    lambda **_: MySource(),
+    spec=SourceSpec(
+        source_id="mysource",
+        lane="grounding",
+        signals=("upvotes",),
+        targeting="keyword",
+        auth="none",
+        env=(),
+        access="open",
+        relevance_hint="what this source is best at surfacing",
+    ),
+)
 ```
 
 Once registered, it works like any built-in: `--source mysource`, `get_source("mysource")`, or
@@ -100,7 +127,7 @@ Once registered, it works like any built-in: `--source mysource`, `get_source("m
 own text as the thing people are talking about.
 
 To check your source is wired up correctly, use `metalworks.testing.check_item_source` in your
-tests.
+tests (the scaffold writes one for you).
 
 ## Next
 

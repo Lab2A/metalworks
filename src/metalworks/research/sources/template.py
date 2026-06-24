@@ -40,7 +40,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from metalworks.contract import CorpusComment, CorpusRecord
-from metalworks.research.sources import SourceWindow
+from metalworks.research.sources import SourceSpec, SourceWindow
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -173,4 +173,41 @@ class MyCorpusSource:
         return SourceWindow(end=datetime.now(tz=UTC))
 
 
-__all__ = ["MyCorpusSource"]
+# ── declare what this source IS ───────────────────────────────────────────────
+# Every source carries a SourceSpec so the selector, the catalog (`sources list`
+# / docs/sources.md), and the conformance guardrail can read its lane / auth /
+# signal facts without constructing it. Fill these in to match YOUR source:
+#
+# * lane       — "grounding" (discrete pain-bearing items) or "web" (context).
+# * signals    — the named demand-signal kinds you emit (e.g. ("upvotes",)); each
+#                must be registered in metalworks.research.synthesis.signals.
+# * targeting  — the selector knob you vary on: "none" / "keyword" / "subreddit" /
+#                "instance" / "slug".
+# * auth/env   — "none" (env empty) or "key"/"oauth"/"paid" (env names the var(s)).
+# * access     — "open" / "free_key" / "paid" / "blocked".
+SPEC = SourceSpec(
+    source_id="mysource",
+    lane="grounding",
+    signals=("upvotes",),
+    targeting="keyword",
+    auth="none",
+    env=(),
+    access="open",
+    relevance_hint="one line on what this source is best at surfacing",
+)
+
+
+# Register on import so a bare ``import`` of your module wires the source up.
+# Pass ``spec=SPEC`` so the metadata layer is populated too:
+#
+#     from metalworks.research.sources import register_source
+#     register_source("mysource", lambda **_: MyCorpusSource(), spec=SPEC)
+#
+# If your source emits a signal kind the registry doesn't know yet, declare its
+# semantics so the deterministic scorer can weight it (mirrors register_source):
+#
+#     from metalworks.research.synthesis.signals import SignalSpec, register_signal
+#     register_signal(SignalSpec(kind="helpfulness", weight=1.0, transform="log"))
+
+
+__all__ = ["SPEC", "MyCorpusSource"]

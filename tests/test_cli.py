@@ -113,6 +113,73 @@ def test_models_list_runs_with_a_key(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert "ANTHROPIC_API_KEY" in result.output
 
 
+# ── sources list (spec-driven) ────────────────────────────────────────────────
+
+
+def test_sources_list_renders_from_specs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`sources list` renders lane/auth/env from each SourceSpec (no key set)."""
+    monkeypatch.chdir(tmp_path)
+    for key in ("PRODUCT_HUNT_TOKEN", "EXA_API_KEY", "TAVILY_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    result = runner.invoke(app, ["sources", "list"])
+    assert result.exit_code == 0
+    out = result.output
+    # Built-in specs surface with their lane + auth columns.
+    assert "reddit" in out
+    assert "producthunt" in out
+    assert "grounding" in out
+    assert "lane" in out.lower()
+    assert "reachable" in out.lower()
+    # producthunt needs PRODUCT_HUNT_TOKEN, which is unset → not reachable.
+    assert "needs key" in out.lower() or "PRODUCT_HUNT_TOKEN" in out
+
+
+def test_sources_list_reachable_flips_with_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Setting a source's env var flips its computed `reachable` column."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PRODUCT_HUNT_TOKEN", "tok-123")
+    result = runner.invoke(app, ["sources", "list"])
+    assert result.exit_code == 0
+    assert "yes" in result.output  # at least the keyed source is now reachable
+
+
+def _table_region(output: str) -> str:
+    """The rows above the `enabled order:` footer (which always lists Reddit)."""
+    return output.split("enabled order:", 1)[0]
+
+
+def test_sources_list_lane_filter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`--lane web` shows only web-lane sources (web in, reddit out)."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["sources", "list", "--lane", "web"])
+    assert result.exit_code == 0
+    rows = _table_region(result.output)
+    assert "web" in rows
+    # reddit is a grounding source — it must be filtered out of a --lane web view.
+    assert "reddit" not in rows
+
+
+def test_sources_list_needs_key_filter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`--needs-key` shows only keyed sources (producthunt in, reddit out)."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["sources", "list", "--needs-key"])
+    assert result.exit_code == 0
+    rows = _table_region(result.output)
+    assert "producthunt" in rows
+    assert "reddit" not in rows
+
+
+def test_doctor_shows_sources_section(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`doctor` gains a Sources / key-status section."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "sources" in result.output.lower()
+    assert "reddit" in result.output
+
+
 def test_models_set_writes_and_is_reflected(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

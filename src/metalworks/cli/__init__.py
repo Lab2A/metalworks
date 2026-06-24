@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.research.deps import ResearchDeps
+    from metalworks.research.sources import SourceSpec
     from metalworks.research.validate import ResearchFn, ValidationStep
     from metalworks.stores.repos import RunRepo
 
@@ -245,6 +246,8 @@ def doctor(
     except Exception as exc:
         console.print(f"  [yellow]could not read store: {exc}[/yellow]")
 
+    _doctor_sources_section()
+
     console.print("\n[bold]Hints[/bold]")
     hints = _doctor_hints()
     if hints:
@@ -296,6 +299,36 @@ def _doctor_fix(hints: list[str]) -> None:
 
     if not acted:
         console.print("  [green]nothing to repair.[/green]")
+
+
+def _doctor_sources_section() -> None:
+    """Print the registered sources with lane/auth and a computed key-status.
+
+    Reads ``SOURCE_SPECS`` (after triggering the built-in imports) — the same
+    spec-driven view ``sources list`` renders, condensed for the doctor report.
+    Keyless sources show ``reachable``; an authed source shows whether one of its
+    env vars is set so the operator knows what's missing at a glance.
+    """
+    from metalworks.research.sources import SOURCE_SPECS
+
+    _discover_sources()  # trigger built-in self-registration so specs populate
+    enabled = set(config.enabled_source_ids())
+    console.print("\n[bold]Sources[/bold]")
+    if not SOURCE_SPECS:
+        console.print("  [dim]no registered sources[/dim]")
+        return
+    for sid in sorted(SOURCE_SPECS):
+        spec = SOURCE_SPECS[sid]
+        on = "[green]on[/green]" if sid in enabled else "[dim]off[/dim]"
+        if spec.auth == "none":
+            status = "[green]keyless[/green]"
+        elif _source_reachable(spec):
+            status = "[green]key set[/green]"
+        elif spec.env:
+            status = f"[yellow]needs key[/yellow] ({spec.env[0]})"
+        else:
+            status = "[yellow]needs key[/yellow]"
+        console.print(f"  {sid:<20} {on:<22} [dim]{spec.lane}/{spec.auth}[/dim]  {status}")
 
 
 @app.command()
@@ -546,18 +579,20 @@ def _setup_sources_step(yes: bool) -> None:
     no-op. Under ``--yes`` (or a defaulted prompt) it keeps the current set and
     writes nothing — non-destructive and fully scriptable.
     """
+    from metalworks.research.sources import SOURCE_SPECS
+
     current = config.enabled_source_ids()
     discovered = _discover_sources()
     console.print("\n[bold]Data sources[/bold]")
     for sid in sorted({*discovered, *current}):
-        note, probe = _SOURCE_REACH.get(sid, ("registered", None))
+        spec = SOURCE_SPECS.get(sid)
         on = "[green]enabled[/green]" if sid in current else "[dim]available[/dim]"
-        reach = (
-            ""
-            if probe is None or _module_available(probe)
-            else f" [yellow](needs {probe})[/yellow]"
-        )
-        console.print(f"  {sid:<12} {on}  [dim]{note}[/dim]{reach}")
+        if spec is None:
+            note, reach = "not registered", " [yellow](no connector)[/yellow]"
+        else:
+            note = f"{spec.lane} · {spec.auth}"
+            reach = "" if _source_reachable(spec) else " [yellow](needs key)[/yellow]"
+        console.print(f"  {sid:<14} {on}  [dim]{note}[/dim]{reach}")
     default = ",".join(current)
     if yes:
         console.print(f"  [dim]--yes → keeping current sources: {default}.[/dim]")
@@ -1029,70 +1064,145 @@ def models_warm() -> None:
 
 # ── sources sub-app ─────────────────────────────────────────────────────────
 
-# Reachability annotation for known source ids: which keyless extra (importable
-# module) a built-in connector rides, and whether it needs a key/extra at all.
-# Stream 2c owns the connectors; this map is the CLI's display-only hint so
-# `sources list` can mirror `models list`'s "reachable?" column without reaching
-# into the connectors. An id not listed here is shown as registered-only.
-_SOURCE_REACH: dict[str, tuple[str, str | None]] = {
-    # source_id -> (human note, importable module to probe; None = keyless, no extra)
-    "reddit": ("keyless (Arctic corpus)", "duckdb"),
-    "arctic": ("keyless (Arctic corpus)", "duckdb"),
-    "hackernews": ("keyless (public API)", None),
-}
+# Connector modules whose import self-registers a source AND lands its
+# ``SourceSpec`` in ``SOURCE_SPECS`` (the same map the gen script + spec test
+# use). Importing — not constructing — is enough: ``register_source(..., spec=)``
+# runs at module scope, so a freshly-imported CLI sees every built-in's metadata
+# without needing live readers/keys. The catalog (`sources list`, scaffold-row
+# hints, `doctor`) reads ``SOURCE_SPECS`` — never a hand-kept reachability dict.
+_CONNECTOR_MODULES: tuple[str, ...] = (
+    "metalworks.research.sources.arctic",
+    "metalworks.research.sources.hackernews",
+    "metalworks.research.sources.hn_archive",
+    "metalworks.research.sources.producthunt",
+    "metalworks.research.sources.web",
+)
 
 
 def _discover_sources() -> list[str]:
     """All known source ids: the registry, plus the built-ins that self-register
-    lazily on first ``get_source``. Triggers those lazy imports (best-effort) so
-    a freshly-imported CLI still lists Reddit/Arctic and any registered connector.
+    on import. Triggers those imports (best-effort) so a freshly-imported CLI sees
+    Reddit/Arctic and every other built-in spec, then any third-party connector
+    already registered in-process.
     """
     import contextlib
+    import importlib
 
-    from metalworks.research.sources import SOURCES, get_source
+    from metalworks.research.sources import SOURCES
 
-    for builtin in ("reddit", "hackernews"):
-        if builtin not in SOURCES:
-            # Best-effort: a built-in may not be importable / may need kwargs.
-            with contextlib.suppress(Exception):
-                get_source(builtin)
+    for module in _CONNECTOR_MODULES:
+        # Best-effort: a connector module may need an extra that isn't installed.
+        with contextlib.suppress(Exception):
+            importlib.import_module(module)
     return sorted(SOURCES)
 
 
-@sources_app.command("list")
-def sources_list() -> None:
-    """Show registered data sources, which are enabled, and their reachability.
+def _source_reachable(spec: SourceSpec) -> bool:
+    """A spec is reachable iff its auth requirement is satisfiable right now.
 
-    Read-only. Mirrors ``models list``: one row per registered source with its
-    enabled state (from ``[sources].enabled``) and a keyless/needs-extra hint.
+    Keyless sources (``auth == "none"``) are always reachable. An authed source is
+    reachable when at least one of its declared ``env`` vars is set — exactly the
+    "is the key present?" check the catalog renders. (Extras/import probing stays
+    out of the lane: the spec, not a per-id module map, is the source of truth.)
     """
+    if spec.auth == "none":
+        return True
+    return any(os.environ.get(var) for var in spec.env)
+
+
+def _wide_console() -> Console:
+    """A Console wide enough to render the 8-column sources table un-truncated.
+
+    The default console follows the terminal width (80 in CI / captured tests),
+    which ellipsizes source ids and env names in the spec'd view. A fixed minimum
+    width keeps every cell legible while still honoring a wider real terminal.
+    """
+    try:
+        terminal_width = console.size.width
+    except Exception:
+        terminal_width = 0
+    return Console(width=max(terminal_width, 120))
+
+
+@sources_app.command("list")
+def sources_list(
+    lane: Annotated[
+        str | None,
+        typer.Option("--lane", help="Only show sources on this lane (grounding/web)."),
+    ] = None,
+    needs_key: Annotated[
+        bool,
+        typer.Option("--needs-key", help="Only show sources that require a key (auth != none)."),
+    ] = False,
+) -> None:
+    """Show registered data sources, their lane/auth/env, and whether they're reachable.
+
+    Read-only, driven entirely by each source's ``SourceSpec`` (lane, auth,
+    access, env, relevance hint). ``reachable`` is a computed column: keyless
+    sources are always reachable; an authed source is reachable when one of its
+    env vars is set. ``--lane`` and ``--needs-key`` filter the rows.
+    """
+    from metalworks.research.sources import SOURCE_SPECS
+
     enabled = config.enabled_source_ids()
     discovered = _discover_sources()
-    # Show every id that is either registered or named in config (so a configured
-    # but not-yet-importable source still appears, flagged unreachable).
+    # Show every id that is registered or named in config (so a configured but
+    # not-yet-importable source still appears, flagged unreachable / specless).
     ids = sorted({*discovered, *enabled})
 
     console.print("[bold]Data sources[/bold]")
     table = Table(show_header=True, header_style="bold")
     table.add_column("source")
+    table.add_column("lane")
+    table.add_column("auth")
+    table.add_column("access")
+    table.add_column("env")
     table.add_column("enabled")
     table.add_column("reachable")
-    table.add_column("notes")
+    table.add_column("relevance hint")
+    shown = 0
     for sid in ids:
-        registered = sid in discovered
-        note, probe = _SOURCE_REACH.get(
-            sid, ("registered" if registered else "not registered", None)
-        )
-        on = sid in enabled
-        if not registered:
-            reach_cell = "[dim]no[/dim]"
-        elif probe is not None and not _module_available(probe):
-            reach_cell = f"[yellow]missing[/yellow] ({probe})"
-        else:
+        spec = SOURCE_SPECS.get(sid)
+        if spec is None:
+            # Configured but not registered (no spec) — surface it as unreachable.
+            if lane is not None or needs_key:
+                continue
+            en = "[green]on[/green]" if sid in enabled else "[dim]off[/dim]"
+            table.add_row(
+                sid, "[dim]?[/dim]", "[dim]?[/dim]", "[dim]?[/dim]", "—", en, "[dim]no[/dim]", ""
+            )
+            shown += 1
+            continue
+        if lane is not None and spec.lane != lane:
+            continue
+        if needs_key and spec.auth == "none":
+            continue
+        reachable = _source_reachable(spec)
+        env_cell = ", ".join(spec.env) if spec.env else "[dim]—[/dim]"
+        en_cell = "[green]on[/green]" if sid in enabled else "[dim]off[/dim]"
+        if reachable:
             reach_cell = "[green]yes[/green]"
-        en_cell = "[green]on[/green]" if on else "[dim]off[/dim]"
-        table.add_row(sid, en_cell, reach_cell, note)
-    console.print(table)
+        elif spec.auth != "none" and spec.env:
+            reach_cell = f"[yellow]needs key[/yellow] ({spec.env[0]})"
+        else:
+            reach_cell = "[dim]no[/dim]"
+        table.add_row(
+            sid,
+            spec.lane,
+            spec.auth,
+            spec.access,
+            env_cell,
+            en_cell,
+            reach_cell,
+            spec.relevance_hint,
+        )
+        shown += 1
+    # Render wide so the env / hint columns aren't ellipsized in a narrow terminal
+    # (the spec'd 8-column view doesn't fit 80 cols, and a truncated source id is
+    # actively misleading). A non-tty (piped) console honors the width verbatim.
+    _wide_console().print(table)
+    if shown == 0:
+        console.print("[dim](no sources match the filter)[/dim]")
     console.print(f"\n[dim]enabled order:[/dim] {', '.join(enabled)}")
 
 
@@ -1148,6 +1258,107 @@ def sources_disable(
 ) -> None:
     """Disable a source: remove it from ``[sources].enabled`` in the cwd metalworks.toml."""
     _edit_enabled(source_id, enable=False)
+
+
+@sources_app.command("scaffold")
+def sources_scaffold(
+    source_id: Annotated[
+        str, typer.Argument(help="New source id (lowercase identifier, e.g. discourse).")
+    ],
+    lane: Annotated[
+        str,
+        typer.Option("--lane", help="Lane this source serves: grounding | web."),
+    ] = "grounding",
+    auth: Annotated[
+        str,
+        typer.Option("--auth", help="Auth it needs: none | key | oauth | paid."),
+    ] = "none",
+    out_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--out-dir",
+            help="Directory for the connector + test (default: src/metalworks/research/sources/).",
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite the connector/test files if they already exist."),
+    ] = False,
+) -> None:
+    """Scaffold a new source connector: a fill-in-the-bodies ``ItemSource``.
+
+    Emits a connector module (filled ``SourceSpec`` + ``register_signal`` block,
+    only ``pull`` / ``comments_for`` left to write) and a conformance test, then
+    PRINTS the ``pyproject.toml`` extra snippet and the ``docs/sources.md`` row
+    (never auto-edited — the catalog is regenerated by ``scripts/gen_sources_md.py``).
+    Adding a source is then a fill-in job, not a 7-step edit across 6 files.
+    """
+    from typing import cast
+
+    from metalworks.research.sources.scaffold import (
+        ScaffoldPlan,
+        render_connector,
+        render_docs_row,
+        render_pyproject_extra,
+        render_test,
+    )
+    from metalworks.research.sources.spec import Lane
+
+    if lane not in ("grounding", "web"):
+        err_console.print(f"[red]--lane must be 'grounding' or 'web', got {lane!r}.[/red]")
+        raise typer.Exit(code=2)
+    if auth not in ("none", "key", "oauth", "paid"):
+        err_console.print(f"[red]--auth must be none | key | oauth | paid, got {auth!r}.[/red]")
+        raise typer.Exit(code=2)
+
+    try:
+        plan = ScaffoldPlan.build(source_id, lane=cast("Lane", lane), auth=auth)
+    except ValueError as exc:
+        err_console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2) from exc
+
+    pkg_dir = Path(__file__).resolve().parents[1] / "research" / "sources"
+    target_dir = out_dir if out_dir is not None else pkg_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    connector_path = target_dir / f"{plan.source_id}.py"
+    test_dir = Path("tests")
+    test_path = test_dir / f"test_source_{plan.source_id}.py"
+
+    # The dotted import path the test uses. In-tree (default) → the package path;
+    # a custom --out-dir → import by file stem (the caller wires their own path).
+    if out_dir is None:
+        module_path = f"metalworks.research.sources.{plan.source_id}"
+    else:
+        module_path = plan.source_id
+
+    for path in (connector_path, test_path):
+        if path.exists() and not force:
+            err_console.print(
+                f"[red]{path} already exists.[/red] Re-run with [bold]--force[/bold] to overwrite."
+            )
+            raise typer.Exit(code=1)
+
+    connector_path.write_text(render_connector(plan))
+    test_dir.mkdir(parents=True, exist_ok=True)
+    test_path.write_text(render_test(plan, module_path=module_path))
+
+    console.print(f"[green]Wrote[/green] connector  [dim]{connector_path}[/dim]")
+    console.print(f"[green]Wrote[/green] test       [dim]{test_path}[/dim]")
+
+    console.print("\n[bold]Add this extra to pyproject.toml[/bold] [dim](not auto-edited)[/dim]")
+    console.print(f"[dim]{render_pyproject_extra(plan)}[/dim]")
+
+    console.print(
+        "\n[bold]docs/sources.md row[/bold] "
+        "[dim](informational — run scripts/gen_sources_md.py to regenerate)[/dim]"
+    )
+    console.print(f"[dim]{render_docs_row(plan)}[/dim]")
+
+    console.print(
+        f"\n[bold]Next[/bold]: fill in [cyan]{plan.class_name}.pull[/cyan] / "
+        f"[cyan].comments_for[/cyan], then run "
+        f"[cyan]metalworks sources list[/cyan] and the new conformance test."
+    )
 
 
 # ── corpus sub-app ──────────────────────────────────────────────────────────

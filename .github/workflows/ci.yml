@@ -53,3 +53,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright
+      # Generated-catalog drift gate: docs/sources.md must match what the
+      # generator emits from each connector's SourceSpec (mirrors the
+      # gen_ts_types --check pattern). Fails CI if a spec changed without a regen.
+      - run: uv run python scripts/gen_sources_md.py --check
