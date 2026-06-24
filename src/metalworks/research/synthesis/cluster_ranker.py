@@ -94,10 +94,15 @@ def compute_demand_score(breadth: int, signals: Mapping[str, float] | float) -> 
 
     ``signals`` is the cluster's aggregated source-declared signal vector (e.g.
     ``{"upvotes": 312}``); each known kind contributes via its registered
-    ``SignalSpec`` (unknown kinds are context-only). A bare number is accepted as
-    the legacy ``{"upvotes": n}`` engagement total — so the back-compat invariant
-    holds: a Reddit-only cluster's ``{"upvotes": sum}`` yields ``log1p(sum)``,
-    exactly the pre-signals ``log1p(total_engagement)``.
+    ``SignalSpec`` (unknown kinds are context-only). As of 0.2a that includes the
+    ``is_magnitude`` kinds (``search_volume``/``installs``/…), so a theme carrying
+    high volume sorts above an equal-breadth theme without it — but ONLY here, in
+    the sort key. The verdict band (``demand.strength``) never receives this vector.
+
+    A bare number is accepted as the legacy ``{"upvotes": n}`` engagement total —
+    so the back-compat invariant holds: a Reddit-only cluster's ``{"upvotes": sum}``
+    yields ``log1p(sum)``, exactly the pre-signals ``log1p(total_engagement)``, and
+    a Reddit-only run (no magnitude kinds present) orders byte-identically.
     """
     vec: Mapping[str, float] = (
         {"upvotes": float(signals)} if isinstance(signals, int | float) else signals

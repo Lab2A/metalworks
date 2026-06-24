@@ -20,11 +20,17 @@ This module is the fix, in two halves:
   never silently distorts) — exactly today's ``extra: dict`` behavior. Decisions
   stay deterministic: scoring is a pure function of ``(breadth, signals, specs)``.
 
-**v1 is signal-aware additive only** (the chosen scope). Every shipped spec is
-positive-additive (``weight * transform(total)``); the ``polarity`` /
-``is_breadth`` / ``is_magnitude`` fields are carried on the spec so the later
-steps (negative-polarity reviews, a search-volume magnitude axis) are pure
-additions, but the v1 scorer does NOT consume them yet.
+**Scoring is signal-aware additive** (the chosen scope). Every shipped spec is
+positive-additive (``weight * transform(total)``). As of 0.2a the ``is_magnitude``
+kinds (``search_volume`` / ``installs`` / ``downloads`` / ``views`` / ``funding``
+/ ``rfp_budget``) are registered and contribute to the RANKING score the same
+additive way every other kind does — a high-volume theme sorts higher. This moves
+the sort key ONLY (``compute_demand_score`` → clusters/wedges/segments); it does
+NOT touch the verdict band (``demand.strength`` reads breadth/author counts and
+never sees the signal vector). ``polarity`` remains carried-but-inert: a
+polarity-capable ``rating`` spec is registered, but the scorer does not yet read
+its sign (negative-polarity reviews are 0.2b). ``is_breadth`` is likewise
+reserved.
 
 **Back-compat invariant.** Every shipped social-endorsement kind (``upvotes`` /
 ``points`` / ``votes`` / ``engagement``) is ``log`` / ``weight=1``, so a
@@ -47,19 +53,23 @@ from typing import Protocol
 class SignalSpec:
     """How the deterministic scorer reads one named signal kind.
 
-    ``weight`` and ``transform`` are the v1-active knobs (additive contribution).
-    ``polarity`` / ``is_breadth`` / ``is_magnitude`` are carried but NOT consumed
-    in v1 — they reserve the shape for the magnitude axis (search volume as a
-    demand denominator) and signed signals (a 1-star review is demand FOR a better
-    thing) without a future contract change.
+    ``weight`` and ``transform`` are the active knobs (additive contribution).
+    ``is_magnitude`` marks an absolute-volume kind (search volume, installs); as of
+    0.2a these contribute to the RANKING score additively like any other kind (they
+    re-order clusters), but they are deliberately NOT read by the verdict band —
+    ``demand.strength`` never sees the signal vector, so a high-magnitude theme
+    sorts higher without moving the GO/NO-GO call (that rewire is 0.2b).
+    ``polarity`` / ``is_breadth`` stay carried-but-inert: a polarity-capable rating
+    spec reserves the shape for signed signals (a 1-star review is demand FOR a
+    better thing) without a future contract change.
     """
 
     kind: str
     weight: float = 1.0
     transform: str = "log"  # "log" | "linear" | "bounded"
-    polarity: float = 1.0  # v2: +1 demand-for, -1 demand-against
-    is_breadth: bool = False  # v2: counts as a distinct voice (a verified buyer does)
-    is_magnitude: bool = False  # v2: an absolute volume denominator (search_volume)
+    polarity: float = 1.0  # reserved: +1 demand-for, -1 demand-against (0.2b)
+    is_breadth: bool = False  # reserved: counts as a distinct voice (a verified buyer does)
+    is_magnitude: bool = False  # an absolute volume kind (search_volume); ranks, never bands
 
     def _transform(self, total: float) -> float:
         t = max(total, 0.0)  # v1 additive-only: clamp; polarity/sign is v2
@@ -96,10 +106,26 @@ def get_spec(kind: str) -> SignalSpec | None:
 
 # Built-in social-endorsement kinds — all log / weight 1 so any SINGLE-source run
 # scores exactly as the pre-signals code did (the back-compat invariant). These
-# are the only kinds any v1 source emits; review/search/crowdfunding specs land
-# with their connectors (and turn on polarity / magnitude then).
+# are the only kinds the Reddit/HN/PH path emits; a Reddit-only run's vector is
+# {"upvotes": sum}, so its cluster ordering is byte-identical to pre-magnitude.
 for _kind in ("upvotes", "points", "votes", "engagement"):
     register_signal(SignalSpec(kind=_kind, weight=1.0, transform="log"))
+
+
+# Magnitude kinds (0.2a) — absolute-volume signals a source can declare. They
+# contribute to the RANKING score additively (log-compressed, weight 1, so a theme
+# carrying high search volume sorts above an equal-breadth one) but are flagged
+# ``is_magnitude`` and are NEVER read by the verdict band (``demand.strength`` does
+# not see the signal vector). The log keeps a single huge magnitude from dwarfing
+# the breadth axis — ranking still favors breadth of voices over raw volume.
+for _kind in ("search_volume", "installs", "downloads", "views", "funding", "rfp_budget"):
+    register_signal(SignalSpec(kind=_kind, weight=1.0, transform="log", is_magnitude=True))
+
+
+# A polarity-capable review-rating kind. Registered so a rating contributes to
+# ranking, but ``polarity`` is NOT consumed yet — a low rating is "demand for a
+# better thing", which is the signed 0.2b axis, deferred here.
+register_signal(SignalSpec(kind="rating", weight=1.0, transform="log", polarity=1.0))
 
 
 # Native signal kind a source's bare ``engagement`` int means, for back-compat
