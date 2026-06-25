@@ -76,6 +76,19 @@ def _flatten_listing(nodes: Any, out: list[dict[str, Any]]) -> None:
             _flatten_listing(data_d.get("children", []), out)
 
 
+def _as_rows(payload: Any) -> list[dict[str, Any]]:
+    """Extract the ``{"data": [...]}`` (or bare list) row list from a payload."""
+    if isinstance(payload, dict):
+        payload_d = cast("dict[str, Any]", payload)
+        data: Any = payload_d.get("data", payload_d)
+    else:
+        data = payload
+    if not isinstance(data, list):
+        return []
+    seq: list[Any] = cast("list[Any]", data)
+    return [cast("dict[str, Any]", r) for r in seq if isinstance(r, dict)]
+
+
 class ArcticShiftApiClient:
     """Rate-limited HTTP client for the public Arctic Shift API.
 
@@ -151,6 +164,35 @@ class ArcticShiftApiClient:
                     type(exc).__name__,
                 )
                 yield []
+
+    def search_submissions(
+        self,
+        *,
+        subreddit: str,
+        after: int | None = None,
+        before: int | None = None,
+        limit: int = 100,
+        sort: str = "desc",
+    ) -> list[dict[str, Any]]:
+        """Newest-first submissions for one subreddit, optionally bounded to an
+        ``[after, before)`` unix-second window, via ``/posts/search``.
+
+        The posts index is LIVE (the current month is present), unlike the HF
+        Parquet mirror behind :class:`~metalworks.research.arctic.reader.ArcticReader`.
+        """
+        params: dict[str, Any] = {"subreddit": subreddit, "limit": int(limit), "sort": sort}
+        if after is not None:
+            params["after"] = int(after)
+        if before is not None:
+            params["before"] = int(before)
+        return _as_rows(self._request_with_retries("/posts/search", params=params))
+
+    def submissions_by_ids(self, ids: Sequence[str]) -> list[dict[str, Any]]:
+        """Fetch submissions by bare id via ``/posts/ids`` (hydration read)."""
+        clean = [i for i in ids if i]
+        if not clean:
+            return []
+        return _as_rows(self._request_with_retries("/posts/ids", params={"ids": ",".join(clean)}))
 
     # ── Internal HTTP plumbing ──────────────────────────────────────────
 

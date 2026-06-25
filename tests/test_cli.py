@@ -623,7 +623,7 @@ def test_research_run_source_override_resolves(
 
     import metalworks.cli as cli_mod
 
-    monkeypatch.setattr(cli_mod, "_resolve_chat_or_exit", lambda: object())
+    monkeypatch.setattr(cli_mod, "_resolve_chat_or_exit", lambda model=None: object())
     monkeypatch.setattr(cli_mod, "_resolve_embeddings_or_exit", lambda: object())
 
     def _fake_brief_from_question(deps, question, **kwargs):
