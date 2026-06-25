@@ -902,6 +902,49 @@ def research_result(run_id: str, store_path: str | None = None) -> ToolResult:
 
 
 @guard
+def research_resume(run_id: str, store_path: str | None = None) -> ToolResult:
+    """TIER 2. Resume a previously-started research job from its last incomplete
+    stage (chat + embedding keys).
+
+    Re-runs the SAME ``run_id`` against its persisted brief, reusing the per-stage
+    checkpoints saved during the original run — so the expensive Reddit pull,
+    comment hydration, and synthesis are NOT redone for stages that already
+    finished. If the run already completed, returns its report. Poll with
+    ``research_status`` / ``research_result`` exactly as for ``research_start``."""
+    from metalworks import config
+    from metalworks.mcp.jobs import resume_research_job
+
+    store = config.default_store(store_path)
+    run = store.get_run(run_id)
+    if run is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No run with id {run_id!r}.",
+                "fix": "Use the run_id returned by research_start.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    if run.status == "complete":
+        report = store.get_report(run_id)
+        if report is not None:
+            return {"report": report.model_dump(mode="json")}
+    brief = store.get_brief(run.brief_id) if run.brief_id else None
+    if brief is None:
+        return {
+            "error": {
+                "error_code": "not_found",
+                "message": f"No brief stored for run {run_id!r}; cannot resume.",
+                "fix": "Start a fresh run with research_start.",
+                "docs_url": _DOCS_BASE,
+            }
+        }
+    deps = _build_deps(store_path)
+    resume_research_job(run_id=run_id, deps=deps, brief=brief, runs=deps.corpus)
+    return {"run_id": run_id, "status": "queued"}
+
+
+@guard
 def generate_reply(thread_url: str, *, voice: str | None = None) -> ToolResult:
     """TIER 2 (chat key). Draft a Reddit reply for a thread and run it through
     the deterministic compliance gate. Returns the draft, the verdict, and — when
@@ -1098,6 +1141,7 @@ __all__ = [
     "research_list_runs",
     "research_plan_brief",
     "research_result",
+    "research_resume",
     "research_start",
     "research_status",
 ]

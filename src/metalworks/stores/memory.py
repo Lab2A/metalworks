@@ -49,6 +49,7 @@ class MemoryStores:
         self._inbox: dict[str, InboxItem] = {}
         self._embeddings: dict[str, list[float]] = {}
         self._embedding_identity: IndexIdentity | None = None
+        self._checkpoints: dict[tuple[str, str], str] = {}
 
     # ── BriefRepo ──
 
@@ -90,6 +91,18 @@ class MemoryStores:
     def get_report(self, report_id: str) -> DemandReport | None:
         found = self._reports.get(report_id)
         return found.model_copy(deep=True) if found else None
+
+    # ── CheckpointRepo ──
+
+    def save_checkpoint(self, run_id: str, stage: str, payload: str) -> None:
+        self._checkpoints[(run_id, stage)] = payload
+
+    def get_checkpoint(self, run_id: str, stage: str) -> str | None:
+        return self._checkpoints.get((run_id, stage))
+
+    def clear_checkpoints(self, run_id: str) -> None:
+        for key in [k for k in self._checkpoints if k[0] == run_id]:
+            del self._checkpoints[key]
 
     # ── CorpusRepo: generic record/comment surface (authoritative) ──
 

@@ -87,6 +87,19 @@ _ENV_EXAMPLE = """\
 # GOOGLE_API_KEY=          # or GEMINI_API_KEY
 # OPENROUTER_API_KEY=      # one key reaches 200+ models
 
+# Force one model on every surface (CLI + MCP + SDK), beating key/Vertex
+# autodetection. A ref is provider/id or provider:id; an unknown vendor → OpenRouter:
+# METALWORKS_MODEL=deepseek/deepseek-v4-flash
+
+# Vertex gotcha: if your shell exports GOOGLE_GENAI_USE_VERTEXAI=true (e.g. inherited)
+# but you don't have the [google] extra, chat AND embeddings route to a missing Vertex
+# SDK and fail. Turn it off for metalworks, or install metalworks[google]:
+# GOOGLE_GENAI_USE_VERTEXAI=false
+
+# Reddit data reader (default: the live Arctic Shift API, keyless — no 429s):
+# ARCTIC_SHIFT_SOURCE=api  # api (default) | hf (HF Parquet, needs HF_TOKEN) | mirror
+# HF_TOKEN=                # only for ARCTIC_SHIFT_SOURCE=hf (clears the anonymous 429)
+
 # External web search (optional; exa preferred, then tavily):
 # EXA_API_KEY=
 # TAVILY_API_KEY=
@@ -546,7 +559,10 @@ def init(
     else:
         env_path.write_text(_ENV_EXAMPLE, encoding="utf-8")
         console.print(f"[green]Wrote[/green] {env_path}")
-    console.print("\nNext: set a provider key in your shell, then `metalworks doctor`.")
+    console.print(
+        "\nNext: set a provider key in your shell (or METALWORKS_MODEL), then "
+        "`metalworks preflight`."
+    )
 
 
 def _present_providers() -> list[tuple[str, str]]:
@@ -1798,6 +1814,90 @@ def research_run(
         out.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"[green]Wrote report[/green] {out}")
     _print_report(report)
+
+
+@research_app.command("resume", rich_help_panel="Core flow")
+def research_resume(
+    run_id: Annotated[str, typer.Argument(help="The run id to resume (a prior research run).")],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
+    ] = None,
+) -> None:
+    """Resume a prior run from its last incomplete stage (reuses checkpoints)."""
+    _emit_preflight_banner()
+    from metalworks.contract import RunSummary
+    from metalworks.research import run_research
+    from metalworks.research.arctic import ArcticShiftApiClient
+    from metalworks.research.deps import ResearchDeps
+
+    store = config.default_store()
+    run = store.get_run(run_id)
+    if run is None:
+        err_console.print(
+            f"[red]No run {run_id}.[/red] Run `metalworks research list` to see run ids."
+        )
+        raise typer.Exit(code=1)
+    if run.status == "complete":
+        done = store.get_report(run_id)
+        if done is not None:
+            console.print(f"[green]Run already complete[/green] {run_id}")
+            _print_report(done)
+            return
+    brief = store.get_brief(run.brief_id) if run.brief_id else None
+    if brief is None:
+        err_console.print(
+            f"[red]No brief stored for run {run_id}; cannot resume.[/red] "
+            "Start a fresh run with `metalworks research run`."
+        )
+        raise typer.Exit(code=1)
+
+    chat = _resolve_chat_or_exit()
+    embeddings = _resolve_embeddings_or_exit()
+    reader = config.resolve_corpus_reader()
+    comments = ArcticShiftApiClient()
+    deps = ResearchDeps(
+        chat=chat,
+        embeddings=embeddings,
+        corpus=store,
+        reader=reader,
+        search=config.resolve_search(),
+        comments=comments,
+    )
+    console.print(f"[bold]Resuming research[/bold] {run_id}: {brief.question}")
+    try:
+        report = run_research(deps, brief=brief, run_id=run_id, checkpoints=store)
+    finally:
+        reader.close()
+
+    store.save_report(report)
+    store.save_run(RunSummary.from_report(report, question=brief.question))
+    if out is not None:
+        out.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]Wrote report[/green] {out}")
+    _print_report(report)
+
+
+@research_app.command("status", rich_help_panel="History")
+def research_status(
+    run_id: Annotated[str, typer.Argument(help="The run id to inspect.")],
+) -> None:
+    """Show a run's status + fine-grained stage progress (stage N/total · updated)."""
+    store = config.default_store()
+    run = store.get_run(run_id)
+    if run is None:
+        err_console.print(f"[red]No run {run_id}.[/red]")
+        raise typer.Exit(code=1)
+    line = f"[bold]{run.status}[/bold]"
+    if run.stage is not None:
+        idx = run.stage_index if run.stage_index is not None else "?"
+        total = run.stage_total if run.stage_total is not None else "?"
+        line += f" · stage {idx}/{total}: {run.stage}"
+    if run.updated_at is not None:
+        line += f" · updated {run.updated_at.strftime('%Y-%m-%d %H:%M:%S')}"
+    console.print(line)
+    if run.error:
+        err_console.print(f"[red]{run.error}[/red]")
+        console.print(f"[dim]Resume with[/dim] [bold]metalworks research resume {run_id}[/bold]")
 
 
 @research_app.command("list", rich_help_panel="History")

@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS embeddings (
     corpus_id TEXT PRIMARY KEY, vector BLOB NOT NULL);
 CREATE TABLE IF NOT EXISTS embedding_meta (
     id INTEGER PRIMARY KEY CHECK (id = 1), model_id TEXT NOT NULL, dim INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS run_checkpoints (
+    run_id TEXT NOT NULL, stage TEXT NOT NULL, payload TEXT NOT NULL,
+    PRIMARY KEY (run_id, stage));
 """
 
 
@@ -198,6 +201,29 @@ class SqliteStores:
                 "SELECT payload FROM reports WHERE report_id = ?", (report_id,)
             ).fetchone()
         return DemandReport.model_validate_json(row[0]) if row else None
+
+    # ── CheckpointRepo ──
+
+    def save_checkpoint(self, run_id: str, stage: str, payload: str) -> None:
+        with self._lock:
+            self._con.execute(
+                "INSERT OR REPLACE INTO run_checkpoints (run_id, stage, payload) VALUES (?, ?, ?)",
+                (run_id, stage, payload),
+            )
+            self._con.commit()
+
+    def get_checkpoint(self, run_id: str, stage: str) -> str | None:
+        with self._lock:
+            row = self._con.execute(
+                "SELECT payload FROM run_checkpoints WHERE run_id = ? AND stage = ?",
+                (run_id, stage),
+            ).fetchone()
+        return row[0] if row else None
+
+    def clear_checkpoints(self, run_id: str) -> None:
+        with self._lock:
+            self._con.execute("DELETE FROM run_checkpoints WHERE run_id = ?", (run_id,))
+            self._con.commit()
 
     # ── CorpusRepo: generic record/comment surface (authoritative) ──
 

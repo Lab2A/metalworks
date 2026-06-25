@@ -30,12 +30,22 @@ from typing import TYPE_CHECKING
 from metalworks.contract import (
     CorpusRecord,
     CorpusStats,
+    CrossReference,
     DemandReport,
     Fork,
     InsightCluster,
     SourceMapEntry,
     SourceSelection,
     WebFinding,
+)
+from metalworks.research.checkpoints import (
+    AnalyzingCheckpoint,
+    HydratingCheckpoint,
+    PlanningCheckpoint,
+    PullingCheckpoint,
+    TriagingCheckpoint,
+    TriangulatingCheckpoint,
+    make_checkpointer,
 )
 from metalworks.research.exploration import run_exploration_triage
 from metalworks.research.planner import (
@@ -59,6 +69,7 @@ if TYPE_CHECKING:
 
     from metalworks.contract import ResearchBrief
     from metalworks.research.deps import ResearchDeps
+    from metalworks.stores.repos import CheckpointRepo
 
 
 logger = logging.getLogger(__name__)
@@ -320,6 +331,8 @@ def run_research(
     deps: ResearchDeps,
     *,
     brief: ResearchBrief,
+    run_id: str | None = None,
+    checkpoints: CheckpointRepo | None = None,
     per_sub_limit: int | None = None,
     max_findings: int = 10,
 ) -> DemandReport:
@@ -327,33 +340,59 @@ def run_research(
 
     `partial=True` with a caveat whenever a best-effort stage (web research,
     comment hydration, triangulation) degraded. Synthesis failures raise.
+
+    Resume: when both ``run_id`` and a ``checkpoints`` store are passed, each
+    stage's output is checkpointed (keyed by ``run_id``), and a re-invocation with
+    the same ``run_id`` LOADS completed stages instead of recomputing them — so a
+    failed run resumes from the last incomplete stage. ``run_id`` is ALSO the
+    report id, so a resumed run produces the same report id. With no ``run_id``
+    (the SDK / CLI direct callers) a fresh id is generated and the run is a
+    transparent, byte-for-byte-unchanged pass-through (no checkpoints).
     """
-    report_id = str(uuid.uuid4())
+    report_id = run_id or str(uuid.uuid4())
+    cp = make_checkpointer(checkpoints, run_id)
 
-    # Brief-aware source selection (opt-in). With the selector disabled — the
-    # default — ``selection`` stays ``None`` and every ``effective_sources(None)``
-    # call below is byte-for-byte the prior configured/Reddit path. An explicit
-    # ``deps.sources`` override still wins inside ``effective_sources``, so a
-    # ``--source`` run is unaffected even with the selector on. The selector's own
-    # non-removable floor guarantees ``selection.selected`` is never empty (it
-    # falls back to ``reddit`` with a distinct caveat), so this can't yield an
-    # empty corpus blamed on the picker.
-    selection = _maybe_select_sources(deps, brief=brief)
-    if selection is not None:
-        for line in preflight_lines(selection):
-            logger.info("source_selector: %s", line)
+    # ── planning (non-determinism capture) ─────────────────────────────────
+    # Brief-aware source selection (opt-in) + LLM subreddit pick + the month
+    # window. These are non-deterministic (LLM), so we checkpoint the RESOLVED
+    # inputs BEFORE pulling — a resume reuses the exact same plan rather than
+    # re-rolling different subreddits, which would corrupt the corpus downstream.
+    # With the selector disabled — the default — ``selection`` stays ``None`` and
+    # every ``effective_sources(None)`` call below is byte-for-byte the prior
+    # configured/Reddit path. An explicit ``deps.sources`` override still wins
+    # inside ``effective_sources``. The selector's own non-removable floor
+    # guarantees ``selection.selected`` is never empty.
+    def _compute_planning() -> PlanningCheckpoint:
+        selection_ = _maybe_select_sources(deps, brief=brief)
+        if selection_ is not None:
+            for line in preflight_lines(selection_):
+                logger.info("source_selector: %s", line)
+        # Effective subreddits: the LLM appends on-topic subs to the user's D5
+        # list without mutating the persisted brief (immutability).
+        effective_subs = pick_target_subreddits(deps, brief=brief)
+        return PlanningCheckpoint(
+            effective_subs=effective_subs,
+            selection=selection_,
+            months=_window_months(deps, brief),
+        )
 
-    # Effective subreddits: the LLM appends on-topic subs to the user's D5
-    # list without mutating the persisted brief (immutability).
-    effective_subs = pick_target_subreddits(deps, brief=brief)
-    effective_brief = brief.model_copy(update={"target_subreddits": effective_subs})
+    planning = cp.stage("planning", PlanningCheckpoint, _compute_planning)
+    selection = planning.selection
+    months = list(planning.months)
+    effective_brief = brief.model_copy(update={"target_subreddits": planning.effective_subs})
 
-    months = _window_months(deps, brief)
-
+    # ── pulling ─────────────────────────────────────────────────────────────
     deps.emit("pulling")
-    items, records_by_id = _pull_corpus(
-        deps, effective_brief, months=months, per_sub_limit=per_sub_limit, selection=selection
-    )
+
+    def _compute_pulling() -> PullingCheckpoint:
+        items_, records_ = _pull_corpus(
+            deps, effective_brief, months=months, per_sub_limit=per_sub_limit, selection=selection
+        )
+        return PullingCheckpoint(items=items_, records_by_id=records_)
+
+    pulling = cp.stage("pulling", PullingCheckpoint, _compute_pulling)
+    items = pulling.items
+    records_by_id = pulling.records_by_id
     if not items:
         return _empty_report(
             deps=deps,
@@ -364,116 +403,178 @@ def run_research(
             selection=selection,
         )
 
+    # ── triaging ────────────────────────────────────────────────────────────
     deps.emit("triaging")
-    relevant_indices, exploration_report = run_exploration_triage(
-        deps,
-        question=brief.question,
-        relevance_rubric=brief.relevance_rubric,
-        items=items,
-        thresholds=brief.triage_thresholds,
-    )
-    relevant_items = [items[i] for i in relevant_indices]
 
+    def _compute_triaging() -> TriagingCheckpoint:
+        relevant_indices_, exploration_report_ = run_exploration_triage(
+            deps,
+            question=brief.question,
+            relevance_rubric=brief.relevance_rubric,
+            items=items,
+            thresholds=brief.triage_thresholds,
+        )
+        return TriagingCheckpoint(
+            relevant_indices=relevant_indices_, exploration_report=exploration_report_
+        )
+
+    triaging = cp.stage("triaging", TriagingCheckpoint, _compute_triaging)
+    exploration_report = triaging.exploration_report
+    relevant_items = [items[i] for i in triaging.relevant_indices]
+
+    # ── hydrating ───────────────────────────────────────────────────────────
     # Hydration = INGEST the triage-relevant subset into the durable corpus:
     # the records (already pulled, just persist what survived triage) plus their
     # comments (the expensive per-link API fetch, run only on the relevant set).
     # This is the auto-ingest write path: on an empty corpus, a single
     # research() call leaves the relevant threads + quotes persisted as a side
-    # effect — no separate ingest step.
+    # effect — no separate ingest step. The corpus writes are durable + idempotent,
+    # so a resume that LOADS this checkpoint safely skips the comment re-fetch.
     deps.emit("hydrating")
-    stage_errors: list[str] = []
-    post_ids = [it.post_id for it in relevant_items]
-    relevant_records = [records_by_id[pid] for pid in post_ids if pid in records_by_id]
-    ingest_records(deps.corpus, relevant_records)
-    n_comments = 0
-    any_comment_layer = False
-    unit_source_ids: set[str] = set()
-    for source in deps.effective_sources(selection):
-        written, has_comments = ingest_comments_for(deps.corpus, source, post_ids)
-        n_comments += written
-        any_comment_layer = any_comment_layer or has_comments
-        # A source OPTS IN to self-representing units (web): its records carry the
-        # demand signal in their own text. This is an explicit flag, NOT inferred
-        # from has_comments — a Reddit source with no comment client wired also
-        # has no comments, but its posts are still comment-bearing, not units.
-        if getattr(source, "yields_units", False):
-            unit_source_ids.add(source.source_id)
-    # Flag the unit-source records so synthesis promotes each to its own unit.
-    # Idempotent re-upsert; only the (small) unit subset is rewritten.
-    if unit_source_ids:
-        unit_records = [
-            r.model_copy(update={"extra": {**r.extra, "is_unit": True}})
-            for r in relevant_records
-            if r.source in unit_source_ids
-        ]
-        ingest_records(deps.corpus, unit_records)
-    comments_error: str | None = None
-    if not any_comment_layer:
-        comments_error = "no comment source configured (deps.comments is None)"
-        stage_errors.append("comment_hydration")
-    elif int(getattr(deps.comments, "last_skipped", 0) or 0):
-        # A source dropped links to upstream 5xx/429 — surface partial.
-        stage_errors.append("comment_hydration")
 
-    # Synthesis || web research — independent, joined at a barrier.
+    def _compute_hydrating() -> HydratingCheckpoint:
+        stage_errors_local: list[str] = []
+        post_ids_ = [it.post_id for it in relevant_items]
+        relevant_records_ = [records_by_id[pid] for pid in post_ids_ if pid in records_by_id]
+        ingest_records(deps.corpus, relevant_records_)
+        n_comments_ = 0
+        any_comment_layer_ = False
+        unit_source_ids_: set[str] = set()
+        for source in deps.effective_sources(selection):
+            written, has_comments = ingest_comments_for(deps.corpus, source, post_ids_)
+            n_comments_ += written
+            any_comment_layer_ = any_comment_layer_ or has_comments
+            # A source OPTS IN to self-representing units (web): its records carry
+            # the demand signal in their own text. This is an explicit flag, NOT
+            # inferred from has_comments — a Reddit source with no comment client
+            # wired also has no comments, but its posts are still comment-bearing.
+            if getattr(source, "yields_units", False):
+                unit_source_ids_.add(source.source_id)
+        # Flag the unit-source records so synthesis promotes each to its own unit.
+        # Idempotent re-upsert; only the (small) unit subset is rewritten.
+        if unit_source_ids_:
+            unit_records = [
+                r.model_copy(update={"extra": {**r.extra, "is_unit": True}})
+                for r in relevant_records_
+                if r.source in unit_source_ids_
+            ]
+            ingest_records(deps.corpus, unit_records)
+        comments_error_: str | None = None
+        if not any_comment_layer_:
+            comments_error_ = "no comment source configured (deps.comments is None)"
+            stage_errors_local.append("comment_hydration")
+        elif int(getattr(deps.comments, "last_skipped", 0) or 0):
+            # A source dropped links to upstream 5xx/429 — surface partial.
+            stage_errors_local.append("comment_hydration")
+        return HydratingCheckpoint(
+            post_ids=post_ids_,
+            relevant_records=relevant_records_,
+            n_comments=n_comments_,
+            any_comment_layer=any_comment_layer_,
+            unit_source_ids=sorted(unit_source_ids_),
+            comments_error=comments_error_,
+            stage_errors_so_far=stage_errors_local,
+        )
+
+    hydrating = cp.stage("hydrating", HydratingCheckpoint, _compute_hydrating)
+    post_ids = hydrating.post_ids
+    n_comments = hydrating.n_comments
+    comments_error = hydrating.comments_error
+    stage_errors: list[str] = list(hydrating.stage_errors_so_far)
+
+    # ── analyzing: synthesis ‖ web research (+ magnitude overlay) ────────────
     deps.emit("analyzing")
-    synthesis_out: SynthesisOutput
-    web_findings: list[WebFinding]
-    web_error: str | None = None
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        fut_synth = pool.submit(synthesize, deps, brief=brief, hydrated_post_ids=post_ids)
-        fut_web = pool.submit(web_research, deps, brief=brief, max_findings=max_findings)
-        synthesis_out = fut_synth.result()  # required — raises loud
-        try:
-            web_findings = fut_web.result()
-        except Exception as e:  # best-effort
-            web_findings = []
-            web_error = f"{type(e).__name__}: {str(e)[:120]}"
-            stage_errors.append("web_research")
 
-    # Lane-② magnitude overlay (issue #122). Deterministically extract measurable
-    # entities from the already-grounded artifacts (cluster quote names, slot-plan
-    # product, web-finding domains — NO LLM), call any active magnitude providers,
-    # and merge their numbers into the matching clusters' demand_signals + rescore
-    # (RANKING only). Best-effort, exactly like web research: a provider failure
-    # degrades to partial + caveat, never aborts. A provider can NEVER create a
-    # cluster — it only attaches to existing ones. Off by default (no providers).
-    magnitude_error = _apply_magnitude_overlay(
-        deps,
-        slot_plan_product=(
-            synthesis_out.slot_plan.product if synthesis_out.slot_plan is not None else None
-        ),
-        clusters=synthesis_out.ranked_clusters,
-        web_findings=web_findings,
-        months=months,
-        stage_errors=stage_errors,
-    )
+    def _compute_analyzing() -> AnalyzingCheckpoint:
+        synthesis_out_: SynthesisOutput
+        web_findings_: list[WebFinding]
+        web_error_: str | None = None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_synth = pool.submit(synthesize, deps, brief=brief, hydrated_post_ids=post_ids)
+            fut_web = pool.submit(web_research, deps, brief=brief, max_findings=max_findings)
+            synthesis_out_ = fut_synth.result()  # required — raises loud
+            try:
+                web_findings_ = fut_web.result()
+            except Exception as e:  # best-effort
+                web_findings_ = []
+                web_error_ = f"{type(e).__name__}: {str(e)[:120]}"
+        # Lane-② magnitude overlay (issue #122). Deterministically extract
+        # measurable entities from the already-grounded artifacts (cluster quote
+        # names, slot-plan product, web-finding domains — NO LLM), call any active
+        # magnitude providers, and merge their numbers into the matching clusters'
+        # demand_signals + rescore (RANKING only) IN PLACE on synthesis_out_.
+        # Best-effort, exactly like web research; off by default (no providers).
+        magnitude_error_ = _apply_magnitude_overlay(
+            deps,
+            slot_plan_product=(
+                synthesis_out_.slot_plan.product if synthesis_out_.slot_plan is not None else None
+            ),
+            clusters=synthesis_out_.ranked_clusters,
+            web_findings=web_findings_,
+            months=months,
+            stage_errors=[],  # local sink; the error string drives the flag below
+        )
+        return AnalyzingCheckpoint(
+            synthesis_out=synthesis_out_,
+            web_findings=web_findings_,
+            web_error=web_error_,
+            magnitude_error=magnitude_error_,
+        )
+
+    analyzing = cp.stage("analyzing", AnalyzingCheckpoint, _compute_analyzing)
+    synthesis_out = analyzing.synthesis_out
+    web_findings = analyzing.web_findings
+    web_error = analyzing.web_error
+    magnitude_error = analyzing.magnitude_error
+    # Reconstruct the stage_errors these best-effort failures contributed (a
+    # truthy error string ⟺ the stage degraded), so partial/caveat is identical
+    # whether this stage was just computed or loaded from a checkpoint.
+    if web_error:
+        stage_errors.append("web_research")
+    if magnitude_error:
+        stage_errors.append("magnitude")
 
     corpus_stats = _build_corpus_stats(relevant_items)
     exploration_report.threads_synthesized = synthesis_out.n_synthesized
     # Surface the near-dup merge rate (breadth-collapse observability, issue #82).
     exploration_report.dedup_merge_rate = synthesis_out.dedup_merge_rate
 
+    # ── triangulating ───────────────────────────────────────────────────────
     deps.emit("triangulating")
-    triangulation_error: str | None = None
-    cross_references = []
-    must_address_resolution: dict[str, str] = {}
-    ranked_clusters_final = synthesis_out.ranked_clusters
-    try:
-        triangulation = triangulate(
-            deps,
-            brief=brief,
-            ranked_clusters=synthesis_out.ranked_clusters,
-            web_findings=web_findings,
+
+    def _compute_triangulating() -> TriangulatingCheckpoint:
+        triangulation_error_: str | None = None
+        cross_references_: list[CrossReference] = []
+        must_address_resolution_: dict[str, str] = {}
+        ranked_clusters_final_ = synthesis_out.ranked_clusters
+        try:
+            triangulation = triangulate(
+                deps,
+                brief=brief,
+                ranked_clusters=synthesis_out.ranked_clusters,
+                web_findings=web_findings,
+            )
+            cross_references_ = triangulation.cross_references
+            must_address_resolution_ = triangulation.must_address_resolution
+            ranked_clusters_final_ = apply_cross_stream_confidence(
+                clusters=synthesis_out.ranked_clusters,
+                cross_references=triangulation.cross_references,
+            )
+        except TriangulationFailedError as e:
+            triangulation_error_ = str(e)[:200]
+        return TriangulatingCheckpoint(
+            cross_references=cross_references_,
+            must_address_resolution=must_address_resolution_,
+            ranked_clusters_final=ranked_clusters_final_,
+            triangulation_error=triangulation_error_,
         )
-        cross_references = triangulation.cross_references
-        must_address_resolution = triangulation.must_address_resolution
-        ranked_clusters_final = apply_cross_stream_confidence(
-            clusters=synthesis_out.ranked_clusters,
-            cross_references=triangulation.cross_references,
-        )
-    except TriangulationFailedError as e:
-        triangulation_error = str(e)[:200]
+
+    triangulating = cp.stage("triangulating", TriangulatingCheckpoint, _compute_triangulating)
+    cross_references = triangulating.cross_references
+    must_address_resolution = triangulating.must_address_resolution
+    ranked_clusters_final = triangulating.ranked_clusters_final
+    triangulation_error = triangulating.triangulation_error
+    if triangulation_error:
         stage_errors.append("triangulating")
 
     caveat_parts: list[str] = []

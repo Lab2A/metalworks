@@ -246,6 +246,11 @@ async def research_result(run_id: str, store_path: str | None = None) -> dict[st
     return tools.research_result(run_id, store_path)
 
 
+async def research_resume(run_id: str, store_path: str | None = None) -> dict[str, Any]:
+    """TIER 2. Resume a failed/partial job from its last checkpoint (chat + embedding keys)."""
+    return tools.research_resume(run_id, store_path)
+
+
 async def generate_reply(thread_url: str, voice: str | None = None) -> dict[str, Any]:
     """TIER 2. Draft a reply + compliance verdict (+ confirm_token on pass) (chat key)."""
     return tools.generate_reply(thread_url, voice=voice)
@@ -309,6 +314,7 @@ _TOOL_WRAPPERS = (
     research_start,
     research_status,
     research_result,
+    research_resume,
     generate_reply,
     discovery_run,
     reddit_post_comment,

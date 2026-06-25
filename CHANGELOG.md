@@ -8,6 +8,35 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-25
+
+### Added
+- **Research-job progress heartbeat.** A background `research_start` job now re-saves its
+  `RunSummary` on every pipeline stage, so `research_status` reports fine-grained progress —
+  `stage` (e.g. `analyzing`), `stage_index`/`stage_total` (for a `4/6` display), and `updated_at` —
+  letting a poller tell a grinding run from a hung one. Four new defaulted `RunSummary` fields
+  (`stage`, `stage_index`, `stage_total`, `updated_at`); old payloads still validate. The CLI gains
+  `metalworks research status <run_id>` to surface them.
+- **Resume a failed research run from its last checkpoint.** The pipeline now checkpoints each
+  stage's output keyed by `run_id` (a new `CheckpointRepo` on both the memory + sqlite stores, with
+  an explicit typed Pydantic serializer per stage — never pickle), so a failed run can re-run from
+  the last incomplete stage instead of from zero — reusing the expensive Reddit pull, comment
+  hydration, and synthesis. The non-determinism (subreddit / source pick) is captured in a `planning`
+  checkpoint BEFORE the pull, so a resume reuses the exact same corpus plan. New `research_resume`
+  primitive across all four surfaces: MCP tool (`research_resume`), CLI (`metalworks research resume
+  <run_id>`), facade (`Metalworks.research_resume(run_id)`), and the `demand-report` skill (which now
+  resumes a `failed` run before falling back). A fresh run with no checkpoint store is byte-for-byte
+  unchanged — the checkpoint-or-compute wrapper is a transparent pass-through.
+
+### Changed
+- **Plugin docs + directive skill preambles.** Bundle a concise agent-facing
+  `docs/operating-metalworks.md` (provider/model resolution + the Vertex gotcha, the readers/sources
+  and `ARCTIC_SHIFT_SOURCE`, the async run loop, a common-errors table). All 22 skill preambles now
+  carry a directive "STOP and read the reference before opening `src/`" plus a poll-with-Monitor /
+  never-blind-`sleep` note — so an agent reads the docs instead of reverse-engineering the source.
+  `metalworks init`'s `.env.example` documents `METALWORKS_MODEL`, the `GOOGLE_GENAI_USE_VERTEXAI`
+  gotcha, and `ARCTIC_SHIFT_SOURCE`; `init` now points at `metalworks preflight`.
+
 ## [0.2.1] - 2026-06-25
 
 ### Fixed

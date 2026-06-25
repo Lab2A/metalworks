@@ -358,6 +358,45 @@ class Metalworks:
             write_run(project, result, question=new_report.query, diff=diff)
         return result, diff
 
+    def research_resume(self, run_id: str) -> Research:
+        """Resume a prior :meth:`research` run from its last incomplete stage.
+
+        Re-runs the pipeline under the SAME ``run_id``, reusing the per-stage
+        checkpoints persisted in this client's store — so the expensive Reddit
+        pull, comment hydration, and synthesis are skipped for stages that already
+        finished. Synchronous (unlike the MCP job): returns the finished
+        :class:`~metalworks.contract.Research` bundle. Raises ``KeyError`` if no
+        brief is stored for ``run_id`` (nothing to resume from).
+
+        If the run already completed and its report is stored, that report is
+        returned without recomputing.
+        """
+        from metalworks.contract import Research
+        from metalworks.research import run_research
+
+        store = self._r.store()
+        run = store.get_run(run_id)
+        if run is not None and run.status == "complete":
+            done = store.get_report(run_id)
+            if done is not None:
+                return Research(demand=done)
+        brief_id = run.brief_id if run is not None else None
+        brief = store.get_brief(brief_id) if brief_id else None
+        if brief is None:
+            raise KeyError(f"No brief stored for run {run_id!r}; cannot resume.")
+        report = run_research(
+            self._r.research_deps(), brief=brief, run_id=run_id, checkpoints=store
+        )
+        result = Research(demand=report)
+        from metalworks.project import Project
+
+        project = Project.find()
+        if project is not None:
+            from metalworks.runs import write_run
+
+            write_run(project, result, question=brief.question)
+        return result
+
     def plan(self, prompt: str) -> ResearchBrief:
         """Walk the D1-D8 planner (recommended answers) → a ``ResearchBrief``."""
         from metalworks.research.planner import plan_brief

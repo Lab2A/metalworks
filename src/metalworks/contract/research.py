@@ -1163,6 +1163,24 @@ class RunSummary(BaseModel):
         "oom_chunked",
     ]
     progress: str | None = None
+    # ── Fine-grained progress heartbeat (additive, defaulted) ──
+    # The job's emit sink re-saves the run on each pipeline stage so a poller can
+    # tell grinding from hung. `status` stays the coarse running state; these carry
+    # the detail. All None for a run that never emitted (queued/legacy payloads).
+    stage: str | None = Field(
+        default=None,
+        description="Current pipeline stage name (e.g. 'analyzing'). None ⇒ not yet emitted.",
+    )
+    stage_index: int | None = Field(
+        default=None, description="1-based position of `stage` in the canonical stage list."
+    )
+    stage_total: int | None = Field(
+        default=None, description="Total number of pipeline stages, for a '4/6' display."
+    )
+    updated_at: datetime | None = Field(
+        default=None,
+        description="When the run row was last touched (each stage heartbeat). None ⇒ never.",
+    )
     error: str | None = None
     total_distinct_authors: int | None = None
     created_at: datetime
