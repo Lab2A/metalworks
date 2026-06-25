@@ -8,6 +8,27 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+### Changed
+- **Sources — sources-by-idea as the default (#167).** The ultra-wide corpus was invisible on the
+  first run (reddit-only default; the selector was opt-in). Two changes make the brief pick its
+  sources by default. **(1) A CUT in the selection path.** `planner.select_sources` (the default
+  path) was append-only — the LLM ranked the reachable set but never dropped, so a pick returned ALL
+  reachable sources reordered (9 keyless sources every run, including clearly-irrelevant ats/wordpress
+  for an espresso brief). It now **cuts**: the model SELECTS the few sources worth pulling for the
+  brief (typically 2–5), an omitted source is *respected as not-relevant* (no re-append), the
+  non-removable `reddit` floor is always kept, and the pick is capped at 6 (`SELECT_CAP`). The
+  append-only `planner.pick_sources` full rank is unchanged for callers that want the whole reachable
+  corpus prioritized. **(2) `[sources].select` default flips ON** (`config.source_selector_enabled`):
+  a run with no explicit `[sources].enabled` / `--source` selects by idea. **Precedence unchanged** —
+  explicit override > selector > `reddit` floor; an explicit source list still wins. **Blast-radius
+  guard:** when there is no chat model, or the selection call fails / returns nothing usable, the cut
+  degrades to the `reddit` floor (just `reddit`), NOT the all-reachable set — so an offline /
+  model-less run is deterministic reddit-only, exactly the old default. No contract change (the
+  surfaced `SourceSelection` shape is unchanged); the verdict band is untouched (selection is
+  discovery/corpus-construction, like subreddit picking — the verdict still scores deterministically).
+  A `network`-marked selector-quality eval over representative briefs (espresso→reddit/forums, dev
+  tool→reddit+stackexchange, wordpress-plugin→wordpress) asserts relevant-in / irrelevant-cut.
+
 ### Added
 - **Sources — source-mix disclosure on clusters (#164 step 1).** Going ultra-wide let a cluster fuse
   quotes from many source types (Reddit + a job posting + a review + an RFP); cite-or-die proves each

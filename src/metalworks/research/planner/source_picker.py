@@ -15,17 +15,32 @@ Two-stage selection
    is set in the environment. An authed source with none of its keys set is
    *skipped*, carrying the :class:`~metalworks.errors.MissingKeyError`-shaped
    ``env_var`` / ``fix`` so a pre-flight line can tell the operator what to set.
-2. **LLM relevance ranking** on each reachable source's ``relevance_hint``
-   (append-only, same posture as the subreddit picker): the model ranks the
-   reachable ids; on any failure we keep the deterministic (registry) order. The
-   ranking only *reorders* the gated set — it can never add an unreachable source.
+2. **LLM relevance selection** on each reachable source's ``relevance_hint``.
+   There are two postures over the same gated set:
+
+   * **CUT** (:func:`select_sources`, the *default* path — #167): the model SELECTS
+     the few sources *worth pulling for this brief* (typically 2-5). An omitted
+     source means *not relevant* and is **dropped** (the omission is respected, not
+     re-appended). The non-removable ``reddit`` floor is always kept and the pick is
+     capped at :data:`SELECT_CAP`. When there is **no chat model**, the ranking
+     **fails**, or it returns **nothing usable**, the cut degrades to the reddit
+     floor (just ``reddit``) — never the full reachable set — so an offline /
+     unscripted run is deterministic and cheap.
+   * **APPEND-ONLY rank** (:func:`pick_sources`, the "prioritize everything" path):
+     the model only *reorders* the reachable ids; ids it omits append in registry
+     order, so nothing reachable is ever dropped. Kept for callers that want the
+     full ranked corpus rather than a cut.
+
+   Neither posture can ever add an unreachable source — both operate on the gated
+   set only.
 
 The non-removable floor
 -----------------------
-When the gated ranking yields nothing — e.g. a brief that matches only paid
-sources with no keys set — :func:`select_sources` falls back to the configured
-default (or ``reddit``) with a *distinct caveat*. A run never produces an empty
-corpus blamed on subreddits; the floor is the review's hard acceptance criterion.
+When the cut yields nothing — a brief that matches only paid sources with no keys
+set, OR no chat model / a failed ranking — :func:`select_sources` falls back to the
+configured default (or ``reddit``) with a *distinct caveat*. A run never produces an
+empty corpus blamed on subreddits; the floor is the review's hard acceptance
+criterion and the blast-radius guard for the default-on selector (#167).
 
 Per-target picker registry
 ---------------------------
@@ -63,6 +78,12 @@ logger = logging.getLogger(__name__)
 # The non-removable floor: when the gated ranking is empty, the run falls back to
 # this id (an open, keyless grounding source) rather than an empty corpus.
 FLOOR_SOURCE = "reddit"
+
+# The sane cap on a brief-aware CUT (``select_sources``): the model selects the
+# relevant few (typically 2-5); we never pull more than this many connectors for a
+# single brief even if the model names more. The non-removable reddit floor counts
+# toward this cap.
+SELECT_CAP = 6
 
 
 # ── Per-target picker registry ───────────────────────────────────────────────
@@ -354,7 +375,7 @@ def _gate(specs: list[SourceSpec]) -> tuple[list[SourceSpec], list[SkippedSource
     return reachable, skipped
 
 
-# ── LLM relevance ranking (append-only; deterministic order on failure) ──────
+# ── LLM relevance ranking / selection (cut by default; floor on failure) ─────
 
 
 class _Ranked(BaseModel):
@@ -368,6 +389,8 @@ class _RankingOutput(BaseModel):
     )
 
 
+# The append-only ranker's prompt (``pick_sources``): rank ALL, omission only
+# deprioritizes because the caller re-appends.
 _RANK_SYSTEM = (
     "You are a research source scout. Given a research brief and a list of candidate "
     "data sources (each with a one-line description of what it provides), rank the sources "
@@ -383,6 +406,27 @@ _RANK_SYSTEM = (
 )
 
 
+# The CUT prompt (``select_sources``, the default path): SELECT only the relevant
+# few; an omitted source is dropped, so omission is the cut.
+_SELECT_SYSTEM = (
+    "You are a research source scout. Given a research brief and a list of candidate "
+    "data sources (each with a one-line description of what it provides), SELECT only the "
+    "sources worth pulling to answer THIS brief — the relevant few, not all of them.\n"
+    "\n"
+    "Hard rules:\n"
+    "1. Only return ids from the provided candidate list — never invent a source.\n"
+    "2. SELECT the sources whose data directly answers the brief's question; OMIT the ones "
+    "that don't. Omission means 'not relevant' — an omitted source is NOT pulled, so be "
+    "deliberate. A consumer/lifestyle brief favors community/forum sources (reddit, "
+    "discourse) and cuts dev/B2B ones (stackexchange) and ATS/CMS ones (ats, wordpress); a "
+    "developer-tool or B2B brief elevates stackexchange/github; a 'what already ships' brief "
+    "favors product/launch sources.\n"
+    "3. Prefer a TIGHT pick: typically 2-5 sources, ordered most-relevant first. Fewer, "
+    "on-topic sources beat a long list padded with weak picks.\n"
+    "4. Do not worry about including reddit explicitly — it is always kept as a floor."
+)
+
+
 def _rank_prompt(brief: ResearchBrief, specs: list[SourceSpec]) -> str:
     lines = "\n".join(f"- {s.source_id}: {s.relevance_hint}" for s in specs)
     return (
@@ -390,6 +434,16 @@ def _rank_prompt(brief: ResearchBrief, specs: list[SourceSpec]) -> str:
         f"DECISION CONTEXT:\n{brief.decision_context}\n\n"
         f"CANDIDATE SOURCES:\n{lines}\n\n"
         "Rank these source ids from most to least relevant to the question."
+    )
+
+
+def _select_prompt(brief: ResearchBrief, specs: list[SourceSpec]) -> str:
+    lines = "\n".join(f"- {s.source_id}: {s.relevance_hint}" for s in specs)
+    return (
+        f"RESEARCH QUESTION:\n{brief.question}\n\n"
+        f"DECISION CONTEXT:\n{brief.decision_context}\n\n"
+        f"CANDIDATE SOURCES:\n{lines}\n\n"
+        "Select the few source ids worth pulling for this question; omit the rest."
     )
 
 
@@ -430,6 +484,71 @@ def _rank(deps: ResearchDeps, brief: ResearchBrief, specs: list[SourceSpec]) -> 
     # Append any reachable id the model omitted, in registry order (append-only).
     ranked.extend(sid for sid in candidate_ids if sid not in seen)
     return ranked
+
+
+def _select_ranked(deps: ResearchDeps, brief: ResearchBrief, specs: list[SourceSpec]) -> list[str]:
+    """LLM-CUT the reachable specs to the relevant few (the default selection path).
+
+    Unlike :func:`_rank` (append-only), this **respects omission**: an id the model
+    does not name is dropped, so the result is the model's selected few — not the
+    full reachable set reordered. The non-removable ``reddit`` floor is always kept
+    (prepended when reachable but unnamed), the pick is capped at :data:`SELECT_CAP`,
+    and ids are returned in the model's relevance order.
+
+    The blast-radius guard (#167): when the model returns **nothing usable** — an
+    empty/garbage selection, or (via the ``except``) **no chat model** / a failed
+    ranking call — this returns ``[]``. :func:`select_sources` then applies the
+    non-removable floor, so a default-on selector with an unscripted ``FakeChatModel``
+    degrades to ``reddit``-only (the old default), NOT the all-reachable set.
+    """
+    candidate_ids = [s.source_id for s in specs]
+    allowed = set(candidate_ids)
+    floor_reachable = FLOOR_SOURCE in allowed
+    if not candidate_ids:
+        return []
+    try:
+        out = deps.chat.complete_structured(
+            system=_SELECT_SYSTEM,
+            user=_select_prompt(brief, specs),
+            output_model=_RankingOutput,
+            max_tokens=2048,
+            temperature=0.2,
+        )
+    except Exception as exc:
+        # No chat model OR the ranking failed: degrade to the floor (empty here →
+        # ``select_sources`` applies it), NOT the all-reachable set. This is the
+        # blast-radius guard that keeps offline / unscripted runs reddit-only.
+        logger.debug("source_picker: LLM selection failed (%s); degrading to the reddit floor", exc)
+        return []
+
+    selected: list[str] = []
+    seen: set[str] = set()
+    for r in out.ranked:
+        sid = (r.source_id or "").strip()
+        if sid in allowed and sid not in seen:
+            seen.add(sid)
+            selected.append(sid)
+
+    # The model judged nothing relevant (or returned only hallucinated ids): treat
+    # as no usable selection so the floor applies rather than an arbitrary pick.
+    if not selected:
+        return []
+
+    # Always keep the non-removable reddit floor when it is reachable. It leads the
+    # pick (the grounding source) when the model omitted it.
+    if floor_reachable and FLOOR_SOURCE not in seen:
+        selected.insert(0, FLOOR_SOURCE)
+
+    # A sane cap: never pull more than SELECT_CAP connectors for one brief. If the
+    # floor was just prepended past the cap, keep it and drop the lowest-ranked tail.
+    if len(selected) > SELECT_CAP:
+        if floor_reachable and FLOOR_SOURCE in selected:
+            head = [FLOOR_SOURCE]
+            tail = [sid for sid in selected if sid != FLOOR_SOURCE][: SELECT_CAP - 1]
+            selected = head + tail
+        else:
+            selected = selected[:SELECT_CAP]
+    return selected
 
 
 # ── Public surface ───────────────────────────────────────────────────────────
@@ -513,17 +632,25 @@ def pick_sources(deps: ResearchDeps, *, brief: ResearchBrief) -> list[str]:
 def select_sources(
     deps: ResearchDeps, *, brief: ResearchBrief, configured_floor: str | None = None
 ) -> SourceSelection:
-    """The full brief-aware pick with the non-removable floor + skipped rationale.
+    """The default brief-aware CUT with the non-removable floor + skipped rationale.
 
-    Runs :func:`pick_sources`, records what the gate skipped (no key), and — when
-    the gated ranking yields nothing — falls back to ``configured_floor`` (else
+    Runs the LLM **cut** (:func:`_select_ranked`) over the access-gated reachable
+    set — returning only the few sources the model judges *worth pulling for this
+    brief* (typically 2-5), the non-removable ``reddit`` floor always kept, capped at
+    :data:`SELECT_CAP`. Records what the gate skipped (no key), and — when the cut
+    yields nothing (a brief matching only keyless-but-irrelevant sources, OR **no
+    chat model** / a failed ranking call) — falls back to ``configured_floor`` (else
     :data:`FLOOR_SOURCE` = ``reddit``) with a *distinct* caveat, so a run never
-    produces an empty corpus. The returned :class:`SourceSelection` is surfaced on
-    the report and drives the pre-flight lines.
+    produces an empty corpus and an offline run is deterministic reddit-only. The
+    returned :class:`SourceSelection` is surfaced on the report and drives the
+    pre-flight lines.
+
+    This is the cut path (#167); :func:`pick_sources` keeps the append-only full
+    rank for callers that want the whole reachable corpus prioritized.
     """
     specs = candidate_specs()
     reachable, skipped = _gate(specs)
-    selected = _rank(deps, brief, reachable)
+    selected = _select_ranked(deps, brief, reachable)
 
     floor_applied = False
     caveat: str | None = None
@@ -532,11 +659,11 @@ def select_sources(
         selected = [floor]
         floor_applied = True
         caveat = (
-            f"No source matched the brief's access tier; fell back to {floor}. "
+            f"No source was selected for the brief's access tier; fell back to {floor}. "
             "Set the keys named in the skipped list to widen the corpus."
         )
         logger.info(
-            "source_picker: gated ranking empty (%d skipped for keys); floor=%s",
+            "source_picker: cut selected nothing (%d skipped for keys); floor=%s",
             len(skipped),
             floor,
         )
@@ -545,7 +672,7 @@ def select_sources(
         caveat = f"Some sources were skipped for missing keys: {names}."
 
     rationale = (
-        f"Ranked {len(selected)} reachable source(s) for the brief"
+        f"Selected {len(selected)} reachable source(s) for the brief"
         + (f"; {len(skipped)} skipped for missing keys" if skipped else "")
         + ("; floor applied" if floor_applied else "")
         + "."
@@ -570,6 +697,7 @@ register_target_picker("slug", _slug_picker)
 
 __all__ = [
     "FLOOR_SOURCE",
+    "SELECT_CAP",
     "TargetPicker",
     "candidate_specs",
     "discourse_instances",

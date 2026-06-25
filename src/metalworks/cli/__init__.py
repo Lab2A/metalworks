@@ -1649,8 +1649,9 @@ def research_run(
     store = config.default_store()
     reader = ArcticReader(probe_sleep_s=0.0)
     comments = ArcticShiftApiClient()
-    # --source overrides the run's connectors; without it deps.sources stays None
-    # so effective_sources() keeps the configured/Reddit default (unchanged path).
+    # --source overrides the run's connectors (override wins over the selector);
+    # without it deps.sources stays None so the brief-aware selector picks by idea
+    # (default ON — #167), degrading to the Reddit floor when there's no chat model.
     override_sources = None
     if source:
         try:
