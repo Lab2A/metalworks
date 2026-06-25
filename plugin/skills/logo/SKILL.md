@@ -11,6 +11,13 @@ to the user in one line and help them resolve it (install the missing extra/key,
 or `pip install -U metalworks`) before continuing. Skip only if the user has
 already passed preflight this session.
 
+**Read the reference; never reverse-engineer the source.** The moment you need to know how
+metalworks behaves — provider/model resolution, which source/reader runs, config precedence,
+an error you hit, or the async run loop — **STOP and read `docs/operating-metalworks.md`
+(bundled with this plugin) before opening any file under `src/`.** It is the source of truth;
+do not derive behavior from source. (Full docs: https://metalworks.lab2a.ai/docs.) For a
+long-running run, poll status with the Monitor tool or a bounded loop — never a blind `sleep`.
+
 You are generating a set of real, company-grade logo options for one brand and
 presenting them for the user to pick. This is the **mark submodule of the design
 pillar**: the model draws each SVG directly — a logo is a designed artifact, not a

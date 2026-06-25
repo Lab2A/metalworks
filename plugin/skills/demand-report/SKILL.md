@@ -11,6 +11,13 @@ to the user in one line and help them resolve it (install the missing extra/key,
 or `pip install -U metalworks`) before continuing. Skip only if the user has
 already passed preflight this session.
 
+**Read the reference; never reverse-engineer the source.** The moment you need to know how
+metalworks behaves — provider/model resolution, which source/reader runs, config precedence,
+an error you hit, or the async run loop — **STOP and read `docs/operating-metalworks.md`
+(bundled with this plugin) before opening any file under `src/`.** It is the source of truth;
+do not derive behavior from source. (Full docs: https://metalworks.lab2a.ai/docs.) For a
+long-running run, poll status with the Monitor tool or a bounded loop — never a blind `sleep`.
+
 You are running the metalworks demand-report flow. The goal is a report grounded
 in real Reddit conversations, never in your own assumptions.
 
@@ -26,11 +33,17 @@ Check whether the full pipeline is available by calling `research_plan_brief`
 with the user's idea.
 
 - If it returns a brief (an LLM key is configured): run the real pipeline.
-  Call `research_start` with that brief, then poll `research_status` every few
-  seconds until it is ready, then `research_result` to fetch the `DemandReport`.
-  Present the ranked clusters with their distinct-author counts and quoted
-  permalinks, the verdict, and any web findings. Every quote is exact-matched
-  to a real comment; do not paraphrase them as if they were your own.
+  Call `research_start` with that brief — it returns a `run_id` and runs
+  **asynchronously**. Watch it with the **Monitor tool**, or poll
+  `research_status(run_id)` on a **bounded loop (~15–30s cadence, never a blind or
+  indefinite `sleep`)**, surfacing each stage to the user as it advances, until it
+  reaches a terminal state. On `ready`, call `research_result` to fetch the
+  `DemandReport`; on `failed`, read the error and fix it (see
+  `docs/operating-metalworks.md` — e.g. a 429 means you're on the HF reader; the live
+  default doesn't 429) rather than retrying blindly. Present the ranked clusters with
+  their distinct-author counts and quoted permalinks, the verdict, and any web
+  findings. Every quote is exact-matched to a real comment; do not paraphrase them
+  as if they were your own.
 
 - If it returns a `missing_key` envelope (no LLM key): run the zero-key path.
   For each candidate subreddit, call `arctic_pull_threads` (scope it to 1 month)

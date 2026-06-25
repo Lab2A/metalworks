@@ -87,6 +87,19 @@ _ENV_EXAMPLE = """\
 # GOOGLE_API_KEY=          # or GEMINI_API_KEY
 # OPENROUTER_API_KEY=      # one key reaches 200+ models
 
+# Force one model on every surface (CLI + MCP + SDK), beating key/Vertex
+# autodetection. A ref is provider/id or provider:id; an unknown vendor → OpenRouter:
+# METALWORKS_MODEL=deepseek/deepseek-v4-flash
+
+# Vertex gotcha: if your shell exports GOOGLE_GENAI_USE_VERTEXAI=true (e.g. inherited)
+# but you don't have the [google] extra, chat AND embeddings route to a missing Vertex
+# SDK and fail. Turn it off for metalworks, or install metalworks[google]:
+# GOOGLE_GENAI_USE_VERTEXAI=false
+
+# Reddit data reader (default: the live Arctic Shift API, keyless — no 429s):
+# ARCTIC_SHIFT_SOURCE=api  # api (default) | hf (HF Parquet, needs HF_TOKEN) | mirror
+# HF_TOKEN=                # only for ARCTIC_SHIFT_SOURCE=hf (clears the anonymous 429)
+
 # External web search (optional; exa preferred, then tavily):
 # EXA_API_KEY=
 # TAVILY_API_KEY=
@@ -546,7 +559,10 @@ def init(
     else:
         env_path.write_text(_ENV_EXAMPLE, encoding="utf-8")
         console.print(f"[green]Wrote[/green] {env_path}")
-    console.print("\nNext: set a provider key in your shell, then `metalworks doctor`.")
+    console.print(
+        "\nNext: set a provider key in your shell (or METALWORKS_MODEL), then "
+        "`metalworks preflight`."
+    )
 
 
 def _present_providers() -> list[tuple[str, str]]:
