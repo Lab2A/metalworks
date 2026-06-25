@@ -8,6 +8,8 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-24
+
 ### Changed
 - **Sources — sources-by-idea as the default (#167).** The ultra-wide corpus was invisible on the
   first run (reddit-only default; the selector was opt-in). Two changes make the brief pick its
