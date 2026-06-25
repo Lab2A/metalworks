@@ -40,7 +40,8 @@ import metalworks.research.sources.magnitude
 import metalworks.research.sources.producthunt
 import metalworks.research.sources.samgov
 import metalworks.research.sources.stackexchange
-import metalworks.research.sources.web  # noqa: F401
+import metalworks.research.sources.web
+import metalworks.research.sources.wordpress  # noqa: F401
 
 # Importing the planner package registers the ``subreddit`` target picker at its scope.
 from metalworks.research.planner import register_target_picker  # noqa: F401
@@ -413,6 +414,56 @@ class _StubDiscourseClient:
         return None
 
 
+_WP_SEARCH = {
+    "info": {"page": 1, "pages": 1, "results": 1},
+    "plugins": [
+        {
+            "slug": "focus-flow",
+            "name": "Focus Flow",
+            "short_description": "A jitter-free focus aid for site admins.",
+            "active_installs": 50000,
+            "rating": 92,
+            "num_ratings": 120,
+            "author": "Ada",
+        }
+    ],
+}
+_WP_REVIEWS_FEED = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+<item>
+<guid>https://wordpress.org/support/topic/best-focus-aid-1/</guid>
+<title><![CDATA[Best focus aid (5 stars)]]></title>
+<link>https://wordpress.org/support/topic/best-focus-aid-1/</link>
+<pubDate>Tue, 23 Jun 2026 03:56:12 +0000</pubDate>
+<dc:creator>Senri Miura</dc:creator>
+<description><![CDATA[<p>Rating: 5 stars</p><p>L-theanine works, no crash.</p>]]></description>
+</item>
+</channel>
+</rss>
+"""
+
+
+class _StubWpResponse(_StubResponse):
+    def __init__(self, payload: dict[str, Any] | None = None, *, text: str = "") -> None:
+        super().__init__(payload or {})
+        self.text = text
+
+
+class _StubWpClient:
+    """A minimal httpx.Client stand-in for the WordPress.org plugin directory. No network."""
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> _StubWpResponse:
+        if "/plugins/info/" in url:
+            return _StubWpResponse(_WP_SEARCH)
+        if "/reviews/feed/" in url:
+            return _StubWpResponse(text=_WP_REVIEWS_FEED)
+        raise AssertionError(f"unexpected URL {url}")
+
+    def close(self) -> None:
+        return None
+
+
 class _FakeSearchProvider:
     """A canned ``SearchProvider`` — distinct domains, no network."""
 
@@ -455,6 +506,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
         "samgov": {"key": "dev-key", "client": _StubSamGovClient()},
         "stackexchange": {"client": _StubSeClient(), "author_salt": "t"},
         "discourse": {"client": _StubDiscourseClient(), "author_salt": "t"},
+        "wordpress": {"client": _StubWpClient(), "author_salt": "t"},
         # 'web' is a web lane, not grounding — rule 1 skips it (no fixture needed).
     }
 
@@ -478,6 +530,7 @@ SHIPPED_SOURCE_IDS = frozenset(
         "samgov",
         "stackexchange",
         "discourse",
+        "wordpress",
         "web",
     }
 )
