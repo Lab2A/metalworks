@@ -68,20 +68,21 @@ logger = logging.getLogger(__name__)
 
 
 def _maybe_select_sources(deps: ResearchDeps, *, brief: ResearchBrief) -> SourceSelection | None:
-    """Run the brief-aware selector when it is opt-in enabled, else ``None``.
+    """Run the brief-aware selector (default ON — #167) unless overridden, else ``None``.
 
-    Two short-circuits keep the default path unchanged:
+    Two short-circuits:
 
     * An explicit ``deps.sources`` override means the operator already chose the
       connectors — the selector must not second-guess it, so we skip selection and
-      ``effective_sources`` returns the override verbatim.
-    * The selector is opt-in via ``[sources].select`` (config-explicit). With it
-      off — the default — we return ``None`` and the configured/Reddit path runs
-      exactly as before.
+      ``effective_sources`` returns the override verbatim (override wins).
+    * The selector is **on by default** via ``[sources].select`` (#167); set
+      ``select = false`` to opt out, in which case we return ``None`` and the
+      configured/Reddit path runs exactly as before.
 
-    Returning ``None`` (not a selection over the default) is deliberate: a ``None``
-    selection leaves every ``effective_sources(None)`` call on its prior behavior,
-    so enabling the selector is the *only* thing that changes a run.
+    When the selector runs with no usable selection (no chat model / a failed
+    ranking), :func:`~metalworks.research.planner.select_sources` degrades to the
+    ``reddit`` floor — so a default-on run with an offline/unscripted model yields a
+    reddit-only selection, the same connectors the old default path used.
     """
     if deps.sources is not None:
         return None

@@ -1,14 +1,21 @@
-"""Offline tests for the 0.4 brief-aware source selector + per-target pickers.
+"""Offline tests for the brief-aware source selector + per-target pickers.
 
-Covers the acceptance criteria of issue #123:
+Covers the acceptance criteria of issues #123 (the selector machinery) and #167
+(sources-by-idea as the default — the CUT + default-on):
 
 * relevance ranking + the deterministic access/auth gate,
+* the **CUT** (#167) — ``select_sources`` returns only the relevant few + the
+  non-removable reddit floor, NOT all reachable; an omitted source is dropped, so
+  an espresso/consumer brief does not pull ats/wordpress,
+* the **default-on** selector (#167) — ``[sources].select`` defaults ON; a run with
+  no override selects by idea, an explicit override still wins,
+* the **blast-radius guard** (#167) — no chat model / a failed ranking degrades to
+  the reddit floor ONLY (deterministic offline), never all-reachable,
 * the **non-removable floor** — a brief that matches only paid sources with no
   keys falls back to ``reddit`` with a distinct caveat, never an empty corpus,
 * the pre-flight "skipped (no key): X — set ENV" line built from the specs,
 * the targeting→picker conformance (every non-``none`` targeting a registered
-  source declares has a registered picker),
-* selector-opt-in default (it does not run unless ``[sources].select`` is on).
+  source declares has a registered picker).
 
 The selector reads ``SOURCE_SPECS``; tests monkeypatch the environment to flip the
 access gate and script ``FakeChatModel`` for the ranking, so they stay offline.
@@ -16,6 +23,7 @@ access gate and script ``FakeChatModel`` for the ranking, so they stay offline.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
@@ -31,6 +39,7 @@ from metalworks.research.planner import (
 )
 from metalworks.research.planner.source_picker import (
     FLOOR_SOURCE,
+    SELECT_CAP,
     _RankingOutput,
     candidate_specs,
     preflight_lines,
@@ -38,6 +47,26 @@ from metalworks.research.planner.source_picker import (
 )
 from metalworks.research.sources.spec import SOURCE_SPECS
 from metalworks.stores.memory import MemoryStores
+
+
+def _ranking(*ids: str) -> _RankingOutput:
+    """A scripted ``_RankingOutput`` naming ``ids`` in order (the selector's pick)."""
+    return _RankingOutput.model_validate({"ranked": [{"source_id": sid} for sid in ids]})
+
+
+def _espresso_brief() -> ResearchBrief:
+    """A consumer/lifestyle brief — community sources fit; ats/wordpress do not."""
+    return ResearchBrief(
+        brief_id="espresso",
+        question="Will home baristas buy a self-cleaning espresso machine?",
+        decision_context="Validating a consumer hardware v0",
+        success_criteria=["clear verdict"],
+        must_address=["price point"],
+        target_subreddits=[],
+        web_research_directions=["pricing"],
+        relevance_rubric="rubric",
+    )
+
 
 # Env vars the paid/keyed built-ins read; clearing them makes those sources
 # unreachable through the access gate (so only the open ones survive).
@@ -282,3 +311,225 @@ def test_candidate_specs_populates_lean_registry() -> None:
     ids = {s.source_id for s in candidate_specs()}
     assert {"reddit", "hackernews", "producthunt", "web"} <= ids
     assert ids <= set(SOURCE_SPECS)
+
+
+# ── #167: select_sources CUTS (the default path) ─────────────────────────────
+
+
+def test_select_sources_cuts_to_the_relevant_few() -> None:
+    """select_sources returns the model's selected few + floor, NOT all reachable.
+
+    The reachable keyless set includes ats/wordpress/hackernews_archive/… — 9 ids.
+    An espresso/consumer brief should pull community sources and CUT the dev/B2B
+    and CMS/ATS ones. We script the fake to select reddit + discourse only; the
+    omitted ids (ats, wordpress, stackexchange, …) must be dropped, not re-appended.
+    """
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("reddit", "discourse"))
+    selection = select_sources(_deps(chat), brief=_espresso_brief())
+
+    assert selection.selected == ["reddit", "discourse"]
+    # The cut respects omission — irrelevant keyless sources are NOT re-appended.
+    assert "ats" not in selection.selected
+    assert "wordpress" not in selection.selected
+    assert "stackexchange" not in selection.selected
+    assert "hackernews_archive" not in selection.selected
+    assert selection.floor_applied is False
+    # A real cut, not the all-reachable set.
+    reachable = {s.source_id for s in candidate_specs() if s.auth == "none"}
+    assert len(selection.selected) < len(reachable)
+
+
+def test_select_sources_keeps_reddit_floor_when_model_omits_it() -> None:
+    """The non-removable reddit floor is kept (prepended) even if the model omits it."""
+    chat = FakeChatModel()
+    # Model selects only stackexchange — reddit must still be kept as the floor.
+    chat.script(_RankingOutput, _ranking("stackexchange"))
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert FLOOR_SOURCE in selection.selected
+    assert selection.selected[0] == FLOOR_SOURCE  # floor leads
+    assert "stackexchange" in selection.selected
+    assert selection.floor_applied is False  # a real pick happened; floor not a fallback
+
+
+def test_select_sources_caps_the_pick() -> None:
+    """The cut never exceeds SELECT_CAP connectors, keeping the reddit floor."""
+    chat = FakeChatModel()
+    # Name far more than the cap; reddit is among them. The cut trims to SELECT_CAP.
+    many = ["ats", "discourse", "hackernews", "stackexchange", "wordpress", "hn_archive"]
+    chat.script(_RankingOutput, _ranking("reddit", *many))
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert len(selection.selected) <= SELECT_CAP
+    assert FLOOR_SOURCE in selection.selected
+
+
+def test_select_sources_drops_hallucinated_ids() -> None:
+    """A selected id outside the candidate set is dropped, not pulled."""
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("totally_made_up", "discourse"))
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert "totally_made_up" not in selection.selected
+    assert "discourse" in selection.selected
+
+
+# ── #167: blast-radius guard — no chat / ranking-fails → reddit floor only ────
+
+
+def test_select_sources_no_usable_pick_degrades_to_reddit_floor() -> None:
+    """An UNSCRIPTED fake (ranking call raises) → reddit floor ONLY, not all reachable.
+
+    This is the blast-radius guard: every existing offline research test that uses a
+    FakeChatModel not scripted for the ranking call gets reddit-only — exactly the
+    old default — so the default-on migration is near-zero.
+    """
+    chat = FakeChatModel()  # unscripted -> complete_structured raises -> cut degrades
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert selection.selected == [FLOOR_SOURCE]  # NOT the 9 reachable keyless ids
+    assert selection.floor_applied is True
+    assert selection.caveat is not None
+
+
+def test_select_sources_empty_selection_degrades_to_reddit_floor() -> None:
+    """A model that selects nothing (empty ranked list) → reddit floor only."""
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking())  # explicit empty pick
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert selection.selected == [FLOOR_SOURCE]
+    assert selection.floor_applied is True
+
+
+# ── #167: access gate still excludes unkeyed sources in select mode ──────────
+
+
+def test_select_sources_access_gate_excludes_unkeyed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A keyed source the model selects but can't reach (no key) is NOT pulled.
+
+    The model names ``web`` (auth=key, all search keys cleared by the fixture). The
+    access gate runs BEFORE selection, so ``web`` is never a candidate — it is cut by
+    the gate and surfaced as skipped, never silently pulled keyless.
+    """
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("reddit", "web", "discourse"))
+    selection = select_sources(_deps(chat), brief=_brief())
+    assert "web" not in selection.selected  # gated out (no key)
+    assert "reddit" in selection.selected
+    assert "discourse" in selection.selected
+    assert any(s.source_id == "web" for s in selection.skipped)
+
+
+# ── #167: [sources].select defaults ON; override still wins ──────────────────
+
+
+def test_source_selector_defaults_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With nothing configured, source_selector_enabled() is True (#167 default flip)."""
+    import metalworks.config as config
+
+    # No [sources] table → select unset → defaults ON.
+    monkeypatch.setattr(config, "load_sources_config", dict)
+    assert config.source_selector_enabled() is True
+
+
+def test_source_selector_opt_out_with_explicit_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit [sources].select = false opts back out (the only off switch)."""
+    import metalworks.config as config
+
+    monkeypatch.setattr(config, "load_sources_config", lambda: {"select": False})
+    assert config.source_selector_enabled() is False
+    monkeypatch.setattr(config, "load_sources_config", lambda: {"select": True})
+    assert config.source_selector_enabled() is True
+
+
+def test_default_on_selects_by_idea_no_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run with no explicit sources selects by idea (default-on path)."""
+    import metalworks.config as config
+    from metalworks.research.pipeline import _maybe_select_sources
+
+    # Real default-on (don't monkeypatch the flag) — just clear the config table.
+    monkeypatch.setattr(config, "load_sources_config", dict)
+    monkeypatch.setattr(config, "default_source_id", lambda: "reddit")
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("reddit", "discourse"))
+    selection = _maybe_select_sources(_deps(chat), brief=_espresso_brief())
+    assert selection is not None
+    assert selection.selected == ["reddit", "discourse"]  # picked by idea, not reddit-only
+
+
+def test_explicit_override_beats_default_on_selector(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit deps.sources override wins even with the selector default-on."""
+    import metalworks.config as config
+    from metalworks.research.pipeline import _maybe_select_sources
+
+    monkeypatch.setattr(config, "load_sources_config", dict)  # selector default-on
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("reddit", "discourse"))
+    deps = _deps(chat)
+    deps.sources = []  # an explicit override means "operator chose" — selector skipped
+    assert _maybe_select_sources(deps, brief=_espresso_brief()) is None
+
+
+# ── #167: network selector-quality eval (needs a real model) ─────────────────
+
+
+@pytest.mark.network
+@pytest.mark.parametrize(
+    ("question", "context", "expect_in", "expect_cut"),
+    [
+        (
+            "Will home baristas buy a self-cleaning espresso machine?",
+            "Consumer hardware v0",
+            {"reddit"},
+            {"ats", "wordpress", "github"},
+        ),
+        (
+            "Should we build a CLI for managing Kubernetes secrets across clusters?",
+            "Developer tooling / B2B infra v0",
+            {"stackexchange"},
+            {"ats", "wordpress"},
+        ),
+        (
+            "Is there demand for a WordPress plugin that auto-translates posts?",
+            "WordPress ecosystem plugin v0",
+            {"wordpress"},
+            set(),
+        ),
+    ],
+)
+def test_selector_quality_real_model(
+    question: str, context: str, expect_in: set[str], expect_cut: set[str]
+) -> None:
+    """A real-model cut puts relevant sources in and cuts irrelevant ones (per brief).
+
+    Marked ``network`` (deselected by default): it resolves a real chat model and
+    runs the actual selection LLM call, asserting per-brief that the expected
+    relevant sources are selected and the clearly-irrelevant ones are cut. Skips
+    when no chat key is set so it never fails for a credential.
+    """
+    has_key = any(
+        os.environ.get(k)
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY")
+    )
+    if not has_key:
+        pytest.skip("no chat key set (ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY)")
+
+    from metalworks.config import resolve_chat
+
+    brief = ResearchBrief(
+        brief_id="eval",
+        question=question,
+        decision_context=context,
+        success_criteria=["clear verdict"],
+        must_address=["price point"],
+        target_subreddits=[],
+        web_research_directions=["pricing"],
+        relevance_rubric="rubric",
+    )
+    deps = _deps(resolve_chat())  # type: ignore[arg-type]
+    selection = select_sources(deps, brief=brief)
+    selected = set(selection.selected)
+
+    assert FLOOR_SOURCE in selected, "the reddit floor is always kept"
+    assert expect_in <= selected, f"expected {expect_in} selected, got {selected}"
+    assert not (expect_cut & selected), f"expected {expect_cut} cut, but {expect_cut & selected} in"
+    # A real cut, not the full reachable corpus.
+    reachable = {s.source_id for s in candidate_specs() if s.auth == "none"}
+    assert len(selected) < len(reachable), "the cut must be smaller than all-reachable"

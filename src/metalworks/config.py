@@ -283,24 +283,31 @@ def default_source_id() -> str:
 
 
 def source_selector_enabled() -> bool:
-    """Whether the brief-aware source SELECTOR is opt-in enabled (``[sources].select``).
+    """Whether the brief-aware source SELECTOR is enabled (``[sources].select``).
 
-    The selector (``planner.source_picker``) is **opt-in by default**: with
-    ``select`` unset or false, runs use the configured ``[sources].enabled`` /
-    ``reddit`` default exactly as before — default behavior is unchanged. Set
-    ``select = true`` to let the picker choose brief-relevant, access-gated
-    sources per run. An explicit source override (CLI ``--source`` /
-    ``[sources].enabled`` passed as the override) always wins over the selector:
-    the precedence is **explicit override > selector (when enabled) > default**.
+    **On by default** (#167 — sources-by-idea is the smart default): with ``select``
+    unset, a run with no explicit source override lets the picker CUT to the
+    brief-relevant, access-gated sources per run (``planner.select_sources``) — the
+    ultra-wide corpus is visible on the first run instead of reddit-only. Set
+    ``select = false`` to opt back out to the configured ``[sources].enabled`` /
+    ``reddit`` default. An explicit source override (CLI ``--source`` /
+    ``[sources].enabled`` passed as the override) ALWAYS wins over the selector:
+    the precedence is **explicit override > selector > reddit floor** — unchanged.
+
+    The blast-radius guard lives in :func:`~metalworks.research.planner.select_sources`:
+    when there is no chat model, or the ranking call fails / returns nothing usable,
+    the cut degrades to the reddit floor (just ``reddit``), so a default-on run with
+    no model is exactly the old reddit-only default — deterministic and offline-safe.
     """
     value = load_sources_config().get("select")
-    return value is True
+    return value is not False
 
 
 def discovery_loop_enabled() -> bool:
     """Whether the homegrown agentic discovery LOOP is opt-in enabled (``[sources].discover``).
 
-    **Opt-in by default** (mirrors :func:`source_selector_enabled` — #123 precedent): with
+    **Opt-in by default** (the #123 ``[sources]`` opt-in posture; note
+    :func:`source_selector_enabled` itself flipped ON in #167): with
     ``discover`` unset or false, a configured single-shot ``SearchProvider`` drives the
     legacy **single-pass** web-research path exactly as before — no extra LLM follow-up-query
     rounds, default behavior and cost unchanged. Set ``discover = true`` to run the

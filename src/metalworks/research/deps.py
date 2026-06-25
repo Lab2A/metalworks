@@ -127,9 +127,10 @@ class ResearchDeps:
            existing caller and the default path pass no ``selection``, so this and
            the floor below are byte-for-byte unchanged.
         2. **Selector output** — a ``selection`` from the brief-aware picker
-           (opt-in; the pipeline only computes one when ``[sources].select`` is
-           enabled). Its ``selected`` ids are constructed via the source registry,
-           threading ``reader`` / ``comments`` to whichever factory accepts them.
+           (on by default — #167; the pipeline computes one unless ``[sources].select``
+           is ``false`` or an override is set). Its ``selected`` ids are constructed
+           via the source registry, threading ``reader`` / ``comments`` to whichever
+           factory accepts them.
         3. **Floor** — a single :class:`ArcticItemSource` (Reddit), so a run is
            never source-less.
 

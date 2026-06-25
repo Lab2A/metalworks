@@ -134,34 +134,42 @@ degrading retrieval. Re-run research to rebuild the index under the new model.
 ## Sources
 
 Which connectors a research run pulls from is resolved by a fixed precedence —
-**explicit override > brief-aware selector (opt-in) > the `reddit` default** — so
-default behavior never changes unless you ask for it:
+**explicit override > brief-aware selector > the `reddit` floor** — so an explicit
+choice always wins:
 
 | Layer | How you set it | Wins when |
 | --- | --- | --- |
-| **Explicit override** | CLI `--source reddit --source hackernews`, or `[sources].enabled` in config | Always — the operator chose the connectors, so neither the selector nor the default second-guesses it |
-| **Selector (opt-in)** | `[sources].select = true` | No override given. The selector ranks every *reachable* source for the brief and pulls the relevant ones |
-| **Default** | nothing configured | No override and the selector is off — the run uses `reddit` (the Arctic connector) |
+| **Explicit override** | CLI `--source reddit --source hackernews`, or `[sources].enabled` in config | Always — the operator chose the connectors, so neither the selector nor the floor second-guesses it |
+| **Selector (default ON)** | nothing configured, or `[sources].select = true` | No override given. The selector **cuts** to the few *reachable* sources relevant to the brief and pulls those (plus the reddit floor) |
+| **Floor** | `[sources].select = false`, or no chat model / a failed selection | No usable selection — the run uses `reddit` (the Arctic connector) |
 
 ```toml
 # .metalworks/config.toml
 [sources]
 enabled = ["reddit", "hackernews"]   # explicit override — exactly these, in order
 default = "reddit"                    # the floor the selector falls back to
-select  = true                        # opt in to the brief-aware selector (default: false)
+select  = false                       # opt OUT of the brief-aware selector (default: true)
 ```
 
-The **selector is opt-in by default** (`select` unset/false): with it off, runs
-behave exactly as before. When on, it applies a deterministic **access gate** —
-a source is only pickable if it needs no key or its key is set — then an LLM
-relevance rank over what's reachable. A source it wants but can't reach (no key)
-is reported in a pre-flight line naming the env var to set, e.g.
+The **selector is ON by default** (sources-by-idea, #167): with `select` unset and
+no explicit override, a run **picks its sources by the idea**. It applies a
+deterministic **access gate** — a source is only pickable if it needs no key or its
+key is set — then an LLM **cut** over what's reachable: the model selects the few
+sources worth pulling for this brief (typically 2–5), an omitted source is dropped
+(not re-appended), the non-removable `reddit` floor is always kept, and the pick is
+capped at 6. So a consumer brief pulls community/forum sources and cuts the dev/B2B
+and CMS/ATS ones; a developer-tool brief elevates Stack Exchange / GitHub. Set
+`select = false` to opt back out to the configured `[sources].enabled` / `reddit`
+default. A source the cut wants but can't reach (no key) is reported in a pre-flight
+line naming the env var to set, e.g.
 `Skipped (no key): producthunt — Set the PRODUCT_HUNT_TOKEN environment variable.`
 
-The selector has a **non-removable floor**: if nothing is reachable for the brief
-(e.g. it matched only paid sources and no keys are set), the run falls back to
-`reddit` (or `[sources].default`) with a distinct caveat — it never produces an
-empty corpus. The pick, the skipped sources, and any floor caveat are surfaced on
+The selector has a **non-removable floor** and a **blast-radius guard**: when the
+cut yields nothing — a brief that matched only paid sources with no keys set, OR
+there is no chat model / the selection call fails — the run falls back to `reddit`
+(or `[sources].default`) with a distinct caveat, never the all-reachable set and
+never an empty corpus. (This guard keeps an offline / model-less run deterministic
+reddit-only.) The pick, the skipped sources, and any floor caveat are surfaced on
 the report's `source_selection` field.
 
 ## Check the resolution
