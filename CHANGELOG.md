@@ -27,6 +27,20 @@ contracts may change in any release.
   so the homegrown loop is OFF and `web_research` delegates to it. Offline tests
   (`tests/test_discovery_parallel.py`, `httpx.MockTransport` over a recorded Basis response) plus a
   `network`-marked live smoke. Internal-only (no `contract` change, no TS regen).
+- **Sources P4.1 — Exa Research discovery adapter (#156).** New
+  `metalworks.research.discovery.exa.ExaResearchDiscovery` — the first **agentic** `DiscoveryProvider`
+  (`agentic=True`, `provider_id="exa_research"`) over Exa's **Research/Deep** endpoint. `discover`
+  submits a research task, waits for Exa's own iterate-and-dig loop, and maps each **field-level
+  citation** (verbatim Highlights/excerpt + its source URL) to a `DiscoveryFinding`
+  (`quote`=excerpt verbatim, `source_url`=citation URL, `title`, `extra={"domain": ...}`), deduped by
+  URL and capped by the deterministic `DiscoveryBudget`. **Cite-or-die:** Exa's synthesized
+  answer/summary prose (`output.content`) is **never** ingested — only the cited excerpts become
+  findings, so the deterministic scorer downstream runs on real quotes. Auth `EXA_API_KEY`; the
+  exa-py SDK is lazy-imported behind the `exa` extra (`import metalworks` stays free; the bare matrix
+  is green without the extra). `config.resolve_discovery()` now returns it when `EXA_API_KEY` is set,
+  which trips the capability-ladder gate in `web_research` (homegrown loop stays OFF; metalworks
+  delegates discovery to Exa). Keyless/unconfigured → not selected, no crash. Internal-only types (no
+  `contract` change, no TS regen). Offline + `network`-marked tests in `tests/test_discovery_exa.py`.
 - **Sources P4.0 — agentic discovery chassis (#155).** New
   `metalworks.research.discovery` package: a `DiscoveryProvider` Protocol (`provider_id`, `agentic`,
   `discover(*, question, directions, budget)`), the cite-or-die unit `DiscoveryFinding` (verbatim
