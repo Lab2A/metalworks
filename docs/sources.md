@@ -27,6 +27,7 @@ more evidence behind every report.
 | `samgov` | U.S. government procurement notices (SAM.gov) — explicit unmet needs with a budget | grounding | A free key | `SAM_GOV_API_KEY` |
 | `stackexchange` | Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …) | grounding | No | — |
 | `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | web | A free key | `EXA_API_KEY`, `TAVILY_API_KEY`, `PARALLEL_API_KEY`, `FIRECRAWL_API_KEY` |
+| `wordpress` | WordPress site admins, agencies & freelancers reviewing plugins in the open WordPress.org directory — the SMB long-tail (verbatim reviews + an active-install deployment count) | grounding | No | — |
 
 ## Pick what to read from
 

@@ -33,6 +33,27 @@ contracts may change in any release.
   empty-comment drop, `reactions` registered + ranking lift, keyless-leaks-no-token, query/window
   shape, `check_item_source` conformance, registry resolution, plus a `network`-marked live smoke).
   GraphQL Discussions and per-repo deep crawl left out of scope per the issue.
+- **Sources P3 — WordPress plugin reviews connector (#150).** New
+  `metalworks.research.sources.wordpress.WordPressSource` — a keyless `ItemSource` over the
+  WordPress.org plugin directory, a Phase-3 grounding singleton (the review/marketplace shape). The
+  WordPress.org directory is the one marketplace that is fully open AND carries both quotable reviews
+  and a deployment magnitude: it reaches site admins / agencies / freelancers (the SMB long-tail B2B
+  layer Reddit/HN underweight). A review maps like a comment — the plugin is the record, each review
+  is the quote-bearing sub-item. `pull` runs the brief's terms as the `request[search]` plugin search
+  (`https://api.wordpress.org/plugins/info/1.2/?action=query_plugins`) and maps each plugin to a
+  `CorpusRecord` (name, short description, plugin page url), emitting `{"installs": active_installs}`
+  — the deployment magnitude — on the plugin record (OMITTED, never `0.0`, when absent). `comments_for`
+  fetches each plugin's public reviews feed (`wordpress.org/support/plugin/<slug>/reviews/feed/`, RSS)
+  and maps each review to a `CorpusComment` (verbatim review text + per-review permalink + reviewer
+  handle pseudonymized), emitting `{"rating": stars}` per review — the registered polarity-capable
+  kind (carried/ranked, not yet band-affecting). Both `installs` (magnitude) and `rating` (polarity)
+  are already registered in `synthesis.signals` (no new `register_signal`); the verdict band is
+  untouched. Auth is keyless: `auth="none"`, `access="open"`; `targeting="keyword"` (the brief's terms
+  drive the search), picked by the `keyword` target picker. Registered via the single
+  `BUILTIN_SOURCE_MODULES` map (#139); `docs/sources.md` regenerated. New `tests/test_source_wordpress.py`
+  (offline stub-client unit tests for search→plugin→installs, reviews→quotes→rating, empty-review drop,
+  blank-author collapse, installs lifts ranking, `check_item_source` conformance, registry resolution,
+  plus a `network`-marked live smoke); added to the 0.5 conformance sweep.
 - **Sources P3 — SAM.gov procurement connector (#148).** New
   `metalworks.research.sources.samgov.SamGovItemSource` — the marquee Phase-3 grounding singleton, a
   `yields_units` `ItemSource` over the SAM.gov Opportunities API

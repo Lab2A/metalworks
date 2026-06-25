@@ -147,6 +147,7 @@ BUILTIN_SOURCE_MODULES: dict[str, str] = {
     "stackexchange": "metalworks.research.sources.stackexchange",
     "discourse": "metalworks.research.sources.discourse",
     "github": "metalworks.research.sources.github",
+    "wordpress": "metalworks.research.sources.wordpress",
     "web": "metalworks.research.sources.web",
 }
 
