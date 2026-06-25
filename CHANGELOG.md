@@ -8,6 +8,36 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-25
+
+### Fixed
+- **Reasoning-model hang at the triage stage.** A demand run on a reasoning model (e.g.
+  `deepseek-v4-flash` via OpenRouter) could hang for 10+ minutes and then fail, because the
+  OpenAI/compatible adapter made a single **non-streaming** call whose one timeout had to cover the
+  model's entire hidden-reasoning phase *plus* the output — a model that thinks longer than the
+  budget timed out mid-reasoning, before any output existed. Three changes fix it:
+  - **Streamed the OpenAI/compatible path.** `complete_text` and the native `json_schema`
+    `complete_structured` path now call `chat.completions.create(..., stream=True,
+    stream_options={"include_usage": True})`, accumulate the delta chunks, and capture token usage
+    from the final usage chunk (output and observability hook unchanged). The per-call timeout is now
+    an `httpx.Timeout(connect=15, read=timeout_s, write=15, pool=15)` — a **read (gap-between-chunks)**
+    budget, not a total — so a model that is slow to the first token or trickles tokens completes as
+    long as no single gap exceeds the budget, while a genuinely stalled stream still fails cleanly.
+  - **`max_retries=0` on the OpenAI and Anthropic clients.** The provider SDKs default to 2 internal
+    retries and treat a timeout as retryable, silently stacking the budget up to 3× and re-running the
+    hidden-reasoning phase from scratch. With them off, metalworks' `timeout_s` is the single honest
+    budget and the shared `with_backoff` stays the sole retry (rate-limits only).
+  - **Configurable, reasoning-safe default timeout.** New `config.llm_timeout_s()` resolver
+    (`METALWORKS_LLM_TIMEOUT` env → `llm_timeout` config → **300s**, up from 120s). The chat adapter
+    methods now default `timeout_s` to `None` and resolve this lazily, so the knob flows through every
+    surface (CLI, MCP, SDK); grounding keeps a higher 300s floor.
+
+  **Deferred (follow-up):** Anthropic and Google still use **non-streaming** calls — they received the
+  higher configurable timeout (and Anthropic also `max_retries=0`), but were not converted to
+  streaming in this release. The google-genai client does not cleanly expose a no-retry setting, so
+  `max_retries=0` was not applied there. The reported bug is the OpenAI/OpenRouter path, which is now
+  streamed.
+
 ## [0.3.0] - 2026-06-25
 
 ### Added

@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from metalworks.errors import GroundingUnavailable, MissingExtraError, MissingKeyError
 from metalworks.llm.adapters._retry import with_backoff
+from metalworks.llm.adapters._timeout import resolve_timeout_s
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
     ChatCapabilities,
@@ -56,20 +57,33 @@ def _supports_reasoning(model_id: str) -> bool:
     return model_id.startswith("o") or model_id.startswith("gpt-5")
 
 
-def _usage_of(response: Any) -> Usage:
-    usage = getattr(response, "usage", None)
-    return Usage(
-        input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
-        output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
-    )
+def _consume_stream(stream: Any) -> tuple[str, Usage, Any]:
+    """Accumulate a streamed chat.completions response into (text, usage, last_chunk).
 
-
-def _content_of(response: Any) -> str:
-    choices: list[Any] = list(getattr(response, "choices", None) or [])
-    if not choices:
-        return ""
-    message = getattr(choices[0], "message", None)
-    return getattr(message, "content", None) or ""
+    Iterates delta chunks, concatenating ``chunk.choices[0].delta.content``
+    (guarding ``None``), and captures token usage from the final
+    ``include_usage`` chunk (it carries ``.usage`` and an empty ``choices``
+    list). The accumulated text equals the non-streamed message content for the
+    same response — the streaming change is transparent to callers.
+    """
+    parts: list[str] = []
+    usage = Usage()
+    last_chunk: Any = None
+    for chunk in stream:
+        last_chunk = chunk
+        choices: list[Any] = list(getattr(chunk, "choices", None) or [])
+        if choices:
+            delta = getattr(choices[0], "delta", None)
+            content = getattr(delta, "content", None)
+            if content:
+                parts.append(content)
+        chunk_usage = getattr(chunk, "usage", None)
+        if chunk_usage is not None:
+            usage = Usage(
+                input_tokens=int(getattr(chunk_usage, "prompt_tokens", 0) or 0),
+                output_tokens=int(getattr(chunk_usage, "completion_tokens", 0) or 0),
+            )
+    return "".join(parts), usage, last_chunk
 
 
 class OpenAIChatModel:
@@ -119,7 +133,12 @@ class OpenAIChatModel:
         )
         self._on_generation = on_generation
         self._bad_request_error: type[Exception] = openai.BadRequestError
-        self._client: Any = openai.OpenAI(api_key=key, base_url=resolved_base_url)
+        # max_retries=0: the SDK's default 2 internal retries would silently
+        # stack up to 3x the timeout (and re-run the whole hidden-reasoning
+        # phase from scratch) on a retryable APITimeoutError. With them off,
+        # metalworks' timeout_s is the single honest budget and ``with_backoff``
+        # stays the sole retry (rate-limits only).
+        self._client: Any = openai.OpenAI(api_key=key, base_url=resolved_base_url, max_retries=0)
 
     # ── ChatModel ──
 
@@ -131,24 +150,29 @@ class OpenAIChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult:
-        response = with_backoff(
-            lambda: self._client.chat.completions.create(
+        budget = resolve_timeout_s(timeout_s)
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
+        def _call() -> tuple[str, Usage, Any]:
+            stream = self._client.chat.completions.create(
                 model=self.model_id,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
+                messages=messages,
                 max_completion_tokens=max_tokens,
-                timeout=timeout_s,
+                timeout=self._read_timeout(budget),
+                stream=True,
+                stream_options={"include_usage": True},
                 **self._tuning_kwargs(temperature, thinking_budget),
-            ),
-            provider="OpenAI",
-        )
-        usage = _usage_of(response)
+            )
+            return _consume_stream(stream)
+
+        text, usage, last_chunk = with_backoff(_call, provider="OpenAI")
         self._emit("text", usage)
-        return TextResult(text=_content_of(response), usage=usage, raw=response)
+        return TextResult(text=text, usage=usage, raw=last_chunk)
 
     def complete_structured(
         self,
@@ -159,8 +183,10 @@ class OpenAIChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T:
+        budget = resolve_timeout_s(timeout_s)
+
         def _text(ask: str) -> str:
             return self.complete_text(
                 system=system,
@@ -168,7 +194,7 @@ class OpenAIChatModel:
                 max_tokens=max_tokens,
                 temperature=temperature,
                 thinking_budget=thinking_budget,
-                timeout_s=timeout_s,
+                timeout_s=budget,
             ).text
 
         if not self.capabilities.native_structured:
@@ -188,21 +214,25 @@ class OpenAIChatModel:
                 "strict": False,
             },
         }
-        try:
-            response = with_backoff(
-                lambda: self._client.chat.completions.create(
-                    model=self.model_id,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    max_completion_tokens=max_tokens,
-                    timeout=timeout_s,
-                    response_format=response_format,
-                    **self._tuning_kwargs(temperature, thinking_budget),
-                ),
-                provider="OpenAI",
+
+        def _call() -> tuple[str, Usage, Any]:
+            stream = self._client.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_completion_tokens=max_tokens,
+                timeout=self._read_timeout(budget),
+                response_format=response_format,
+                stream=True,
+                stream_options={"include_usage": True},
+                **self._tuning_kwargs(temperature, thinking_budget),
             )
+            return _consume_stream(stream)
+
+        try:
+            text, usage, _ = with_backoff(_call, provider="OpenAI")
         except self._bad_request_error:
             # Schema rejected by the API — fall through to ladder tier 3.
             return prompt_embedded_structured(
@@ -211,8 +241,8 @@ class OpenAIChatModel:
                 complete_text=_text,
                 user=user,
             )
-        self._emit("structured", _usage_of(response))
-        return validate_payload(self.model_id, output_model, _content_of(response))
+        self._emit("structured", usage)
+        return validate_payload(self.model_id, output_model, text)
 
     # ── GroundedChatModel (capability is False; method raises) ──
 
@@ -223,7 +253,7 @@ class OpenAIChatModel:
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult:
         raise GroundingUnavailable(
             self.model_id,
@@ -232,6 +262,21 @@ class OpenAIChatModel:
         )
 
     # ── internal ──
+
+    @staticmethod
+    def _read_timeout(timeout_s: float) -> Any:
+        """An ``httpx.Timeout`` whose READ leg is the gap-between-chunks budget.
+
+        Streaming makes ``timeout_s`` a per-chunk read timeout, not a total: a
+        reasoning model that takes a long time to the first token, or trickles
+        tokens, completes as long as no single gap exceeds ``timeout_s`` — a
+        genuinely hung stream (no data for ``timeout_s``) raises cleanly. The
+        connect/write/pool legs stay short. httpx is lazy-imported here so
+        importing the adapter module stays cheap.
+        """
+        import httpx
+
+        return httpx.Timeout(connect=15.0, read=timeout_s, write=15.0, pool=15.0)
 
     def _tuning_kwargs(self, temperature: float, thinking_budget: int) -> dict[str, Any]:
         """Per-model temperature / reasoning_effort handling (see module docstring)."""
