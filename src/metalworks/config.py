@@ -566,11 +566,16 @@ def resolve_discovery() -> DiscoveryProvider | None:
     wins, never raises (returns ``None`` so the gate falls through to the
     homegrown loop over a plain ``SearchProvider``, then to single-pass search).
 
-    No agentic adapter ships yet: the Exa Research adapter (P4.1) and Parallel
-    Task adapter (P4.2) are follow-on issues. They register an ``agentic=True``
-    provider here behind their key, at which point the gate trips. Until then
-    this returns ``None`` and the homegrown loop is the active rung.
+    Exa Research (P4.1) is the first agentic adapter: with ``EXA_API_KEY`` set it
+    returns :class:`~metalworks.research.discovery.exa.ExaResearchDiscovery`, at
+    which point the gate trips and metalworks' homegrown loop stays off. The
+    Parallel Task adapter (P4.2) is a follow-on. With no agentic key set this
+    returns ``None`` and the homegrown loop is the active rung.
     """
+    if os.environ.get("EXA_API_KEY"):
+        from metalworks.research.discovery.exa import ExaResearchDiscovery
+
+        return ExaResearchDiscovery()
     return None
 
 
