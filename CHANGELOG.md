@@ -9,6 +9,24 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources P4.2 — Parallel Task discovery adapter (#157).** New
+  `metalworks.research.discovery.parallel.ParallelTaskDiscovery` — the second **agentic**
+  `DiscoveryProvider` (`agentic=True`, `provider_id="parallel_task"`), over Parallel's
+  [Task API](https://docs.parallel.ai) managed deep-research engine. `discover` runs a Task
+  (`POST /v1/tasks/runs` → `GET /v1/tasks/runs/{id}/result` over `httpx`, mirroring the single-shot
+  `search.adapters.parallel` REST shape) and consumes **only the Basis citations + excerpts** — each
+  cited `output.basis[].citations[].excerpts[]` entry maps to one cite-or-die `DiscoveryFinding`
+  (`quote` = the excerpt **verbatim**, `source_url` = citation url, `title`, `extra={"confidence",
+  "domain"}`). Parallel's synthesized `output.content` prose is **never** ingested — cite-or-die,
+  asserted against a recorded response. The `DiscoveryBudget` maps to a Parallel **processor** tier,
+  defaulting to the cheapest deep-research tier **`lite`** (≈ $5 / 1k task runs; deeper tiers out of
+  scope); `max_findings`/`max_domains` cap kept excerpts / distinct hosts deterministically.
+  `extra["confidence"]` is carried for provenance only and does **not** feed the verdict band. Auth
+  `PARALLEL_API_KEY`; SDK lazy-imported behind the `parallel` extra (bare matrix stays green).
+  `config.resolve_discovery()` returns it when `PARALLEL_API_KEY` is set — tripping the chassis gate
+  so the homegrown loop is OFF and `web_research` delegates to it. Offline tests
+  (`tests/test_discovery_parallel.py`, `httpx.MockTransport` over a recorded Basis response) plus a
+  `network`-marked live smoke. Internal-only (no `contract` change, no TS regen).
 - **Sources P4.1 — Exa Research discovery adapter (#156).** New
   `metalworks.research.discovery.exa.ExaResearchDiscovery` — the first **agentic** `DiscoveryProvider`
   (`agentic=True`, `provider_id="exa_research"`) over Exa's **Research/Deep** endpoint. `discover`

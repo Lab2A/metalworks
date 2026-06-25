@@ -566,16 +566,32 @@ def resolve_discovery() -> DiscoveryProvider | None:
     wins, never raises (returns ``None`` so the gate falls through to the
     homegrown loop over a plain ``SearchProvider``, then to single-pass search).
 
-    Exa Research (P4.1) is the first agentic adapter: with ``EXA_API_KEY`` set it
-    returns :class:`~metalworks.research.discovery.exa.ExaResearchDiscovery`, at
-    which point the gate trips and metalworks' homegrown loop stays off. The
-    Parallel Task adapter (P4.2) is a follow-on. With no agentic key set this
-    returns ``None`` and the homegrown loop is the active rung.
+    Recognizes both agentic adapters, first-present key wins: **Exa Research**
+    (P4.1, ``EXA_API_KEY``) then **Parallel Task** (P4.2, ``PARALLEL_API_KEY``) —
+    Exa first as the recommended fit (neural community search + reddit-path
+    filters at the cheapest deep tier). With one configured the gate trips and
+    metalworks' homegrown loop stays off; with no agentic key set this returns
+    ``None`` and the homegrown loop is the active rung. Each adapter (and its
+    extra) is imported lazily only when its key is present, so ``import
+    metalworks`` and the bare matrix stay free; a present key with an absent
+    extra falls through rather than crashing a run.
     """
+    from metalworks.errors import MissingExtraError, MissingKeyError
+
     if os.environ.get("EXA_API_KEY"):
         from metalworks.research.discovery.exa import ExaResearchDiscovery
 
-        return ExaResearchDiscovery()
+        try:
+            return ExaResearchDiscovery()
+        except (MissingExtraError, MissingKeyError):
+            pass
+    if os.environ.get("PARALLEL_API_KEY"):
+        from metalworks.research.discovery.parallel import ParallelTaskDiscovery
+
+        try:
+            return ParallelTaskDiscovery()
+        except (MissingExtraError, MissingKeyError):
+            pass
     return None
 
 
