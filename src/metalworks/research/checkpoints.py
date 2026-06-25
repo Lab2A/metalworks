@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from metalworks.contract import (
     CorpusRecord,
@@ -85,6 +85,7 @@ class PullingCheckpoint(BaseModel):
 
     items: list[ExplorationItem]
     records_by_id: dict[str, CorpusRecord]
+    pull_caveats: list[str] = Field(default_factory=list)
 
 
 class TriagingCheckpoint(BaseModel):

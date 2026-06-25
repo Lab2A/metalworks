@@ -8,6 +8,21 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-06-25
+
+### Fixed
+- **A single Arctic Shift `422 Timeout` no longer kills a whole research run.** The live API returns
+  `422` with a `Timeout` body when a search is too heavy server-side (a wide window over a
+  multi-million-member subreddit) — a *transient* condition, not a client error. The reader treated
+  every `4xx` as fatal, so one slow window aborted the `pulling` stage and the run. The client now
+  **retries a `422 Timeout`** with backoff like a `5xx` (a genuine bad-parameter `422` without a
+  timeout body still fails fast, unretried), and on exhaustion raises a clear, actionable error
+  (*"narrow the window or pull a smaller subreddit"*).
+- **The corpus pull is now best-effort per `(source, subreddit)`.** Previously one window that raised
+  (even after the retries above) aborted the entire pull. A failing window is now recorded as a
+  caveat and skipped; the run proceeds on whatever was pullable and is marked `partial=True` with the
+  skipped windows surfaced in `report.caveat`. Only a fully empty corpus stops the run (as before).
+
 ## [0.3.2] - 2026-06-25
 
 ### Fixed
