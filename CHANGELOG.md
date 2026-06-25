@@ -9,6 +9,19 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources — source-mix disclosure on clusters (#164 step 1).** Going ultra-wide let a cluster fuse
+  quotes from many source types (Reddit + a job posting + a review + an RFP); cite-or-die proves each
+  quote is real, not that the cluster is *coherent*. New **additive** contract field
+  `InsightCluster.source_mix: dict[str, int]` — source_id → count of the cluster's **members** from
+  that source, computed in `cluster_ranker._build_cluster` over **all** members (not just the 2-3
+  surfaced quotes), so it reflects true composition. A Reddit-only cluster is `{"reddit": N}`. A
+  derived `@computed_field cross_source: bool` flags a theme as suspiciously cross-source when it
+  draws from ≥ 2 sources **and** no single source supplies ≥ 60% (`CROSS_SOURCE_DOMINANCE`) of the
+  members. Deterministic (pure computation from `member.source`, no LLM). **Disclosure only** — it
+  never feeds `demand_score` or the verdict band (which stay breadth-only; guarded by test). Surfaced
+  lightly in the run-summary markdown (`runs.py`) as a `_sources: …_` line with a ⚠ on cross-source
+  clusters. Defaulted/empty so old payloads validate; TS + JSON-Schema regenerated. Steps 2
+  (coherence verify-pass) and 3 (same-source-purity weighting) remain out of scope.
 - **Sources P4.2 — Parallel Task discovery adapter (#157).** New
   `metalworks.research.discovery.parallel.ParallelTaskDiscovery` — the second **agentic**
   `DiscoveryProvider` (`agentic=True`, `provider_id="parallel_task"`), over Parallel's

@@ -498,6 +498,14 @@
         "signal": {
           "$ref": "#/$defs/SignalStrength",
           "description": "Confidence chip, derived from distinct_author_count."
+        },
+        "source_mix": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Source composition of the cluster's MEMBERS: source_id \u2192 count of members from that source (computed over ALL members, not just the 2-3 surfaced quotes, so it reflects true composition). A Reddit-only cluster is {'reddit': N}. Disclosure only \u2014 surfaced so a human can SEE when a theme is suspiciously cross-source; it never feeds demand_score or the verdict band (which stay breadth-only). Defaulted/empty so old payloads validate.",
+          "title": "Source Mix",
+          "type": "object"
         }
       },
       "required": [

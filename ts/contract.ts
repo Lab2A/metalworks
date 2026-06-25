@@ -81,9 +81,13 @@ export interface InsightCluster {
   signal: SignalStrength;
   /** 2-3 verified quotes (materialized, portable). A cluster with zero verified quotes is never shipped (no-quote-no-theme). */
   quotes: ResolvedCitation[];
+  /** Source composition of the cluster's MEMBERS: source_id → count of members from that source (computed over ALL members, not just the 2-3 surfaced quotes, so it reflects true composition). A Reddit-only cluster is {'reddit': N}. Disclosure only — surfaced so a human can SEE when a theme is suspiciously cross-source; it never feeds demand_score or the verdict band (which stay breadth-only). Defaulted/empty so old payloads validate. */
+  source_mix?: Record<string, number>;
   attribution_method?: string | null;
   attribution_confidence?: string | null;
   demographic_match?: number | null;
+  /** True when the cluster spans sources with no dominant one.  A theme is flagged cross-source when it draws from >= 2 distinct sources AND no single source supplies >= ``CROSS_SOURCE_DOMINANCE`` (60%) of the members — the case ultra-wide synthesis can fuse incommensurate sources into one "theme". A single-source cluster (e.g. Reddit-only) is never cross-source. Pure disclosure: a consumer/report reads this to surface a warning; it has no effect on demand_score or the band. Empty mix → False. */
+  cross_source: boolean;
 }
 
 export interface SlotPlan {

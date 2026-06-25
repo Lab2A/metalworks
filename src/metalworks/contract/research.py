@@ -42,7 +42,7 @@ import hashlib
 import math
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -234,9 +234,41 @@ class InsightCluster(BaseModel):
         description="2-3 verified quotes (materialized, portable). A cluster with zero verified "
         "quotes is never shipped (no-quote-no-theme)."
     )
+    source_mix: dict[str, int] = Field(
+        default_factory=dict,
+        description="Source composition of the cluster's MEMBERS: source_id → count of members "
+        "from that source (computed over ALL members, not just the 2-3 surfaced quotes, so it "
+        "reflects true composition). A Reddit-only cluster is {'reddit': N}. Disclosure only — "
+        "surfaced so a human can SEE when a theme is suspiciously cross-source; it never feeds "
+        "demand_score or the verdict band (which stay breadth-only). Defaulted/empty so old "
+        "payloads validate.",
+    )
     attribution_method: str | None = Field(default=None)
     attribution_confidence: str | None = Field(default=None)
     demographic_match: float | None = Field(default=None)
+
+    # Disclosure threshold: a cluster is "cross-source" when no single source
+    # accounts for >= this fraction of its members — i.e. the theme is stitched
+    # across source types rather than dominated by one. Deterministic, derived
+    # purely from source_mix; never feeds scoring or the verdict band.
+    CROSS_SOURCE_DOMINANCE: ClassVar[float] = 0.6
+
+    @computed_field
+    @property
+    def cross_source(self) -> bool:
+        """True when the cluster spans sources with no dominant one.
+
+        A theme is flagged cross-source when it draws from >= 2 distinct sources
+        AND no single source supplies >= ``CROSS_SOURCE_DOMINANCE`` (60%) of the
+        members — the case ultra-wide synthesis can fuse incommensurate sources
+        into one "theme". A single-source cluster (e.g. Reddit-only) is never
+        cross-source. Pure disclosure: a consumer/report reads this to surface a
+        warning; it has no effect on demand_score or the band. Empty mix → False.
+        """
+        total = sum(self.source_mix.values())
+        if total <= 0 or len(self.source_mix) < 2:
+            return False
+        return max(self.source_mix.values()) < self.CROSS_SOURCE_DOMINANCE * total
 
 
 # ──────────────────────────────────────────────────────────────────────────
