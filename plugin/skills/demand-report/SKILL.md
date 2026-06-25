@@ -36,14 +36,21 @@ with the user's idea.
   Call `research_start` with that brief — it returns a `run_id` and runs
   **asynchronously**. Watch it with the **Monitor tool**, or poll
   `research_status(run_id)` on a **bounded loop (~15–30s cadence, never a blind or
-  indefinite `sleep`)**, surfacing each stage to the user as it advances, until it
-  reaches a terminal state. On `ready`, call `research_result` to fetch the
-  `DemandReport`; on `failed`, read the error and fix it (see
-  `docs/operating-metalworks.md` — e.g. a 429 means you're on the HF reader; the live
-  default doesn't 429) rather than retrying blindly. Present the ranked clusters with
-  their distinct-author counts and quoted permalinks, the verdict, and any web
-  findings. Every quote is exact-matched to a real comment; do not paraphrase them
-  as if they were your own.
+  indefinite `sleep`)**, until it reaches a terminal state. `research_status` reports
+  fine-grained progress — read `stage`, `stage_index`/`stage_total`, and `updated_at`
+  (e.g. "stage 4/6: analyzing · updated 3s ago") so you can tell the run is grinding,
+  not hung, and surface that to the user. On `ready`, call `research_result` to fetch
+  the `DemandReport` (on `failed`, see the resume step below). Present the ranked
+  clusters with their distinct-author counts and quoted permalinks, the verdict, and
+  any web findings. Every quote is exact-matched to a real comment; do not paraphrase
+  them as if they were your own.
+
+  If `research_status` reports `failed`, do NOT restart from scratch — call
+  `research_resume(run_id)` first. The pipeline checkpoints each stage, so a
+  resume re-runs only from the last incomplete stage (it reuses the expensive
+  Reddit pull, comment hydration, and synthesis already done) and keeps the same
+  report id. Then resume polling `research_status`. Only fall back to the
+  zero-key path below if a resume also fails or no brief was stored.
 
 - If it returns a `missing_key` envelope (no LLM key): run the zero-key path.
   For each candidate subreddit, call `arctic_pull_threads` (scope it to 1 month)

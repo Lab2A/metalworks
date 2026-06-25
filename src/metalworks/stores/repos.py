@@ -107,6 +107,31 @@ class RunRepo(Protocol):
 
 
 @runtime_checkable
+class CheckpointRepo(Protocol):
+    """Per-stage run checkpoints, keyed ``(run_id, stage)`` → opaque JSON text.
+
+    The resume seam: the research pipeline persists each stage's serialized OUTPUT
+    here so a failed run can re-run from the last incomplete stage instead of from
+    zero. The payload is an EXPLICIT typed serializer's JSON (never pickle) — this
+    protocol stays opaque (plain ``str``) so the storage layer never has to know the
+    stage shapes. Writes are keyed on ``(run_id, stage)`` and idempotent (a re-run
+    of a stage overwrites). ``clear_checkpoints`` frees the space once a run
+    completes (or is abandoned)."""
+
+    def save_checkpoint(self, run_id: str, stage: str, payload: str) -> None:
+        """Insert or replace the checkpoint for ``(run_id, stage)``."""
+        ...
+
+    def get_checkpoint(self, run_id: str, stage: str) -> str | None:
+        """The stored payload for ``(run_id, stage)``, or ``None`` if absent."""
+        ...
+
+    def clear_checkpoints(self, run_id: str) -> None:
+        """Drop every checkpoint for ``run_id`` (called on completion)."""
+        ...
+
+
+@runtime_checkable
 class CorpusRepo(Protocol):
     """Source-neutral, durable corpus persistence (hydration writes, synthesis reads).
 

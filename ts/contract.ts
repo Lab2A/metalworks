@@ -417,6 +417,14 @@ export interface RunSummary {
   version?: number;
   status: "queued" | "planning_brief" | "pulling_arctic_shift" | "embedding_triage" | "llm_classifying" | "analyzing_relevant" | "web_research" | "compiling" | "complete" | "failed" | "compile_failed" | "oom_chunked";
   progress?: string | null;
+  /** Current pipeline stage name (e.g. 'analyzing'). None ⇒ not yet emitted. */
+  stage?: string | null;
+  /** 1-based position of `stage` in the canonical stage list. */
+  stage_index?: number | null;
+  /** Total number of pipeline stages, for a '4/6' display. */
+  stage_total?: number | null;
+  /** When the run row was last touched (each stage heartbeat). None ⇒ never. */
+  updated_at?: string | null;
   error?: string | null;
   total_distinct_authors?: number | null;
   created_at: string;
