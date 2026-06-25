@@ -8,6 +8,8 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-25
+
 ### Added
 - **Research-job progress heartbeat.** A background `research_start` job now re-saves its
   `RunSummary` on every pipeline stage, so `research_status` reports fine-grained progress —
@@ -25,6 +27,15 @@ contracts may change in any release.
   <run_id>`), facade (`Metalworks.research_resume(run_id)`), and the `demand-report` skill (which now
   resumes a `failed` run before falling back). A fresh run with no checkpoint store is byte-for-byte
   unchanged — the checkpoint-or-compute wrapper is a transparent pass-through.
+
+### Changed
+- **Plugin docs + directive skill preambles.** Bundle a concise agent-facing
+  `docs/operating-metalworks.md` (provider/model resolution + the Vertex gotcha, the readers/sources
+  and `ARCTIC_SHIFT_SOURCE`, the async run loop, a common-errors table). All 22 skill preambles now
+  carry a directive "STOP and read the reference before opening `src/`" plus a poll-with-Monitor /
+  never-blind-`sleep` note — so an agent reads the docs instead of reverse-engineering the source.
+  `metalworks init`'s `.env.example` documents `METALWORKS_MODEL`, the `GOOGLE_GENAI_USE_VERTEXAI`
+  gotcha, and `ARCTIC_SHIFT_SOURCE`; `init` now points at `metalworks preflight`.
 
 ## [0.2.1] - 2026-06-25
 
