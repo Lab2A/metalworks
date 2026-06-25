@@ -3,6 +3,14 @@ name: position-wedge
 description: Turn a finished demand report into a grounded market-positioning wedge — a Dunford statement (competitive alternative, unique attribute, value, beachhead, category) plus a price hypothesis, every slot tracing to a real Reddit quote or web finding by permalink. Use after a demand report exists and the user asks "how should I position this", "what's the angle", "what's my wedge", or wants a positioning statement / pricing hypothesis grounded in evidence rather than invented.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report into a defensible positioning hypothesis — a
 Dunford wedge whose every claim points back to evidence the report already
 verified. You are NOT brainstorming taglines; the wedge is selected from real

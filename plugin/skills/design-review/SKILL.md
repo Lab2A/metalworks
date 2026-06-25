@@ -3,6 +3,14 @@ name: design-review
 description: Audit a RENDERED page's actual computed styles against design hard-rules and (optionally) a report's design system. Use after a site is built or deployed and the user asks to "review the design", "audit the look", "check the fonts/colors", "does it match the design system", or "design QA". It reads what's actually on screen — fonts, heading scale, colors — via a real browser and grades it deterministically. Needs the browser renderer; a screenshot-only backend can't read computed styles.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are auditing a **rendered** page's design — what's actually on screen, not
 what a `DESIGN.md` says it should be. The review is **deterministic**: every
 finding is a pure function of the page's computed styles plus, when supplied, the

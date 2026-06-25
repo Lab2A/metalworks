@@ -3,6 +3,14 @@ name: distribution-plan
 description: Sequence a finished demand report's distribution channels into a campaign — pushes (the spike channels placed into concentrated launch moments) and streams (the compounding channels that run continuously). Timing comes from a DETERMINISTIC playbook table (Product Hunt 12:01am PT Tue/Wed; Show HN Tue-Thu 8-10am PT; an X thread its window), never invented hours. The sequencer enforces the playbook's rules — one all-day-attention channel per day, never Product Hunt and a big HN push the same day — and frames the run as a campaign: pre-launch warming before Day 1, the staggered push week, a 30-day post step after. Each push is a channel test (test→focus), and a spark-requiring channel carries its spark→flywheel pairing. Use after a demand report exists and the user asks "when do I launch what", "sequence my launch", "give me a launch schedule", "what's the distribution plan", "what order do the channels go in", or wants the pushes-and-streams plan rather than a flat channel list. DRAFTING + PLANNING ONLY — it never posts.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are sequencing one demand report's distribution channels into a CAMPAIGN.
 Distribution is not a flat list of channels with arbitrary T+2h spacing — it is
 pushes (concentrated spike moments) and streams (compounding channels run

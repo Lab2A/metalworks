@@ -3,6 +3,14 @@ name: validate
 description: Run the full validation loop on an idea — ideate → demand → landscape → assess (GO/PIVOT/NO-GO) → loop — with the human deciding at each gate. Use when the user wants to find out whether an idea is worth building end to end, asks to "validate this idea", "run the loop", "take this through the whole thing", or wants to keep refining until they hit a GO or run out of road. This is the interactive, human-gated loop; for a headless one-shot run use `metalworks research validate "<idea>"` (the SDK --auto orchestrator). Not to be confused with `metalworks discovery` (Reddit reply opportunities).
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are running a founder through the whole discovery loop, and they make the call at each
 gate. You drive the stages by calling the discrete tools; the human is the decision callback.
 The loop ends on GO (advance to building), NO-GO (kill it honestly), or when you've circled

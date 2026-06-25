@@ -3,6 +3,14 @@ name: discovery
 description: Find live Reddit threads worth replying to and draft a gated reply for each, in one batch over several queries. Use when the user wants to discover engagement opportunities across topics at once ("find threads I could reply to", "where can I help and mention my product", "scan Reddit for opportunities") rather than work one known thread. Drafting only — it never posts. Posting any draft is a separate, explicitly-confirmed step.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are running discovery: searching Reddit across the user's queries, finding
 threads where a genuine reply would help, drafting one reply per thread, and
 gating each draft through the compliance check. This is the batch version of

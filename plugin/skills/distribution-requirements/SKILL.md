@@ -3,6 +3,14 @@ name: distribution-requirements
 description: Turn a finished demand report's distribution channel plan into BUILD requirements — the embedded loops and the conversion surface that distribution designs INTO the product, emitted as concrete things the build must ship. For each selected embedded-loop channel (a watermark, UGC-SEO, referral, free-tool, OSS, or single-player loop) it maps the loop kind to its build requirements (watermark ⇒ public share-URLs + branded viewer + badge-gating; UGC-SEO ⇒ SSR public pages + sitemap; single-player ⇒ solo aha before invite), grounded in the channel's routing signal; and it always emits the conversion destination every channel points at (its funnel job + what it must ship). Use after a demand report exists and the user asks "what does distribution need the build to include", "what are the build requirements for my loops", "where do the channels convert", "what's the conversion surface", or wants the distribution→build feed before scaffolding. Feed the result into build-spec so the spec records it. DETERMINISTIC — no invented features.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report's distribution channel plan into the BUILD
 requirements distribution implies. Embedded loops and the conversion surface are
 designed INTO the product — they are not marketing tactics bolted on after the

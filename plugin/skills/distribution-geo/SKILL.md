@@ -3,6 +3,14 @@ name: distribution-geo
 description: Turn a finished demand report into the GEO / LLM-citability stream — the participation targets (the real Reddit threads/communities to engage, pulled from the report's own permalinks), the citability probes (the real conversational queries to test whether you're the cited answer, derived from the cluster claims), and the answer-first answer briefs (grounded, factual answers whose evidence resolves against the report and whose stat anchors carry real distinct-author / mention counts). Use after a demand report exists and the user asks "how do I get cited by AI", "how do I get cited by ChatGPT/Perplexity", "what's my GEO play", "which Reddit threads should I join", "how do I show up in answer engines", or wants a grounded plan to become the cited answer rather than generic SEO advice. Reddit is the #1 AI-cited domain; this names where to participate and what to say — DRAFTING ONLY, it never posts.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report into its GEO / LLM-citability stream — the
 compounding play to become the answer AI engines cite. Reddit is the #1 AI-cited
 domain and most AI citations are Q&A threads, so the move is to participate in the

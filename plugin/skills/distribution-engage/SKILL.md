@@ -3,6 +3,14 @@ name: distribution-engage
 description: Distribution's participation/execution arm — the one channel metalworks can OPERATE rather than merely plan. Take a GEO participation target (a real Reddit thread the demand report surfaced) and draft a disclosed, founder-voiced reply for that exact thread, run it through the deterministic compliance gate, and hand it to the human to post. Use after a demand report (and ideally its GEO plan) exists and the user asks "draft a reply for this thread", "engage this participation target", "help me reply where my audience is asking", "execute the GEO participation stream", or wants to actually show up in the threads the report found rather than only plan to. Reuses the Reddit reply machinery + the shared honesty gate; the no-upvote / native-first / no-AI-tell invariants are the same single voice system the launch assets use. DRAFTING ONLY — posting is human-gated and never automatic.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are drafting one disclosed, founder-voiced Reddit reply for a GEO
 participation target — a real thread the demand report's `distribution_geo`
 stream surfaced (the threads the audience is *already* asking in). This is

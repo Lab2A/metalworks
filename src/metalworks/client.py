@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         ParticipationTarget,
         Persona,
         PositioningBrief,
+        PreflightReport,
         RedditComment,
         RedditPost,
         ReportDiff,
@@ -263,6 +264,21 @@ class Metalworks:
         )
         self._reddit_ns: _RedditNamespace | None = None
         self._discovery_ns: _DiscoveryNamespace | None = None
+
+    # ── preflight ───────────────────────────────────────────────────────────
+
+    def preflight(self, *, check_update: bool = True) -> PreflightReport:
+        """The proactive setup + update report — is everything ready to run?
+
+        Reports the active corpus reader, resolved chat/embedding models,
+        installed extras, present keys, and any actionable setup issues — plus,
+        when ``check_update`` is True, a cached, offline-safe PyPI update check.
+        Pure reporting: no LLM, no auto-network beyond the cached update probe
+        (offline-by-default — a failure degrades to no update line, never raises).
+        """
+        from metalworks.preflight import preflight as run_preflight
+
+        return run_preflight(check_update=check_update)
 
     # ── research ────────────────────────────────────────────────────────────
 

@@ -195,6 +195,27 @@ the report's `source_selection` field.
 ## Check the resolution
 
 ```bash
-metalworks doctor        # resolved chat + embedding models, keys found, actionable hints
-metalworks models list   # the same, plus a provider × key × extra reachability matrix
+metalworks preflight     # "is everything set up + is there an update?" (--json for machines)
+metalworks doctor        # the full report: extras, keys, models, corpus reader, hints (+ --fix)
+metalworks models list   # the resolved models plus a provider × key × extra reachability matrix
 ```
+
+`metalworks preflight` is the proactive, machine-readable check the skills run first: it reports
+the active corpus reader, resolved chat/embedding models, installed extras, present keys, and any
+setup issues, plus a cached PyPI update check. `doctor` renders from the same checks (a pretty
+superset) and keeps `--fix`. The heavy `research` / `build` / `distribution` commands also print a
+one-line **banner** before they run — silent when healthy, otherwise pointing you at `doctor`.
+
+## Update check + banner settings
+
+Two non-secret settings (in `metalworks.toml` / `~/.config/metalworks/metalworks.toml`) tune the
+proactive checks. Both are **on by default**; set either to `false` to opt out:
+
+```toml
+update_check = false      # never query PyPI for a newer release (the check is otherwise cached
+                          # once-daily in ~/.metalworks/ and silent on any network failure)
+preflight_banner = false  # never print the pre-command setup/update banner
+```
+
+The update check is offline-safe by design — `httpx` is imported lazily inside the fetch only, so
+`import metalworks` never hits the network, and any failure simply omits the update line.

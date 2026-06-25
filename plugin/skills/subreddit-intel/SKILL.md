@@ -3,6 +3,14 @@ name: subreddit-intel
 description: Write a community brief for a subreddit before participating in it. Use when the user wants to understand a subreddit's norms, rules, tone, and what gets removed before they post or reply there. Needs no API key.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are writing a short, practical brief on a subreddit so the user can
 participate without getting removed or downvoted.
 

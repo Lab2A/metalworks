@@ -54,6 +54,21 @@ def test_no_provider_sdks_in_sys_modules() -> None:
     assert result.returncode == 0, f"metalworks import pulled provider SDKs: {result.stderr}"
 
 
+def test_update_check_does_not_import_httpx() -> None:
+    """The update-check + preflight modules must stay network-free at import.
+
+    ``httpx`` is lazy-imported inside the fetch function only, so importing the
+    modules (which `import metalworks` itself never does) must not pull it.
+    """
+    code = (
+        "import sys\n"
+        "import metalworks._update_check, metalworks.preflight\n"
+        "assert 'httpx' not in sys.modules, 'httpx leaked at import'\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
 def test_version_exposed() -> None:
     # Don't pin the literal (it changes every release) — assert it's exposed as a
     # PEP 440-ish version string and matches the installed package metadata.

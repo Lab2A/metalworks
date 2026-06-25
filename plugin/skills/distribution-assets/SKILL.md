@@ -3,6 +3,14 @@ name: distribution-assets
 description: Turn a finished demand report (and its channel strategy) into channel-SHAPED, drafting-only launch assets — one per selected channel, shaped to its surface (Product Hunt = tagline + maker comment + gallery captions; Show HN = title + technical first comment; X = a numbered tweet thread; LinkedIn = a carousel). Demand/factual claims are grounded to real Reddit quotes (no-cite-no-claim); persuasive hooks, taglines and the per-channel offer/CTA are free craft. Platform invariants are enforced — never an "upvote us" ask, native-first (no link in the hook), founder-voiced. Use after a demand report exists and the user asks "draft my launch", "write the Product Hunt / Show HN post", "give me the launch thread", "what should the launch copy say", or wants channel-native launch copy grounded in evidence rather than a flat blob. DRAFTING ONLY — this NEVER posts.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report into channel-SHAPED launch assets — the actual
 copy for each channel the strategy selected, drafted in the shape that channel
 rewards. A Product Hunt post is a tagline + an authentic maker comment + gallery

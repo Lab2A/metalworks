@@ -3,6 +3,14 @@ name: draft-reply
 description: Draft an authentic Reddit reply for a thread and run it through the compliance gate before the user posts. Use when the user wants help replying to a specific Reddit thread or comment. Drafting is free; posting requires explicit confirmation and is never automatic.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are drafting one genuine, disclosed Reddit reply for a thread the user
 provides, and gating it before anything is posted.
 

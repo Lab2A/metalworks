@@ -3,6 +3,14 @@ name: distribution-strategy
 description: Turn a finished demand report into a channel strategy — route the report's real named entities + signals into the structured channel space as test→focus channel experiments (community-native, marketplace/wedge, embedded loop, data asset, a launch-platform spark), each carrying a cheap test + a success threshold and a routing_signal that traces to a real corpus entity. Use after a demand report exists and the user asks "what channels should I use", "how do I distribute this", "how do I launch this", "where do I find my users", or wants a grounded distribution plan rather than generic "post to Product Hunt" advice. NOT a ranked portfolio — a set of experiments to test and then concentrate on the winner.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report into a channel strategy — the entity→channel
 routing that decides WHERE this product gets distributed, grounded in the real
 communities, platforms and signals the audience already named. You are NOT
