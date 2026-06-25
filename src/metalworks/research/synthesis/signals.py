@@ -122,6 +122,15 @@ for _kind in ("search_volume", "installs", "downloads", "views", "funding", "rfp
     register_signal(SignalSpec(kind=_kind, weight=1.0, transform="log", is_magnitude=True))
 
 
+# ``reactions`` (0.5, Phase-3) — the 👍 (+1) reaction count on a GitHub issue: an
+# absolute endorsement-volume magnitude ("340 people want this"). Registered
+# ``is_magnitude=True`` so it lifts the RANKING score (log-compressed, weight 1) like
+# every other magnitude kind, but is NEVER read by the verdict band. The GitHub
+# connector emits it per issue/comment; its grounding lane also declares the
+# non-magnitude ``engagement`` (comment count) so it satisfies the rule-5 sweep.
+register_signal(SignalSpec(kind="reactions", weight=1.0, transform="log", is_magnitude=True))
+
+
 # A polarity-capable review-rating kind. Registered so a rating contributes to
 # ranking, but ``polarity`` is NOT consumed yet — a low rating is "demand for a
 # better thing", which is the signed 0.2b axis, deferred here.
