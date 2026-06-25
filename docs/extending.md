@@ -19,8 +19,15 @@ expected.
 | `ChatModel` | `metalworks.llm` | Anthropic / OpenAI / Google / OpenAI-compatible | [Custom ChatModel](/docs/custom-chatmodel) |
 | `EmbeddingProvider` | `metalworks.embeddings` | Google, OpenAI | [Protocols](/docs/protocols) |
 | `SearchProvider` | `metalworks.search` | Exa, Tavily | [Protocols](/docs/protocols) |
+| `ItemSource` (grounding) / `MagnitudeProvider` / `DiscoveryProvider` | `metalworks.research.sources` / `…sources.magnitude` / `…research.discovery` | Reddit, Stack Exchange, GitHub, web, … (see the [catalog](/docs/sources)) | [Build a source](/docs/build-sources) |
 | `CorpusReader` / `CommentSource` | `metalworks.research.deps` | Arctic Shift | [Use your own corpus](/docs/custom-corpus) |
 | storage repos | `metalworks.stores` | `MemoryStores`, `SqliteStores` | [Bring your own store](/docs/custom-store) |
+
+A **source** is the seam that turns "Reddit research" into "research over any source". It comes
+in three lanes — a **grounding** connector that yields quotable records, a **magnitude**
+provider that attaches an absolute number to a theme, or an agentic **discovery** provider that
+reaches the long tail. Each is its own small protocol, registered append-only; see
+[Build a source](/docs/build-sources).
 
 Anything you don't pass to `Metalworks(...)` is resolved from the environment.
 Anything you do pass is used verbatim — that's how you swap a layer.

@@ -11,7 +11,10 @@ way. **The model phrases and organizes; it is never the source of a fact.**
 
 1. **Every claim links to a real quote.** Each finding, quote, competitor gap, launch-copy
    line, and feature carries a link to the actual source it came from — a Reddit thread, a
-   Hacker News comment, a web page. You can open it and read it yourself.
+   Hacker News comment, a Stack Exchange answer, a GitHub issue, a web page. metalworks reads
+   across many [sources](/docs/sources), spanning consumers to developers to procurement, so a
+   need isn't measured from one crowd alone — but whatever the source, you can open it and read
+   it yourself.
 2. **Anything it can't back, it drops.** If the tool can't tie a statement to a real quote
    (or, for web facts, a real source URL), that statement never ships. It isn't softened or
    guessed — it's removed.
@@ -28,8 +31,14 @@ line by line, back to real people.
   stored record. If a piece of generated text doesn't match a real one, it's dropped.
 - **Numbers are counted, not asserted.** "312 people raised this" comes from counting
   distinct authors, never from a model estimate.
+- **Demand-volume numbers rank, they don't decide.** A source can attach an absolute number
+  to a theme — a package's downloads, a search term's volume. That lifts a high-volume theme in
+  the **ranking**, but the go / no-go call reads only how many *distinct people* raised the
+  need. A number can sharpen the order; it can never manufacture a verdict.
 - **Web facts carry their real source.** When a finding comes from the web, its URL comes
-  from the search tool's citation data — never from model prose. No source, no finding.
+  from the search tool's citation data — never from model prose. No source, no finding. The web
+  discovery lane is agentic — it searches, reads, and searches again to reach niche forums and
+  community threads — but it ingests only **verbatim citations**, never a synthesized summary.
 - **Every later step inherits this.** Positioning, the design system, the build spec,
   launch copy — each reads from the same report and links every claim back to it. The chain
   runs from a real quote all the way to the line in your launch copy.

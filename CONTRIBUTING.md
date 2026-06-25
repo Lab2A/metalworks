@@ -138,10 +138,18 @@ See [docs/custom-chatmodel.md](docs/custom-chatmodel.md) for a worked example.
 
 ## Adding a source connector
 
-A *source* is where research reads conversations from (Reddit, Hacker News, the
-web, your own data). Adding one is a fill-in-the-bodies job — scaffold it, write
-two methods, done. The catalog (`metalworks sources list`, `docs/sources.md`) is
-generated from each source's `SourceSpec`, so you never hand-edit a registry.
+A *source* is where research reads demand from. It comes in one of **three lanes**:
+a **grounding** connector (an `ItemSource` yielding quotable records — the path
+below), a **magnitude** provider (an absolute number attached to a theme *after*
+clustering — `register_magnitude`, reference `magnitude.py`), or an agentic **web**
+discovery provider (`register_discovery` / `resolve_discovery`, reference
+`discovery/exa.py`). The full how-to for all three — with worked examples — is
+[docs/build-sources.md](docs/build-sources.md). The grounding path is below.
+
+Adding a grounding connector is a fill-in-the-bodies job — scaffold it, write
+two methods, register it in one map, done. The catalog (`metalworks sources list`,
+`docs/sources.md`) is generated from each source's `SourceSpec`, so you never
+hand-edit a registry.
 
 **1. Scaffold it.** Pick a lowercase id, a lane (`grounding` for discrete
 pain-bearing items, `web` for context), and an auth mode. Worked example — a
@@ -187,7 +195,15 @@ its semantics so the deterministic scorer can weight it — the scaffold leaves 
 [`research/sources/template.py`](src/metalworks/research/sources/template.py) for
 the full field-by-field guide.
 
-**4. Verify.** The scaffolded test skips until `pull` returns records; once it
+**4. Register it (one map — #139).** A built-in connector is listed in exactly one
+place: the `BUILTIN_SOURCE_MODULES` map in
+[`src/metalworks/research/sources/__init__.py`](src/metalworks/research/sources/__init__.py)
+— `"discourse": "metalworks.research.sources.discourse"`. `builtin_connector_modules()`
+/ `builtin_source_ids()` derive the lazy-import path, the selector's spec import, the
+CLI discovery, and the catalog generator from that one map, so adding a connector
+touches one list, not six. (The module-scope `register_source` runs the rest.)
+
+**5. Verify.** The scaffolded test skips until `pull` returns records; once it
 does, it runs the published conformance check:
 
 ```python
@@ -197,8 +213,16 @@ check_item_source(DiscourseSource())
 
 `check_item_source` enforces the two non-negotiables: stable ids (the corpus
 upserts by id) and idempotent pulls (re-pulling the same query/window yields the
-same id set). Then `metalworks sources list` shows your source with its lane /
-auth / key-status, and `python scripts/gen_sources_md.py` adds its catalog row.
+same id set). The 0.5 conformance sweep (`tests/test_conformance_sweep.py`) then
+holds your registered `SourceSpec` to the whole-registry lane rules — including
+**rule 5**: a grounding source must declare at least one non-magnitude signal,
+unless it sets `yields_units = True` (its records are self-representing, ranked by
+distinct domain — like `web` / `ats`). Finally `metalworks sources list` shows your
+source with its lane / auth / key-status, and `python scripts/gen_sources_md.py`
+adds its catalog row.
+
+For a **magnitude** provider or an agentic **discovery** provider — the other two
+lanes — see [docs/build-sources.md](docs/build-sources.md).
 
 ## Rules that are not negotiable
 

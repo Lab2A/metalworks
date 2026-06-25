@@ -149,7 +149,8 @@ ChatModel  Embedding  Search    PageRenderer ItemSource Stores  (ShapeMatcher
 | `EmbeddingProvider` | `embeddings/` | `embed(texts, task)` + `IndexIdentity` guard | fastembed (local), openai, google (+ `FakeEmbedding`) |
 | `SearchProvider` | `search/` | `search(query, max_results, recency_days)` | exa, tavily, parallel, firecrawl |
 | `PageRenderer` | `render/` | `render(url)`, `extract_computed_styles(url, selectors)` + `capabilities` | playwright (owned Chromium, `[browser]`), firecrawl (hosted, screenshot-only), `FakeRenderer` |
-| `ItemSource` / `CorpusReader` / `CommentSource` | `research/sources/`, `research/deps.py` | `pull`, `comments_for`, `latest_window` | arctic (Reddit), hackernews, producthunt, web |
+| `ItemSource` (grounding) / `MagnitudeProvider` / `DiscoveryProvider` (web) | `research/sources/`, `research/sources/magnitude.py`, `research/discovery/` | `pull` / `comments_for` / `latest_window`; `measure`; `discover` | grounding: arctic (Reddit), hackernews, stackexchange, github, web, …; magnitude: npm, pypi, wikipedia; discovery: exa_research, parallel_task |
+| `CorpusReader` / `CommentSource` | `research/deps.py` | `latest_available_month`, `pull_subreddit`, `comments_for_links` | Arctic Shift (HF mirror) |
 | repos (`BriefRepo`, `RunRepo`, `CorpusRepo`, `AccountRepo`, `OpportunityRepo`, `InboxRepo`, `ArtifactStore`) | `stores/` | typed per-repo methods | memory, sqlite, filestore |
 
 `PageRenderer` is infrastructure like `SearchProvider` — resolved by `config.resolve_renderer()`
@@ -158,9 +159,15 @@ the design pillar (§7) is its first consumer. The protocol exposes no caller-su
 JavaScript — style extraction runs a fixed, vendored script.
 
 The **`SOURCES` registry** (`research/sources/__init__.py`, self-registering on import, lazy
-builtin loading) is the recurring extensibility pattern. `metalworks.testing` ships
-conformance suites (`check_all_repos`, `check_item_source`, `check_page_renderer`) so anyone
-writing a custom adapter can verify it.
+builtin loading) is the recurring extensibility pattern; the parallel `MAGNITUDE_PROVIDERS`,
+`DISCOVERY_PROVIDERS`, and `SIGNAL_SPECS` registries mirror it. Every source declares a **lane**
+in a `SourceSpec` — `grounding` (quotable `ItemSource`), `magnitude` (a number attached to a
+theme after clustering, ranking-only and never a new cluster), or `web` (the agentic discovery
+loop). A built-in grounding connector registers in one map — `BUILTIN_SOURCE_MODULES` (#139) —
+and the 0.5 conformance sweep (`tests/test_conformance_sweep.py`) holds the whole registry to
+lane discipline. `metalworks.testing` ships conformance suites (`check_all_repos`,
+`check_item_source`, `check_page_renderer`) so anyone writing a custom adapter can verify it.
+See [Build a source](/docs/build-sources).
 
 Provider auto-resolution (`config.py`): ambient env keys → adapter instances. Precedence is
 explicit arg > env var > config file. Config files hold only non-secrets; all keys come from
