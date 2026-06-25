@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from metalworks.contract import SourceSelection
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
+    from metalworks.research.discovery import DiscoveryProvider
     from metalworks.research.sources import ItemSource
     from metalworks.research.sources.magnitude import MagnitudeProvider
     from metalworks.research.types import MonthRef
@@ -87,6 +88,7 @@ class ResearchDeps:
     reader: CorpusReader
     fast_chat: ChatModel | None = None
     search: SearchProvider | None = None
+    discovery: DiscoveryProvider | None = None
     comments: CommentSource | None = None
     sources: list[ItemSource] | None = None
     magnitude_providers: list[MagnitudeProvider] | None = None

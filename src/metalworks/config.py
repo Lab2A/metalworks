@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.render import PageRenderer
+    from metalworks.research.discovery import DiscoveryProvider
     from metalworks.research.sources import ItemSource
     from metalworks.search import SearchProvider
     from metalworks.stores import MemoryStores, SqliteStores
@@ -296,6 +297,21 @@ def source_selector_enabled() -> bool:
     return value is True
 
 
+def discovery_loop_enabled() -> bool:
+    """Whether the homegrown agentic discovery LOOP is opt-in enabled (``[sources].discover``).
+
+    **Opt-in by default** (mirrors :func:`source_selector_enabled` — #123 precedent): with
+    ``discover`` unset or false, a configured single-shot ``SearchProvider`` drives the
+    legacy **single-pass** web-research path exactly as before — no extra LLM follow-up-query
+    rounds, default behavior and cost unchanged. Set ``discover = true`` to run the
+    iterate-and-dig loop (`research.discovery.HomegrownDiscovery`). NOTE: an **agentic**
+    ``DiscoveryProvider`` (Exa Research / Parallel Task), when configured, always delegates
+    regardless of this flag — the flag only gates metalworks' own loop over a single-shot
+    provider, which is the behavior change that should not ship silently.
+    """
+    return load_sources_config().get("discover") is True
+
+
 def resolve_sources(override: list[str] | None = None, **source_kwargs: Any) -> list[ItemSource]:
     """Construct the active :class:`ItemSource` connectors, in order.
 
@@ -536,6 +552,28 @@ def resolve_search() -> SearchProvider | None:
     return None
 
 
+def resolve_discovery() -> DiscoveryProvider | None:
+    """Resolve an **agentic** discovery provider, or ``None`` (mirrors :func:`resolve_search`).
+
+    Returns a :class:`~metalworks.research.discovery.DiscoveryProvider` whose
+    ``agentic`` is ``True``. The agentic tier ABOVE single-shot search: an
+    iterate-and-dig provider that does its own loop (Exa Research, Parallel
+    Task). When one is configured, the
+    web stream delegates discovery to it and metalworks' homegrown loop does NOT
+    run (the capability-ladder gate in :mod:`metalworks.research.web`).
+
+    Mirrors :func:`resolve_search` — lazy-imported adapters, first-present key
+    wins, never raises (returns ``None`` so the gate falls through to the
+    homegrown loop over a plain ``SearchProvider``, then to single-pass search).
+
+    No agentic adapter ships yet: the Exa Research adapter (P4.1) and Parallel
+    Task adapter (P4.2) are follow-on issues. They register an ``agentic=True``
+    provider here behind their key, at which point the gate trips. Until then
+    this returns ``None`` and the homegrown loop is the active rung.
+    """
+    return None
+
+
 def resolve_renderer() -> PageRenderer | None:
     """Resolve a :class:`~metalworks.render.PageRenderer`, or ``None``.
 
@@ -627,6 +665,7 @@ __all__ = [
     "magnitude_provider_ids",
     "resolve_chat",
     "resolve_chat_chain",
+    "resolve_discovery",
     "resolve_embeddings",
     "resolve_models",
     "resolve_renderer",
