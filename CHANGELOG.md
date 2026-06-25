@@ -8,6 +8,25 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-25
+
+### Fixed
+- **`metalworks setup` no longer crashes when embeddings can't authenticate.** On a machine with
+  stray Vertex env (`GOOGLE_GENAI_USE_VERTEXAI=true` + a `GOOGLE_APPLICATION_CREDENTIALS` pointing at
+  a deleted key), the best-effort embedding warm-up raised a `DefaultCredentialsError` that setup's
+  `except MetalworksError` didn't catch → raw traceback. Setup now catches any warm failure, reports
+  it, and continues.
+- **`resolve_embeddings` no longer commits to an unusable Vertex.** It checked `vertex_enabled()`
+  (just `GOOGLE_GENAI_USE_VERTEXAI`) and returned a Google adapter that crashed on first embed. It now
+  only uses Vertex when its credentials are actually present (a set `GOOGLE_APPLICATION_CREDENTIALS`
+  must point at an existing file; ambient ADC is still trusted when unset), and otherwise **degrades to
+  the keyless local model** — so an OpenRouter-only setup on a Vertex-configured machine just works.
+
+### Added
+- **`METALWORKS_EMBEDDINGS` override** (`local` / `openai` / `google`) — force the embedding backend
+  without code, symmetric with `METALWORKS_MODEL`. `preflight`/`doctor` also flag a Vertex env whose
+  creds file is missing (now a non-fatal local-degrade, surfaced so it isn't silent).
+
 ## [0.3.1] - 2026-06-25
 
 ### Fixed
