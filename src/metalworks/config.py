@@ -384,6 +384,24 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
         model_id = model or (str(cfg["model"]) if cfg.get("model") else None)
         return configured.strip().lower(), model_id
 
+    # No provider pinned and no explicit/env ref: honor a config ``model`` that is
+    # a routable ref on its own (e.g. "deepseek/deepseek-v4-flash" → OpenRouter),
+    # so setting ``model`` alone works without also pinning ``provider`` — and it
+    # routes BEFORE key-order/Vertex autodetection (which would otherwise hijack it
+    # on a machine with stray GOOGLE_GENAI_USE_VERTEXAI).
+    cfg_model = cfg.get("model")
+    if not model and isinstance(cfg_model, str) and cfg_model.strip():
+        ref = cfg_model.strip()
+        if ":" in ref:
+            provider, _, mid = ref.partition(":")
+            return provider.strip().lower(), (mid.strip() or None)
+        if "/" in ref:
+            head, _, rest = ref.partition("/")
+            head_l = head.strip().lower()
+            if head_l in _NATIVE_PROVIDERS or head_l in _COMPAT_PROVIDERS:
+                return head_l, (rest.strip() or None)
+            return "openrouter", ref
+
     for provider, env_var in _CHAT_KEY_ORDER:
         if os.environ.get(env_var):
             return provider, model

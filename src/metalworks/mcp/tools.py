@@ -166,10 +166,10 @@ def reddit_subreddit_rules(name: str) -> ToolResult:
 
 @guard
 def arctic_list_months(content_type: str = "submissions") -> ToolResult:
-    """TIER 1. The latest available month in the Arctic corpus. Needs ``[arctic]``."""
-    from metalworks.research.arctic import ArcticReader
+    """TIER 1. The latest available month in the corpus (the active reader)."""
+    from metalworks import config
 
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     try:
         latest = reader.latest_available_month(content_type)
         return {"latest_available_month": str(latest), "content_type": content_type}
@@ -190,14 +190,14 @@ def arctic_pull_threads(
     200) so a Tier-1 caller can't kick off an unbounded archive read. Needs
     ``[arctic]``.
     """
-    from metalworks.research.arctic import ArcticReader
+    from metalworks import config
     from metalworks.research.types import months_back
 
     months = max(1, min(int(months), _ARCTIC_MAX_MONTHS))
     limit = max(1, min(int(limit), _ARCTIC_MAX_LIMIT))
     sub = subreddit.strip().lstrip("r/").lstrip("/")
 
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     try:
         window = months_back(months, anchor=reader.latest_available_month("submissions"))
         rows = list(
@@ -287,13 +287,12 @@ def _build_deps(store_path: str | None) -> Any:
     """Assemble ResearchDeps from the environment. Raises MissingKeyError when a
     required provider key is absent (the envelope names the key + extra)."""
     from metalworks import config
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = config.resolve_chat()
     embeddings = config.resolve_embeddings()
     store = config.default_store(store_path)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     return ResearchDeps(
         chat=chat,
         embeddings=embeddings,
@@ -308,13 +307,12 @@ def research_plan_brief(prompt: str, store_path: str | None = None) -> ToolResul
     """TIER 2 (chat key). Walk the D1-D8 planner with default answers and return
     an assembled ResearchBrief for this prompt. Needs a chat-model key."""
     from metalworks import config
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.planner import plan_brief
 
     chat = config.resolve_chat()
     store = config.default_store(store_path)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=config.resolve_embeddings(), corpus=store, reader=reader
     )

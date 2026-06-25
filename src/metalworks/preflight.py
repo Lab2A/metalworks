@@ -122,6 +122,18 @@ def doctor_hints() -> list[str]:
     # openrouter shares the openai SDK, so its missing-extra hint points at [openai].
     _extra_for = {"openrouter": "openai"}
     hints: list[str] = []
+    # The #1 first-run landmine on a machine that exports Vertex env (e.g. a dev
+    # box also used for the corpus): Vertex is ON but the google extra isn't
+    # installed, so chat→Vertex AND embeddings (resolve_embeddings checks Vertex
+    # first) both fail on the missing SDK — even with an OpenRouter key set.
+    from metalworks._genai_client import vertex_enabled
+
+    if vertex_enabled() and not module_available("google.genai"):
+        hints.append(
+            "GOOGLE_GENAI_USE_VERTEXAI is on but `google.genai` is not installed → "
+            "Vertex chat/embeddings will fail; set METALWORKS_MODEL=<provider/model> and "
+            'GOOGLE_GENAI_USE_VERTEXAI=false, or pip install "metalworks[google]".'
+        )
     for provider, env_vars, module in PROVIDER_MATRIX:
         found = next((v for v in env_vars if os.environ.get(v)), None)
         if found and not module_available(module):
@@ -155,8 +167,11 @@ def doctor_hints() -> list[str]:
 
 
 def _hint_severity(hint: str) -> str:
-    """A no-provider-key hint is an error (the pipeline can't run); the rest warn."""
-    return "error" if hint.startswith("No provider key found") else "warn"
+    """A no-provider-key or Vertex-misconfig hint is an error (the pipeline can't
+    run); the rest warn."""
+    if hint.startswith(("No provider key found", "GOOGLE_GENAI_USE_VERTEXAI is on")):
+        return "error"
+    return "warn"
 
 
 def _fix_for(hint: str) -> str:
