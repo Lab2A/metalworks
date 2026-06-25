@@ -9,6 +9,7 @@ from __future__ import annotations
 from metalworks.contract import ResearchBrief, SignalStrength, TargetSubreddit
 from metalworks.llm import FakeChatModel, GroundedResult, GroundingChunk, GroundingSupport
 from metalworks.research.web import (
+    _external_search,
     _ExternalFindings,
     _is_excluded,
     parse_numbered_findings,
@@ -168,7 +169,11 @@ def test_grounded_zero_chunks_returns_empty() -> None:
 
 
 def test_external_search_path_cites_by_index() -> None:
-    chat = FakeChatModel(grounded=False)  # no native grounding → external path
+    # The single-pass _external_search is now the rung-3 fallback of the
+    # discovery ladder (no agentic provider, no SearchProvider). It is unchanged,
+    # so we pin its cite-by-index behaviour directly; the homegrown loop that now
+    # runs when a SearchProvider IS present is covered in test_research_discovery.
+    chat = FakeChatModel(grounded=False)
     chat.script(
         _ExternalFindings,
         _ExternalFindings.model_validate(
@@ -186,7 +191,13 @@ def test_external_search_path_cites_by_index() -> None:
             SearchResult(url="https://b.com", title="B", snippet="more data"),
         ]
     )
-    findings = web_research(_deps(chat, search), brief=_brief())
+    findings = _external_search(
+        _deps(chat, search),
+        brief_question="q",
+        directions=["pricing"],
+        excluded=[],
+        max_findings=10,
+    )
     # First finding cites valid sources 1 & 2 → MEDIUM; second cites only an
     # invalid index → dropped (no fabricated provenance).
     assert len(findings) == 1

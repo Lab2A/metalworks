@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         GroundingSupport,
     )
     from metalworks.research.deps import ResearchDeps
+    from metalworks.research.discovery import DiscoveryFinding
     from metalworks.search import SearchResult
 
 # Confidence thresholds: count of distinct supporting sources for a finding.
@@ -349,6 +350,104 @@ def _external_search(
     return findings
 
 
+# ── Discovery ladder (the capability-ladder gate) ──────────────────────────
+#
+# A discovery tier ABOVE single-shot search. The rule (verified by spy tests):
+#
+#   1. an AGENTIC DiscoveryProvider is configured → DELEGATE to its iterate-and-
+#      dig loop; metalworks' homegrown loop does NOT run.
+#   2. else a SearchProvider exists → run HomegrownDiscovery (our own loop over
+#      single-shot search).
+#   3. else → today's single-pass _external_search, BYTE-IDENTICAL (the pinned
+#      fallback when neither a discovery provider nor a search provider exists).
+#
+# All three rungs map findings onto the SAME corpus spine (verbatim quote +
+# source_url), so cite-or-die is preserved no matter which rung runs.
+
+
+def _findings_from_discovery(
+    discovery_findings: list[DiscoveryFinding], *, excluded: list[str], max_findings: int
+) -> list[WebFinding]:
+    """Map cite-or-die :class:`DiscoveryFinding`s onto :class:`WebFinding`s.
+
+    The finding's *verbatim* ``quote`` becomes ``specifics`` (the anchoring
+    quote) and its ``title`` the ``claim`` — never a synthesized summary, and
+    ``source_url`` / ``source_title`` come from the finding metadata, not from
+    LLM text. Excluded domains are dropped. Confidence is LOW: a single
+    discovery hit is one source (the deterministic verdict re-scores downstream).
+    """
+    findings: list[WebFinding] = []
+    finding_idx = 0
+    for f in discovery_findings:
+        url = (f.source_url or "").strip()
+        quote = (f.quote or "").strip()
+        if not url or not quote or _is_excluded(url, excluded):
+            continue
+        finding_idx += 1
+        findings.append(
+            WebFinding(
+                finding_index=finding_idx,
+                claim=(f.title or url).strip(),
+                specifics=quote,  # verbatim quote, never a summary (cite-or-die)
+                source_url=url,
+                source_title=(f.title or url).strip(),
+                published_at=None,
+                confidence=_confidence_for(1),
+            )
+        )
+        if finding_idx >= max_findings:
+            break
+    return findings
+
+
+def _discover(
+    deps: ResearchDeps,
+    *,
+    brief_question: str,
+    directions: list[str],
+    excluded: list[str],
+    max_findings: int,
+) -> list[WebFinding]:
+    """The capability-ladder gate. See the module-level note above.
+
+    Rung 1 (agentic provider): delegate to ``deps.discovery.discover`` — the
+    homegrown loop is NOT constructed. Rung 2 (search only): run
+    ``HomegrownDiscovery``. Rung 3 (neither): fall through to ``_external_search``
+    unchanged — this is the byte-identical legacy path, pinned by tests.
+    """
+    from metalworks.research.discovery import DiscoveryBudget, HomegrownDiscovery
+
+    budget = DiscoveryBudget(max_findings=max(1, max_findings))
+
+    # Rung 1 — an AGENTIC provider configured wins: delegate, loop stays OFF.
+    if deps.discovery is not None and deps.discovery.agentic:
+        try:
+            found = deps.discovery.discover(
+                question=brief_question, directions=directions, budget=budget
+            )
+        except Exception:
+            return []
+        return _findings_from_discovery(found, excluded=excluded, max_findings=max_findings)
+
+    # Rung 2 — a SearchProvider exists: run our own iterate-and-dig loop.
+    if deps.search is not None:
+        loop = HomegrownDiscovery(search=deps.search, chat=deps.chat)
+        try:
+            found = loop.discover(question=brief_question, directions=directions, budget=budget)
+        except Exception:
+            return []
+        return _findings_from_discovery(found, excluded=excluded, max_findings=max_findings)
+
+    # Rung 3 — neither: today's single-pass path, byte-identical.
+    return _external_search(
+        deps,
+        brief_question=brief_question,
+        directions=directions,
+        excluded=excluded,
+        max_findings=max_findings,
+    )
+
+
 # ── Public entry ───────────────────────────────────────────────────────────
 
 
@@ -371,7 +470,7 @@ def web_research(
                 system=_SYSTEM_PROMPT, user=user, max_tokens=_MAX_TOKENS, temperature=_TEMPERATURE
             )
         except GroundingUnavailable:
-            return _external_search(
+            return _discover(
                 deps,
                 brief_question=brief.question,
                 directions=directions,
@@ -382,7 +481,7 @@ def web_research(
             return []
         return _findings_from_grounded(result, excluded=excluded, max_findings=max_findings)
 
-    return _external_search(
+    return _discover(
         deps,
         brief_question=brief.question,
         directions=directions,

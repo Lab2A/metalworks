@@ -9,6 +9,25 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources P4.0 — agentic discovery chassis (#155).** New
+  `metalworks.research.discovery` package: a `DiscoveryProvider` Protocol (`provider_id`, `agentic`,
+  `discover(*, question, directions, budget)`), the cite-or-die unit `DiscoveryFinding` (verbatim
+  `quote` + `source_url` + `title` + optional `author`/`extra`), a `DiscoveryBudget`
+  (`max_rounds`/`max_findings`/`max_domains`), a registry (`register_discovery` / `get_discovery`),
+  and `HomegrownDiscovery` — metalworks' own **iterate-and-dig loop** over the existing single-shot
+  `SearchProvider.search`. Round 1 searches the brief's queries (`[question, *directions]`); each
+  subsequent round an LLM **proposes** follow-up queries from what surfaced (deduped vs run queries),
+  with new hits deduped by URL, stopping on the deterministic budget or a no-new-findings round. The
+  follow-up-query LLM call is discovery/corpus-construction, **not** the verdict (same allowance as
+  `pick_target_subreddits`); the budget is a pure stop condition — the LLM only proposes queries.
+  `config.resolve_discovery()` mirrors `resolve_search` (returns `None` until the keyed agentic
+  adapters — Exa Research P4.1, Parallel Task P4.2 — land). **The capability-ladder gate** is wired
+  into `web_research`: if an **agentic** `DiscoveryProvider` is configured → delegate to its
+  `discover` (homegrown loop OFF); else if a `SearchProvider` exists → run `HomegrownDiscovery`; else
+  → today's single-pass `_external_search`, **byte-identical**. All three rungs map findings onto the
+  same corpus spine (`WebFinding`) with the verbatim quote as the anchor — never a synthesized
+  summary (cite-or-die preserved). `ResearchDeps` gains an injectable `discovery` seam. Internal-only
+  types (no `contract` change, no TS regen). Offline tests in `tests/test_research_discovery.py`.
 - **Sources P3 — GitHub Issues connector (#149).** New
   `metalworks.research.sources.github.GitHubItemSource` — a Phase-3 grounding singleton, a
   keyless-with-optional-token `ItemSource` over the GitHub REST API. GitHub Issues capture a demand
