@@ -140,6 +140,20 @@ def cluster_breadth(members: list[LoadedComment]) -> tuple[int, int, str]:
     return breadth, len(authors), unit
 
 
+def source_mix(members: list[LoadedComment]) -> dict[str, int]:
+    """Source composition of a cluster: source_id → count of members from it.
+
+    Computed over ALL members (not the 2-3 surfaced quotes) so it reflects the
+    cluster's true composition. Keys are sorted for a deterministic, stable
+    payload. A Reddit-only cluster yields ``{"reddit": N}``. Pure disclosure —
+    this never feeds ``demand_score`` or the verdict band (see #164 step 1).
+    """
+    mix: dict[str, int] = {}
+    for m in members:
+        mix[m.source] = mix.get(m.source, 0) + 1
+    return {k: mix[k] for k in sorted(mix)}
+
+
 def _format_numbered_comment(i: int, c: LoadedComment) -> str:
     """Render one numbered comment for the synthesis prompt, source-neutrally.
 
@@ -284,6 +298,8 @@ def _build_cluster(
         # once the full report population is known (the badge is relative, not absolute).
         signal=SignalStrength.LOW,
         quotes=quotes,
+        # Source composition over ALL members (disclosure only; never scored).
+        source_mix=source_mix(members),
     )
     return cluster, distinct_authors, [m.subreddit for m in members], member_comment_indices
 

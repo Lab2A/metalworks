@@ -86,7 +86,14 @@ def _comment(cid: str, body: str, *, score: int = 1, author: str = "a1") -> Redd
     )
 
 
-def _loaded(cid: str, body: str, *, upvotes: int = 1, author: str = "a1") -> LoadedComment:
+def _loaded(
+    cid: str,
+    body: str,
+    *,
+    upvotes: int = 1,
+    author: str = "a1",
+    source: str = "reddit",
+) -> LoadedComment:
     return LoadedComment(
         comment_id=cid,
         post_id="post1",
@@ -95,6 +102,7 @@ def _loaded(cid: str, body: str, *, upvotes: int = 1, author: str = "a1") -> Loa
         upvotes=upvotes,
         author_hash=author,
         permalink=f"https://reddit.com/c/{cid}",
+        source=source,
     )
 
 
@@ -303,6 +311,106 @@ def test_cluster_ranker_signal_is_relative_not_absolute() -> None:
     assert cluster_ranker.signal_from_breadth(10, thin) == SignalStrength.LOW
     # The shared back-compat alias resolves to the same relative helper.
     assert cluster_ranker.signal_from_author_count(10, broad) == SignalStrength.HIGH
+
+
+def _mix_cluster(members: list[LoadedComment]) -> InsightCluster:
+    """Build one InsightCluster from members via the real _build_cluster path."""
+    comments = list(members)
+    groups = [[i] for i in range(len(comments))]
+    candidate = _CandidateCluster(
+        claim="theme",
+        member_comment_indices=list(range(len(comments))),
+        quote_comment_indices=[0],
+    )
+    result = cluster_ranker._build_cluster(  # noqa: SLF001 — exercises the build seam directly
+        rank=1, candidate=candidate, groups=groups, comments=comments
+    )
+    assert result is not None
+    return result[0]
+
+
+def test_source_mix_reddit_only_is_reddit_member_count() -> None:
+    # Required test 1: a Reddit-only cluster has source_mix == {"reddit": <members>}.
+    members = [
+        _loaded("c1", "shared claim", author="a1"),
+        _loaded("c2", "shared claim", author="a2"),
+    ]
+    cluster = _mix_cluster(members)
+    assert cluster.source_mix == {"reddit": 2}
+    assert cluster.cross_source is False  # single source is never cross-source
+
+
+def test_source_mix_mixed_sources_counts_and_flags_cross_source() -> None:
+    # Required test 2: a mixed-source cluster has correct per-source counts and
+    # cross_source flags it when no single source is >= 60% of members.
+    members = [
+        _loaded("c1", "shared claim", author="a1", source="reddit"),
+        _loaded("c2", "shared claim", author="a2", source="reviews"),
+        _loaded("c3", "shared claim", author="a3", source="jobs"),
+    ]
+    cluster = _mix_cluster(members)
+    assert cluster.source_mix == {"jobs": 1, "reddit": 1, "reviews": 1}
+    # No source >= 60% of 3 members → cross-source theme is flagged.
+    assert cluster.cross_source is True
+
+    # A dominant source (>= 60%) is NOT flagged even though it spans 2 sources.
+    dominant = [
+        _loaded("d1", "shared claim", author="a1", source="reddit"),
+        _loaded("d2", "shared claim", author="a2", source="reddit"),
+        _loaded("d3", "shared claim", author="a3", source="reddit"),
+        _loaded("d4", "shared claim", author="a4", source="reviews"),
+    ]
+    cluster2 = _mix_cluster(dominant)
+    assert cluster2.source_mix == {"reddit": 3, "reviews": 1}  # 3/4 = 75% >= 60%
+    assert cluster2.cross_source is False
+
+
+def test_source_mix_reflects_all_members_not_just_quotes() -> None:
+    # Required test 3: source_mix counts ALL members, even though only the first
+    # is surfaced as a quote (MAX_QUOTES_PER_CLUSTER + single-quote candidate).
+    members = [
+        _loaded("c1", "shared claim", author="a1", source="reddit"),
+        _loaded("c2", "shared claim", author="a2", source="reviews"),
+        _loaded("c3", "shared claim", author="a3", source="reviews"),
+    ]
+    cluster = _mix_cluster(members)
+    # Only ONE quote is surfaced (quote_comment_indices=[0]) ...
+    assert len(cluster.quotes) == 1
+    # ... but the mix reflects all 3 members across both sources.
+    assert cluster.source_mix == {"reddit": 1, "reviews": 2}
+    assert sum(cluster.source_mix.values()) == 3
+
+
+def test_source_mix_never_affects_verdict_band() -> None:
+    # Required test 4: source_mix is disclosure, not scoring. Two clusters with
+    # IDENTICAL breadth but DIFFERENT source mixes must produce the same demand
+    # band — the band reads breadth/peers/authors, never source_mix.
+    from metalworks.research.synthesis.demand import strength
+
+    single = _mix_cluster(
+        [
+            _loaded("s1", "shared claim", author="a1", source="reddit"),
+            _loaded("s2", "shared claim", author="a2", source="reddit"),
+        ]
+    )
+    mixed = _mix_cluster(
+        [
+            _loaded("m1", "shared claim", author="a1", source="reddit"),
+            _loaded("m2", "shared claim", author="a2", source="reviews"),
+        ]
+    )
+    # Mixes differ; breadth/demand_score do not.
+    assert single.source_mix != mixed.source_mix
+    assert single.cross_source != mixed.cross_source
+    assert single.breadth_count == mixed.breadth_count
+    assert single.demand_score == mixed.demand_score
+
+    # The band function takes breadth/authors/peers — NOT source_mix — so both
+    # clusters band identically.
+    peers = [single.breadth_count, 5, 1]
+    band_single = strength(single.rank, single.distinct_author_count, 10, peers)
+    band_mixed = strength(mixed.rank, mixed.distinct_author_count, 10, peers)
+    assert band_single == band_mixed
 
 
 def test_cluster_ranker_raises_after_retries() -> None:

@@ -53,6 +53,10 @@ def render_run_markdown(research: Research) -> str:
             lines.append(
                 f"_signal: {cluster.signal} · {breadth_str} · {cluster.mention_count} mentions_"
             )
+            if len(cluster.source_mix) > 1:
+                mix_str = ", ".join(f"{src} {n}" for src, n in cluster.source_mix.items())
+                flag = " ⚠ cross-source" if cluster.cross_source else ""
+                lines.append(f"_sources: {mix_str}{flag}_")
             if cluster.quotes:
                 quote = cluster.quotes[0]
                 label = quote.source_name or quote.source
