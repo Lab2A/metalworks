@@ -15,6 +15,7 @@ import pytest
 import respx
 
 from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient, ArcticShiftReader
+from metalworks.research.arctic.api import ArcticShiftApiError
 from metalworks.research.arctic.api_reader import _month_window
 from metalworks.research.types import MonthRef
 
@@ -60,6 +61,55 @@ def test_submissions_by_ids_empty_short_circuits() -> None:
     client = ArcticShiftApiClient(min_interval=0.0)
     assert client.submissions_by_ids([]) == []
     client.close()
+
+
+# ── 422 "Timeout" is transient: retried, not a hard client error (0.3.3) ──────
+
+
+@respx.mock
+def test_422_timeout_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A wide query over a huge sub returns 422 'Timeout' once, then succeeds on retry."""
+    monkeypatch.setattr("time.sleep", lambda _s: None)  # no real backoff in tests
+    route = respx.get(f"{_BASE}/posts/search").mock(
+        side_effect=[
+            httpx.Response(422, text='{"error": "Timeout"}'),
+            httpx.Response(200, json={"data": [{"id": "p1", "subreddit": "big"}]}),
+        ]
+    )
+    client = ArcticShiftApiClient(min_interval=0.0, max_retries=3)
+    rows = client.search_submissions(subreddit="big", after=1, before=2, limit=5, sort="desc")
+    client.close()
+    assert rows == [{"id": "p1", "subreddit": "big"}]
+    assert route.call_count == 2  # first 422 retried, second 200 returned
+
+
+@respx.mock
+def test_422_timeout_exhausts_with_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A persistent 422 'Timeout' exhausts retries and raises a clear, actionable error."""
+    monkeypatch.setattr("time.sleep", lambda _s: None)
+    respx.get(f"{_BASE}/posts/search").mock(
+        return_value=httpx.Response(422, text='{"error": "Timeout"}')
+    )
+    client = ArcticShiftApiClient(min_interval=0.0, max_retries=2)
+    with pytest.raises(ArcticShiftApiError, match="422 Timeout"):
+        client.search_submissions(subreddit="big", after=1, before=2, limit=5, sort="desc")
+    client.close()
+
+
+@respx.mock
+def test_422_non_timeout_raises_immediately(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A genuine bad-parameter 422 (no 'timeout' body) is NOT retried — fails fast."""
+    sleeps: list[float] = []
+    monkeypatch.setattr("time.sleep", lambda s: sleeps.append(s))
+    route = respx.get(f"{_BASE}/posts/search").mock(
+        return_value=httpx.Response(422, text='{"error": "invalid subreddit"}')
+    )
+    client = ArcticShiftApiClient(min_interval=0.0, max_retries=4)
+    with pytest.raises(ArcticShiftApiError, match="422"):
+        client.search_submissions(subreddit="bad", after=1, before=2, limit=5, sort="desc")
+    client.close()
+    assert route.call_count == 1  # one shot, no retry
+    assert sleeps == []  # no backoff slept
 
 
 # ── the reader logic (recording stub client) ─────────────────────────────────

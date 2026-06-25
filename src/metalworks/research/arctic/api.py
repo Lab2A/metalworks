@@ -253,6 +253,27 @@ class ArcticShiftApiClient:
                 time.sleep(wait)
                 continue
 
+            # Arctic Shift returns 422 with a "Timeout" body when a search is too
+            # heavy server-side (a wide window over a multi-million-member sub) —
+            # a TRANSIENT condition, not a client error. Retry it like a 5xx; on
+            # exhaustion the loop re-raises the clear error recorded below.
+            if resp.status_code == 422 and "timeout" in resp.text.lower():
+                last_exc = ArcticShiftApiError(
+                    f"422 Timeout on {path}: the Arctic Shift query was too heavy "
+                    f"server-side — narrow the window or pull a smaller subreddit"
+                )
+                wait = min(2**attempt, 30)
+                logger.warning(
+                    "ArcticShiftApiClient: 422 Timeout on %s (query too heavy), "
+                    "retrying in %.1fs (%d/%d)",
+                    path,
+                    wait,
+                    attempt,
+                    self.max_retries,
+                )
+                time.sleep(wait)
+                continue
+
             if resp.status_code >= 400:
                 raise ArcticShiftApiError(f"{resp.status_code} on {path}: {resp.text[:200]}")
 

@@ -135,7 +135,7 @@ def _pull_corpus(
     months: list[MonthRef],
     per_sub_limit: int | None,
     selection: SourceSelection | None = None,
-) -> tuple[list[ExplorationItem], dict[str, CorpusRecord]]:
+) -> tuple[list[ExplorationItem], dict[str, CorpusRecord], list[str]]:
     """Pull candidate records from every configured source for triage.
 
     Each :class:`ItemSource` is pulled once per brief subreddit (Arctic windows
@@ -148,13 +148,25 @@ def _pull_corpus(
     `per_sub_limit` is a dev guard (None in production). Triage decides
     relevance, so we never pre-truncate by content. Item indices are the
     triage stage's indexing contract.
+
+    Best-effort per (source, subreddit): a single window that fails — e.g. a live
+    Arctic Shift ``422 Timeout`` on a huge subreddit even after the reader's
+    retries — is recorded in the returned caveats and skipped, never aborting the
+    run. The corpus degrades to what was pullable; only an empty corpus stops it.
     """
     window = SourceWindow(months=tuple(months))
     items: list[ExplorationItem] = []
     records_by_id: dict[str, CorpusRecord] = {}
+    pull_caveats: list[str] = []
     for source in deps.effective_sources(selection):
         for sub in brief.target_subreddits:
-            for r in source.pull(query=sub.name, window=window, limit=per_sub_limit):
+            try:
+                pulled = list(source.pull(query=sub.name, window=window, limit=per_sub_limit))
+            except Exception as exc:
+                logger.warning("pull failed for %s/%s: %s", source.source_id, sub.name, exc)
+                pull_caveats.append(f"{source.source_id}/{sub.name} skipped ({exc})")
+                continue
+            for r in pulled:
                 if not r.id:
                     continue
                 records_by_id[r.id] = r
@@ -170,7 +182,7 @@ def _pull_corpus(
                         num_comments=r.extra.get("num_comments"),
                     )
                 )
-    return items, records_by_id
+    return items, records_by_id, pull_caveats
 
 
 def _apply_magnitude_overlay(
@@ -385,21 +397,23 @@ def run_research(
     deps.emit("pulling")
 
     def _compute_pulling() -> PullingCheckpoint:
-        items_, records_ = _pull_corpus(
+        items_, records_, pull_caveats_ = _pull_corpus(
             deps, effective_brief, months=months, per_sub_limit=per_sub_limit, selection=selection
         )
-        return PullingCheckpoint(items=items_, records_by_id=records_)
+        return PullingCheckpoint(items=items_, records_by_id=records_, pull_caveats=pull_caveats_)
 
     pulling = cp.stage("pulling", PullingCheckpoint, _compute_pulling)
     items = pulling.items
     records_by_id = pulling.records_by_id
+    pull_caveats = pulling.pull_caveats
     if not items:
+        skipped = " Sources skipped: " + "; ".join(pull_caveats) + "." if pull_caveats else ""
         return _empty_report(
             deps=deps,
             report_id=report_id,
             brief=brief,
             months=months,
-            caveat="No threads pulled from the brief's subreddits in the window.",
+            caveat="No threads pulled from the brief's subreddits in the window." + skipped,
             selection=selection,
         )
 
@@ -481,6 +495,8 @@ def run_research(
     n_comments = hydrating.n_comments
     comments_error = hydrating.comments_error
     stage_errors: list[str] = list(hydrating.stage_errors_so_far)
+    if pull_caveats:
+        stage_errors.append("pull")
 
     # ── analyzing: synthesis ‖ web research (+ magnitude overlay) ────────────
     deps.emit("analyzing")
@@ -578,6 +594,8 @@ def run_research(
         stage_errors.append("triangulating")
 
     caveat_parts: list[str] = []
+    if pull_caveats:
+        caveat_parts.append("Some source windows were skipped: " + "; ".join(pull_caveats) + ".")
     if selection is not None and selection.caveat:
         # Surface the selector's floor / skipped-key caveat alongside stage
         # caveats so a reader sees WHY the source set is what it is.
