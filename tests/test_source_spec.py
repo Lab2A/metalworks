@@ -224,6 +224,7 @@ def test_no_builtin_spec_id_is_missing_from_the_map() -> None:
         "hackernews_archive",
         "hn_archive",
         "producthunt",
+        "samgov",
         "stackexchange",
         "discourse",
         "ats",

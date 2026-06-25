@@ -207,6 +207,7 @@ _READS: dict[str, str] = {
     "hn_archive": "Alias of `hackernews_archive` (the offline Hacker News archive)",
     "web": "Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl)",
     "producthunt": "Product Hunt launches + their comments",
+    "samgov": "U.S. government procurement notices (SAM.gov) — explicit unmet needs with a budget",
     "stackexchange": "Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …)",
     "ats": "Public company job boards (Greenhouse, Lever, Ashby) — the JD states the hiring need",
     "discourse": "Public Discourse community forums (vendor/product/practitioner boards) + their replies",  # noqa: E501
