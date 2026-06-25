@@ -36,6 +36,7 @@ from pydantic import BaseModel
 from metalworks._genai_client import build_genai_client
 from metalworks.errors import GroundingUnavailable, MissingExtraError
 from metalworks.llm.adapters._retry import with_backoff
+from metalworks.llm.adapters._timeout import resolve_timeout_s
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
     ChatCapabilities,
@@ -169,8 +170,9 @@ class GoogleChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult:
+        timeout_s = resolve_timeout_s(timeout_s)
         config = self._types.GenerateContentConfig(
             **self._config_kwargs(system, max_tokens, temperature, thinking_budget, timeout_s)
         )
@@ -193,8 +195,9 @@ class GoogleChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T:
+        timeout_s = resolve_timeout_s(timeout_s)
         config = self._types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=output_model,
@@ -243,8 +246,9 @@ class GoogleChatModel:
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult:
+        timeout_s = resolve_timeout_s(timeout_s, floor=300.0)
         types = self._types
         config = types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],

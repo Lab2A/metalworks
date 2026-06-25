@@ -710,3 +710,181 @@ def test_firecrawl_tbs_buckets(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _tbs_for_days(5) == "qdr:w"
     assert _tbs_for_days(20) == "qdr:m"
     assert _tbs_for_days(400) == "qdr:y"
+
+
+# ── 7. OpenAI streaming adapter (the reasoning-model-hang fix) ──
+#
+# The OpenAI/compat path is now streamed: complete_text / complete_structured
+# (native) iterate delta chunks and capture usage from the final include_usage
+# chunk. These offline tests use a FakeStreamingOpenAIClient — no real API.
+
+
+class _Delta:
+    def __init__(self, content: str | None) -> None:
+        self.content = content
+
+
+class _Choice:
+    def __init__(self, content: str | None) -> None:
+        self.delta = _Delta(content)
+
+
+class _ChatUsage:
+    def __init__(self, prompt: int, completion: int) -> None:
+        self.prompt_tokens = prompt
+        self.completion_tokens = completion
+
+
+class _Chunk:
+    """A streamed chat.completions chunk: a content delta OR a final usage chunk."""
+
+    def __init__(self, content: str | None = None, usage: Any = None) -> None:
+        # The include_usage chunk carries usage with an EMPTY choices list.
+        self.choices = [_Choice(content)] if content is not None else []
+        self.usage = usage
+
+
+def _delta_chunks(*texts: str, usage: Any = None) -> list[Any]:
+    chunks: list[Any] = [_Chunk(t) for t in texts]
+    chunks.append(_Chunk(None, usage if usage is not None else _ChatUsage(5, 9)))
+    return chunks
+
+
+class _FakeCompletions:
+    def __init__(self, chunks: Any) -> None:
+        self._chunks = chunks
+        self.calls: list[dict[str, Any]] = []
+
+    def create(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        return iter(self._chunks)
+
+
+class _FakeStreamingOpenAIClient:
+    def __init__(self, chunks: Any, init_kwargs: dict[str, Any]) -> None:
+        self.chat = SimpleNamespace(completions=_FakeCompletions(chunks))
+        self.init_kwargs = init_kwargs
+
+
+def _openai_with_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+    chunks: Any,
+    *,
+    hook: Any = None,
+    base_url: str | None = None,
+    native_structured: bool = True,
+) -> tuple[OpenAIChatModel, _FakeStreamingOpenAIClient]:
+    pytest.importorskip("httpx")
+    holder: dict[str, Any] = {}
+
+    def _factory(**kwargs: Any) -> _FakeStreamingOpenAIClient:
+        client = _FakeStreamingOpenAIClient(chunks, kwargs)
+        holder["client"] = client
+        return client
+
+    module = ModuleType("openai")
+    module.OpenAI = _factory  # type: ignore[attr-defined]
+    module.BadRequestError = type("BadRequestError", (Exception,), {})  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "openai", module)
+    monkeypatch.delenv("METALWORKS_LLM_TIMEOUT", raising=False)
+    model = OpenAIChatModel(
+        api_key="sk-test",
+        base_url=base_url,
+        native_structured=native_structured,
+        on_generation=hook,
+    )
+    return model, holder["client"]
+
+
+def test_openai_complete_text_streams_accumulates_text_and_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[dict[str, Any]] = []
+    chunks = _delta_chunks("Hel", "lo ", "world", usage=_ChatUsage(5, 9))
+    model, client = _openai_with_chunks(monkeypatch, chunks, hook=events.append)
+    result = model.complete_text(system="s", user="u")
+    # accumulated text == the full message content
+    assert result.text == "Hello world"
+    assert result.usage.input_tokens == 5
+    assert result.usage.output_tokens == 9
+    # usage flows to the observability hook
+    assert events == [
+        {
+            "provider": "openai",
+            "model": "gpt-5",
+            "input_tokens": 5,
+            "output_tokens": 9,
+            "kind": "text",
+        }
+    ]
+    # the create() call streams with usage included
+    call = client.chat.completions.calls[0]
+    assert call["stream"] is True
+    assert call["stream_options"] == {"include_usage": True}
+
+
+def test_openai_streaming_guards_none_delta_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An empty-delta chunk (content=None but with a choices entry) is skipped.
+    chunks = [_Chunk("a"), _Chunk(""), _Chunk("b"), _Chunk(None, _ChatUsage(1, 1))]
+    model, _ = _openai_with_chunks(monkeypatch, chunks)
+    assert model.complete_text(system="s", user="u").text == "ab"
+
+
+def test_openai_client_constructed_with_max_retries_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _model, client = _openai_with_chunks(monkeypatch, _delta_chunks("ok"))
+    assert client.init_kwargs["max_retries"] == 0
+
+
+def test_openai_read_timeout_uses_resolved_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    model, client = _openai_with_chunks(monkeypatch, _delta_chunks("ok"))
+    # explicit timeout_s flows to the httpx READ leg (gap-between-chunks budget)
+    model.complete_text(system="s", user="u", timeout_s=42.0)
+    timeout = client.chat.completions.calls[0]["timeout"]
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.read == 42.0
+    assert timeout.connect == 15.0
+
+
+def test_openai_read_timeout_defaults_to_llm_timeout_s(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No explicit timeout_s and no env knob → the 300s reasoning-safe default.
+    model, client = _openai_with_chunks(monkeypatch, _delta_chunks("ok"))
+    model.complete_text(system="s", user="u")
+    assert client.chat.completions.calls[0]["timeout"].read == 300.0
+
+
+def test_openai_read_timeout_honors_env_knob(monkeypatch: pytest.MonkeyPatch) -> None:
+    model, client = _openai_with_chunks(monkeypatch, _delta_chunks("ok"))
+    monkeypatch.setenv("METALWORKS_LLM_TIMEOUT", "75")
+    model.complete_text(system="s", user="u")
+    assert client.chat.completions.calls[0]["timeout"].read == 75.0
+
+
+def test_openai_structured_streams_and_validates(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The native json_schema path streams the JSON text, then validates it —
+    # identical output to the non-streamed path.
+    chunks = _delta_chunks('{"x": ', "1, ", '"y": 2}', usage=_ChatUsage(2, 4))
+    model, client = _openai_with_chunks(monkeypatch, chunks, native_structured=True)
+    point = model.complete_structured(system="s", user="u", output_model=_Point)
+    assert point == _Point(x=1, y=2)
+    call = client.chat.completions.calls[0]
+    assert call["stream"] is True
+    assert call["response_format"]["type"] == "json_schema"
+
+
+def test_openai_stalled_stream_surfaces_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A stream that dies mid-iteration (the read-timeout shape) is not swallowed:
+    # the error propagates cleanly rather than hanging.
+    class _StalledTimeout(Exception):
+        pass
+
+    def _gen() -> Any:
+        yield _Chunk("partial ")
+        raise _StalledTimeout("no data for read timeout")
+
+    model, _ = _openai_with_chunks(monkeypatch, _gen())
+    with pytest.raises(_StalledTimeout):
+        model.complete_text(system="s", user="u")

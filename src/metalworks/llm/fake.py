@@ -63,7 +63,7 @@ class FakeChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult:
         self.calls.append({"kind": "text", "system": system, "user": user})
         text = self.text_responses.pop(0) if self.text_responses else f"echo: {user[:200]}"
@@ -78,7 +78,7 @@ class FakeChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T:
         self.calls.append(
             {"kind": "structured", "system": system, "user": user, "output_model": output_model}
@@ -111,7 +111,7 @@ class FakeChatModel:
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult:
         self.calls.append({"kind": "grounded", "system": system, "user": user})
         if not self.capabilities.native_grounding:

@@ -212,6 +212,38 @@ def setting(name: str, *, arg: str | None = None, env: str | None = None) -> str
     return str(value) if value is not None else None
 
 
+# The single honest per-call LLM timeout budget (seconds). Raised from the old
+# 120s adapter default because a reasoning model's hidden thinking phase plus
+# its output must fit inside one non-retried call — 120s could time out
+# mid-reasoning before any output existed. Overridable per machine/run.
+_DEFAULT_LLM_TIMEOUT_S = 300.0
+
+
+def llm_timeout_s() -> float:
+    """Resolve the per-call LLM timeout budget in seconds.
+
+    Precedence: ``METALWORKS_LLM_TIMEOUT`` env > ``llm_timeout`` config setting >
+    ``300.0`` default. This is the budget the chat adapters apply when a caller
+    passes no explicit ``timeout_s`` — for the streaming OpenAI path it is the
+    READ (gap-between-chunks) timeout, so a long-but-progressing reasoning
+    stream completes while a genuinely stalled one fails cleanly. A non-positive
+    or unparseable value degrades to the default rather than crashing a run.
+    Lazy by design: nothing here runs at import (env/config read on call only).
+    """
+    raw: str | None = os.environ.get("METALWORKS_LLM_TIMEOUT")
+    if not raw:
+        configured = load_config().get("llm_timeout")
+        raw = str(configured) if configured is not None else None
+    if raw:
+        try:
+            parsed = float(raw)
+        except (TypeError, ValueError):
+            return _DEFAULT_LLM_TIMEOUT_S
+        if parsed > 0:
+            return parsed
+    return _DEFAULT_LLM_TIMEOUT_S
+
+
 # ── [sources] table ──────────────────────────────────────────────────────────
 
 
@@ -740,6 +772,7 @@ __all__ = [
     "default_source_id",
     "default_store",
     "enabled_source_ids",
+    "llm_timeout_s",
     "load_config",
     "load_sources_config",
     "magnitude_provider_ids",

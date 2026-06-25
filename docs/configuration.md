@@ -59,6 +59,22 @@ METALWORKS_MODEL=openai/gpt-5 metalworks research ideate "..."        # everywhe
 Precedence: explicit `model=` / `--model` ref > `METALWORKS_MODEL` env > config file > first
 present key.
 
+## LLM call timeout (reasoning models)
+
+Each LLM call has a per-call timeout budget, default **300s**. The OpenAI/compatible path
+streams, so this is a **read (gap-between-chunks)** timeout, not a total — a reasoning model
+that is slow to the first token or trickles output completes as long as no single gap exceeds
+the budget, while a genuinely stalled stream still fails cleanly. Raise it for very-long-thinking
+models via `METALWORKS_LLM_TIMEOUT` (seconds, applies to every surface — CLI, MCP, SDK) or the
+`llm_timeout` config setting:
+
+```bash
+METALWORKS_LLM_TIMEOUT=600 metalworks research run -q "..." --model deepseek/deepseek-v4-flash
+```
+
+Precedence: `METALWORKS_LLM_TIMEOUT` env > `llm_timeout` config > `300`. Grounded web calls keep a
+higher floor.
+
 ## Where Reddit data comes from
 
 Submissions and comments come from the **live Arctic Shift API** by default — current data,

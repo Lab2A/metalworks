@@ -120,7 +120,7 @@ class ChatModel(Protocol):
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult: ...
 
     def complete_structured(
@@ -132,7 +132,7 @@ class ChatModel(Protocol):
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T: ...
 
 
@@ -152,5 +152,5 @@ class GroundedChatModel(Protocol):
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult: ...

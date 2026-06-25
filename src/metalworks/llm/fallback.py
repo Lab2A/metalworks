@@ -106,7 +106,7 @@ class FallbackChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult:
         last: RateLimitedError | None = None
         for index, model in enumerate(self._models):
@@ -132,7 +132,7 @@ class FallbackChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T:
         last: RateLimitedError | None = None
         for index, model in enumerate(self._models):
@@ -159,7 +159,7 @@ class FallbackChatModel:
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult:
         last: RateLimitedError | None = None
         for index, model in enumerate(self._models):

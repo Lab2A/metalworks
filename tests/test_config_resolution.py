@@ -455,3 +455,32 @@ def test_hn_factory_preserves_explicit_archive_reader(monkeypatch: pytest.Monkey
     reader = HackerNewsArchiveReader(data_root="./hn-corpus")
     source = get_source("hackernews_archive", reader=reader)
     assert source._reader is reader  # type: ignore[attr-defined]  # noqa: SLF001 - explicit reader kept
+
+
+# ── llm_timeout_s: the configurable reasoning-safe timeout knob ──
+
+
+def test_llm_timeout_defaults_to_300(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("METALWORKS_LLM_TIMEOUT", raising=False)
+    monkeypatch.setattr(config, "load_config", lambda: {})
+    assert config.llm_timeout_s() == 300.0
+
+
+def test_llm_timeout_reads_config_setting(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("METALWORKS_LLM_TIMEOUT", raising=False)
+    monkeypatch.setattr(config, "load_config", lambda: {"llm_timeout": 90})
+    assert config.llm_timeout_s() == 90.0
+
+
+def test_llm_timeout_env_wins_over_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "load_config", lambda: {"llm_timeout": 90})
+    monkeypatch.setenv("METALWORKS_LLM_TIMEOUT", "45")
+    assert config.llm_timeout_s() == 45.0
+
+
+def test_llm_timeout_bad_value_degrades_to_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "load_config", lambda: {})
+    monkeypatch.setenv("METALWORKS_LLM_TIMEOUT", "not-a-number")
+    assert config.llm_timeout_s() == 300.0
+    monkeypatch.setenv("METALWORKS_LLM_TIMEOUT", "-5")
+    assert config.llm_timeout_s() == 300.0

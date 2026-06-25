@@ -31,6 +31,7 @@ from pydantic import BaseModel
 
 from metalworks.errors import GroundingUnavailable, MissingExtraError, MissingKeyError
 from metalworks.llm.adapters._retry import with_backoff
+from metalworks.llm.adapters._timeout import resolve_timeout_s
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
     ChatCapabilities,
@@ -128,7 +129,10 @@ class AnthropicChatModel:
             thinking=True,
         )
         self._on_generation = on_generation
-        self._client: Any = anthropic.Anthropic(api_key=key)
+        # max_retries=0: the SDK retries a retryable timeout up to 2x by default,
+        # silently multiplying the budget. Off, so metalworks' timeout_s is the
+        # single honest budget and ``with_backoff`` stays the sole retry.
+        self._client: Any = anthropic.Anthropic(api_key=key, max_retries=0)
 
     # ── ChatModel ──
 
@@ -140,8 +144,9 @@ class AnthropicChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> TextResult:
+        timeout_s = resolve_timeout_s(timeout_s)
         request_kwargs: dict[str, Any] = {}
         effective_max_tokens = max_tokens
         if thinking_budget > 0:
@@ -182,8 +187,9 @@ class AnthropicChatModel:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         thinking_budget: int = 0,
-        timeout_s: float = 120.0,
+        timeout_s: float | None = None,
     ) -> T:
+        timeout_s = resolve_timeout_s(timeout_s)
         emit_tool = {
             "name": "emit",
             "description": "Emit the structured result matching the schema.",
@@ -234,8 +240,9 @@ class AnthropicChatModel:
         user: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
-        timeout_s: float = 180.0,
+        timeout_s: float | None = None,
     ) -> GroundedResult:
+        timeout_s = resolve_timeout_s(timeout_s, floor=300.0)
         response = with_backoff(
             lambda: self._client.messages.create(
                 model=self.model_id,
