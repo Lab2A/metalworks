@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "metalworks"
-version = "0.1.1"
+version = "0.2.0"
 description = "Open-source marketing research and Reddit engagement library — demand reports from real conversations, usable as a Python library, CLI, MCP server, or Claude Code plugin."
 readme = "README.md"
 license = "MIT"

@@ -23,7 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 import metalworks
-from metalworks import config
+from metalworks import config, preflight
 
 if TYPE_CHECKING:
     from metalworks.contract import DemandReport
@@ -110,43 +110,13 @@ def version() -> None:
 def _doctor_hints() -> list[str]:
     """Compute the actionable Hints lines `doctor` prints (and `--fix` acts on).
 
-    Pure read-only: inspects env keys and importable modules only. Returns the
-    same human-readable lines the report shows, so the report and the repair
-    path can never drift.
+    Delegates to :func:`metalworks.preflight.doctor_hints` — the single source of
+    truth shared with the machine-readable ``preflight()`` report, so the report
+    and the repair path can never drift.
     """
-    # openrouter shares the openai SDK, so its missing-extra hint points at [openai].
-    _extra_for = {"openrouter": "openai"}
-    hints: list[str] = []
-    for provider, env_vars, module in _PROVIDER_MATRIX:
-        found = next((v for v in env_vars if os.environ.get(v)), None)
-        if found and not _module_available(module):
-            extra = _extra_for.get(provider, provider)
-            hints.append(
-                f"{found} is set but `{module}` is not installed → "
-                f'pip install "metalworks[{extra}]"'
-            )
-    if not any(os.environ.get(v) for _, evs, _ in _PROVIDER_MATRIX for v in evs):
-        hints.append("No provider key found → set one (e.g. OPENAI_API_KEY) to run the pipeline.")
-    if not any(os.environ.get(v) for v in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")):
-        if _module_available("fastembed"):
-            hints.append(
-                "No embedding key → using the local model (no key needed). "
-                "Run `metalworks models warm` to pre-download it."
-            )
-        else:
-            hints.append(
-                'No embedding key and fastembed not installed → pip install "metalworks[research]" '
-                "(or set GOOGLE_API_KEY / OPENAI_API_KEY)."
-            )
-    if _module_available("playwright"):
-        from metalworks.render import chromium_present
+    from metalworks.preflight import doctor_hints
 
-        if not chromium_present():
-            hints.append(
-                "Browser extra installed but Chromium is missing → metalworks browser install "
-                "(or set FIRECRAWL_API_KEY to render without a local browser)."
-            )
-    return hints
+    return doctor_hints()
 
 
 def _embeddings_are_local() -> bool:
@@ -166,18 +136,13 @@ def _embeddings_are_local() -> bool:
 def _renderer_status() -> tuple[str, str]:
     """Which renderer tier the next render/teardown would use — without launching one.
 
-    Returns ``(tier, human_detail)``. The tier the design pillar reports as its
-    ``grounding_tier`` when it runs: ``playwright`` (full teardown + style audits),
-    ``firecrawl`` (hosted, screenshot-only), or ``none`` (design falls back to the
-    model's own knowledge — no real competitor teardown).
+    Delegates to :func:`metalworks.preflight.renderer_status` (the shared source of
+    truth). Returns ``(tier, human_detail)``: ``playwright`` / ``firecrawl`` /
+    ``none``.
     """
-    from metalworks.render import chromium_present
+    from metalworks.preflight import renderer_status
 
-    if _module_available("playwright") and chromium_present():
-        return ("playwright", "Playwright (owned Chromium) → full teardown + style audits")
-    if os.environ.get("FIRECRAWL_API_KEY"):
-        return ("firecrawl", "Firecrawl (hosted) → screenshot-only, no style audits")
-    return ("none", "no renderer → design runs from model knowledge (no competitor teardown)")
+    return renderer_status()
 
 
 @app.command()
@@ -198,11 +163,21 @@ def doctor(
     the remaining steps (``pip install …`` / ``export …``) as copy-paste guidance.
     It never runs pip and never mutates the environment.
     """
-    console.print(f"[bold]metalworks {metalworks.__version__}[/bold]")
+    # Single source of truth: the doctor report is a pretty-printer over the same
+    # `preflight()` the SDK / MCP / banner read (plus a few CLI-only sections).
+    report = preflight.preflight(check_update=True)
+
+    console.print(f"[bold]metalworks {report.version}[/bold]")
+    if report.update is not None and report.update.update_available:
+        u = report.update
+        console.print(
+            f"[yellow]update available[/yellow]: {u.installed} → {u.latest}  "
+            "[dim](pip install -U metalworks)[/dim]"
+        )
 
     console.print("\n[bold]Optional extras[/bold]")
-    for extra, module in _EXTRA_PROBES:
-        present = _module_available(module)
+    for extra, _module in _EXTRA_PROBES:
+        present = report.extras.get(extra, False)
         mark = "[green]installed[/green]" if present else "[dim]not installed[/dim]"
         console.print(f"  {extra:<10} {mark}")
 
@@ -213,13 +188,22 @@ def doctor(
         console.print(f"  {label:<14} {status}")
 
     console.print("\n[bold]Resolved models[/bold]")
-    model_ref = config.setting("model")
-    for label, resolver in (
-        ("chat", lambda: config.resolve_chat(model_ref)),
-        ("embedding", config.resolve_embeddings),
-    ):
-        markup, _ = _resolved_model_id(label, resolver)
-        console.print(f"  {label:<10} {markup}")
+    chat_cell = (
+        f"[green]{report.resolved_chat}[/green]"
+        if report.resolved_chat
+        else "[yellow]unresolved[/yellow]"
+    )
+    emb_cell = (
+        f"[green]{report.resolved_embeddings}[/green]"
+        if report.resolved_embeddings
+        else "[yellow]unresolved[/yellow]"
+    )
+    console.print(f"  {'chat':<10} {chat_cell}")
+    console.print(f"  {'embedding':<10} {emb_cell}")
+
+    console.print("\n[bold]Corpus reader[/bold]")
+    reader_note = f" [dim]({report.reader_detail})[/dim]" if report.reader_detail else ""
+    console.print(f"  [green]{report.active_reader}[/green]{reader_note}")
 
     store_path = config.setting("store") or str(Path.home() / ".metalworks" / "store.db")
     console.print("\n[bold]Store[/bold]")
@@ -299,6 +283,120 @@ def _doctor_fix(hints: list[str]) -> None:
 
     if not acted:
         console.print("  [green]nothing to repair.[/green]")
+
+
+@app.command(name="preflight")
+def preflight_cmd(
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the PreflightReport as JSON (for machines)."),
+    ] = False,
+) -> None:
+    """Proactive preflight: is everything set up + is there an update?
+
+    Reuses the same checks ``doctor`` runs (extras / keys / resolved models /
+    corpus reader / renderer / hints) plus a cached, offline-safe PyPI update
+    check, in one machine-readable :class:`~metalworks.contract.PreflightReport`.
+    Pass ``--json`` for the raw report; the skills' preamble runs this first.
+    """
+    report = preflight.preflight(check_update=True)
+    if as_json:
+        console.print_json(report.model_dump_json())
+        return
+
+    console.print(f"[bold]metalworks {report.version}[/bold]")
+    if report.update is not None and report.update.update_available:
+        u = report.update
+        console.print(
+            f"[yellow]update available[/yellow]: {u.installed} → {u.latest}  "
+            "[dim](pip install -U metalworks)[/dim]"
+        )
+    console.print(f"corpus reader  [green]{report.active_reader}[/green]")
+    chat_cell = (
+        f"[green]{report.resolved_chat}[/green]"
+        if report.resolved_chat
+        else "[yellow]unresolved[/yellow]"
+    )
+    console.print(f"chat model     {chat_cell}")
+    if report.issues:
+        console.print("\n[bold]Issues[/bold]")
+        for issue in report.issues:
+            color = "red" if issue.severity == "error" else "yellow"
+            console.print(f"  [{color}]•[/{color}] {issue.message}")
+    else:
+        console.print("\n[green]all set[/green]")
+    if not report.ok:
+        console.print(
+            "\n[dim]Some checks need attention — run `metalworks doctor` for the full report.[/dim]"
+        )
+
+
+# The proactive one-line banner — see `_emit_preflight_banner`. Marker files live
+# under ~/.metalworks/ so the guard is session-once and survives a process exit.
+_BANNER_GUARD = "preflight-banner-shown"
+_BANNER_TTL_SECONDS = 6 * 60 * 60  # don't repeat the banner more than ~4x/day
+
+
+def _banner_disabled() -> bool:
+    value = config.setting("preflight_banner")
+    return value is not None and value.strip().lower() in ("false", "0", "no", "off")
+
+
+def _banner_guard_path() -> Path:
+    return Path.home() / ".metalworks" / _BANNER_GUARD
+
+
+def _banner_recently_shown() -> bool:
+    """True when the banner fired within the TTL — the session-once guard."""
+    import time
+
+    try:
+        ts = float(_banner_guard_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return (time.time() - ts) < _BANNER_TTL_SECONDS
+
+
+def _mark_banner_shown() -> None:
+    import time
+
+    try:
+        path = _banner_guard_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(int(time.time())), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _emit_preflight_banner() -> None:
+    """Print a ONE-LINE stderr banner before heavy work — silent when healthy.
+
+    Cached (the update check uses its ~24h cache; the local probes are cheap),
+    session-once (a ~/.metalworks/ timestamp guard), gated by ``preflight_banner``
+    (default on), and NON-BLOCKING: every failure path is swallowed and it never
+    changes the exit code or stops the command.
+    """
+    try:
+        if _banner_disabled() or _banner_recently_shown():
+            return
+        report = preflight.preflight(check_update=True)
+        parts: list[str] = []
+        issue_count = len(report.issues)
+        if issue_count:
+            parts.append(f"{issue_count} setup issue(s)")
+        if report.update is not None and report.update.update_available:
+            u = report.update
+            parts.append(f"update {u.installed}→{u.latest} available")
+        # Always set the guard so we don't recompute every command this session.
+        _mark_banner_shown()
+        if not parts:
+            return  # silent when healthy
+        err_console.print(
+            f"[yellow]⚠ metalworks:[/yellow] {' · '.join(parts)} — run 'metalworks doctor'"
+        )
+    except Exception:
+        # Non-blocking by contract: a banner failure must never break the command.
+        return
 
 
 def _doctor_sources_section() -> None:
@@ -925,17 +1023,10 @@ def config_set(key: str, value: str) -> None:
 
 # ── models sub-app ──────────────────────────────────────────────────────────
 
-# Provider → (key env var(s), importable SDK/extra module) for the reachability
-# matrix. Mirrors `doctor`'s _EXTRA_PROBES / _KEY_PROBES but keyed by the
-# provider the resolvers actually route to, so a row maps 1:1 to "can metalworks
-# reach this provider right now". OpenRouter is keyed on OPENROUTER_API_KEY and
-# rides the OpenAI SDK (it is an OpenAI-compatible endpoint).
-_PROVIDER_MATRIX: tuple[tuple[str, tuple[str, ...], str], ...] = (
-    ("anthropic", ("ANTHROPIC_API_KEY",), "anthropic"),
-    ("openai", ("OPENAI_API_KEY",), "openai"),
-    ("google", ("GOOGLE_API_KEY", "GEMINI_API_KEY"), "google.genai"),
-    ("openrouter", ("OPENROUTER_API_KEY",), "openai"),
-)
+# Provider/key/extra probe matrices are the shared source of truth in
+# `metalworks.preflight` (so `doctor`, `preflight()`, and `models list` all read
+# the same rows). Re-exported here under the CLI's historical names.
+_PROVIDER_MATRIX = preflight.PROVIDER_MATRIX
 
 
 def _resolved_model_id(label: str, resolver: Any) -> tuple[str, str]:
@@ -1642,6 +1733,7 @@ def research_run(
     ] = None,
 ) -> None:
     """Run the research pipeline from a --question (no brief.json needed) or a --brief file."""
+    _emit_preflight_banner()
     from metalworks.contract import ResearchBrief, RunSummary
     from metalworks.research import run_research
     from metalworks.research.arctic import ArcticShiftApiClient
@@ -1782,6 +1874,7 @@ def research_refresh(
     ] = None,
 ) -> None:
     """Re-synthesize a stored report against the current corpus → a new pinned version + diff."""
+    _emit_preflight_banner()
     from metalworks.contract import DemandReport, RunSummary
     from metalworks.research.arctic import ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
@@ -1916,6 +2009,7 @@ def research_position(
     ] = None,
 ) -> None:
     """Derive a grounded positioning wedge from a stored report (one LLM call)."""
+    _emit_preflight_banner()
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.synthesis import build_positioning_brief
 
@@ -1982,6 +2076,7 @@ def research_landscape(
     ] = None,
 ) -> None:
     """Map the full landscape: competitors + existing solutions + cost of doing nothing."""
+    _emit_preflight_banner()
     from metalworks.research import run_landscape
     from metalworks.research.deps import ResearchDeps
 
@@ -2053,6 +2148,7 @@ def research_ideate(
     ] = None,
 ) -> None:
     """Frame an idea to test — idea-first (sharpen a pitch) or evidence-first (--from-report)."""
+    _emit_preflight_banner()
     if not idea and not from_report:
         err_console.print("[red]Provide an idea, or --from-report <report_id>.[/red]")
         raise typer.Exit(code=1)
@@ -2134,6 +2230,7 @@ def research_assess(
     ] = None,
 ) -> None:
     """Verdict: GO / PIVOT / NO-GO — the deterministic gap over demand + landscape."""
+    _emit_preflight_banner()
     from metalworks.research import run_assessment, run_landscape
     from metalworks.research.deps import ResearchDeps
 
@@ -2253,6 +2350,7 @@ def research_validate(
     engine's recommendation is the pre-filled default). Pass --auto to run it
     headlessly. Either way the final report is saved to the store.
     """
+    _emit_preflight_banner()
     from metalworks.research import validate as run_validate
     from metalworks.research.deps import ResearchDeps
 
@@ -2572,6 +2670,7 @@ def build_init(
     ] = "empty",
 ) -> None:
     """Derive a grounded BuildSpec and scaffold a cite-or-die build harness (no product code)."""
+    _emit_preflight_banner()
     from typing import Literal, cast, get_args
 
     from metalworks.build import build_spec_from_report, scaffold
@@ -2662,6 +2761,7 @@ def distribution_strategy(
     ] = None,
 ) -> None:
     """Route a stored report's named entities + signals into test→focus channel experiments."""
+    _emit_preflight_banner()
     from metalworks.research import build_channel_strategy
     from metalworks.research.deps import ResearchDeps
 
@@ -2719,6 +2819,7 @@ def distribution_assets(
     ] = None,
 ) -> None:
     """Draft channel-SHAPED, drafting-only distribution assets per channel (DRAFTING ONLY)."""
+    _emit_preflight_banner()
     from metalworks.research import build_channel_assets, build_channel_strategy
     from metalworks.research.deps import ResearchDeps
 
@@ -2787,6 +2888,7 @@ def distribution_data_report(
 ) -> None:
     """Project a stored report into a corpus-derived data report — a deterministic ranking
     of its clusters with REAL counts, real permalinks, and a verbatim quote per row."""
+    _emit_preflight_banner()
     from metalworks.research import build_data_asset
     from metalworks.research.deps import ResearchDeps
 
@@ -2854,6 +2956,7 @@ def distribution_geo(
     ] = None,
 ) -> None:
     """GEO / LLM-citability: participation targets, citability probes, answer-first briefs."""
+    _emit_preflight_banner()
     from metalworks.research import build_geo_plan
     from metalworks.research.deps import ResearchDeps
 
@@ -2924,6 +3027,7 @@ def distribution_engage(
 ) -> None:
     """Participation/execution arm (D9): draft a DISCLOSED, compliance-gated reply for one
     GEO participation target (a real thread). DRAFTING ONLY — a human posts it (gated)."""
+    _emit_preflight_banner()
     from metalworks.contract import ParticipationTarget
     from metalworks.research import participation_reply
     from metalworks.research.deps import ResearchDeps
@@ -2991,6 +3095,7 @@ def distribution_requirements(
     ] = None,
 ) -> None:
     """Emit the distribution → build requirements (D3): embedded loops + the conversion surface."""
+    _emit_preflight_banner()
     from metalworks.research import build_channel_strategy
     from metalworks.research import distribution_requirements as _distribution_requirements
     from metalworks.research.deps import ResearchDeps
@@ -3061,6 +3166,7 @@ def distribution_plan(
     ] = None,
 ) -> None:
     """Sequence the report's channels into pushes (moments) + streams (continuous) (D7)."""
+    _emit_preflight_banner()
     from metalworks.research import build_channel_strategy, plan_distribution
     from metalworks.research.deps import ResearchDeps
 
@@ -3112,6 +3218,7 @@ def distribution_measure(
     ] = None,
 ) -> None:
     """Emit the per-channel success metric + instrumentation to wire BEFORE the push (D8)."""
+    _emit_preflight_banner()
     from metalworks.research import build_channel_strategy, channel_metrics
     from metalworks.research.deps import ResearchDeps
 
@@ -3386,26 +3493,10 @@ def mcp_serve(
 
 # ── Shared helpers ──────────────────────────────────────────────────────────
 
-_EXTRA_PROBES: tuple[tuple[str, str], ...] = (
-    ("anthropic", "anthropic"),
-    ("openai", "openai"),
-    ("google", "google.genai"),
-    ("reddit", "redditwarp"),
-    ("arctic", "duckdb"),
-    ("exa", "exa_py"),
-    ("tavily", "tavily"),
-    ("browser", "playwright"),
-    ("mcp", "mcp"),
-)
-
-_KEY_PROBES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("anthropic", ("ANTHROPIC_API_KEY",)),
-    ("openai", ("OPENAI_API_KEY",)),
-    ("google", ("GOOGLE_API_KEY", "GEMINI_API_KEY")),
-    ("exa", ("EXA_API_KEY",)),
-    ("tavily", ("TAVILY_API_KEY",)),
-    ("reddit", ("REDDIT_CLIENT_ID",)),
-)
+# The extras / keys probe matrices are the shared source of truth in
+# `metalworks.preflight`; re-exported here under the CLI's historical names.
+_EXTRA_PROBES = preflight.EXTRA_PROBES
+_KEY_PROBES = preflight.KEY_PROBES
 
 _SECRET_KEYS = frozenset(
     {
@@ -3424,12 +3515,7 @@ _SECRET_KEYS = frozenset(
 
 
 def _module_available(module: str) -> bool:
-    import importlib.util
-
-    try:
-        return importlib.util.find_spec(module) is not None
-    except (ImportError, ValueError):
-        return False
+    return preflight.module_available(module)
 
 
 def _resolve_report_id(store: RunRepo, report_id: str | None) -> str:

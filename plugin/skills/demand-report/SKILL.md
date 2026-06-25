@@ -3,6 +3,14 @@ name: demand-report
 description: Produce a demand report for a product idea from real Reddit conversations. Use when the user wants to validate an idea, gauge demand, find unmet needs, or understand what consumers say about a category. Works with no API keys (sampled corpus + synthesis here) or with an LLM key (the full clustered pipeline).
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are running the metalworks demand-report flow. The goal is a report grounded
 in real Reddit conversations, never in your own assumptions.
 

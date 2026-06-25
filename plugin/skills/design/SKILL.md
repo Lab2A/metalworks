@@ -3,6 +3,14 @@ name: design
 description: Author a grounded-but-flexible visual design system for a finished demand report — an aesthetic direction, a SAFE/RISK choice per design dimension (typography, color, layout, spacing, motion, decoration), and a DESIGN.md source of truth. Use after a demand report exists and the user asks "design the brand", "what should this look like", "give me a design system", "what fonts/colors", or wants a look grounded in what rivals actually do rather than generic taste. The competition is read at the richest tier available (a real browser teardown of competitor sites > web text > the model's own knowledge); the result is honest about which tier produced it. Authors a system; it does NOT write product CSS.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are authoring the VISUAL design system for one report — the look's counterpart
 to positioning's words. Unlike copy, design is taste, so grounding here is
 DIRECTIONAL, never cited: the competitive landscape INFORMS the bet ("rivals skew

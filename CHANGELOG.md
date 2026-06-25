@@ -8,6 +8,38 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-25
+
+### Added
+- **Proactive preflight + the skill preamble.** A new `preflight` primitive surfaces "is
+  everything set up + is there an update" **before** the work runs, instead of failing midway.
+  It is doctor's machine-readable twin (`PreflightReport`) and reports the active corpus reader
+  (`arctic_shift_api` | `hf_parquet` | `supabase_mirror`), resolved chat/embedding models,
+  installed extras, present keys, and actionable setup issues. Available on all four surfaces:
+  `metalworks preflight` (with `--json`), `Metalworks.preflight()`, the `preflight` MCP tool
+  (Tier 1, zero-key, offline-safe), and a shared **"## Preamble (run first)"** block added to all
+  22 plugin skills so the agent runs preflight first. `PreflightReport` / `PreflightIssue` /
+  `UpdateStatus` are new `metalworks.contract` models (additive — old payloads still validate).
+- **PyPI update check.** A cached, offline-safe check (`metalworks._update_check`) compares the
+  installed version against the latest on PyPI. Cached once-daily in `~/.metalworks/`, disable-able
+  via the `update_check = false` config setting, snooze-able, and **silent on any failure** (`httpx`
+  is lazy-imported inside the fetch only — `import metalworks` stays network-free). doctor and the
+  banner show an "update available" line when one exists.
+- **Proactive preflight banner.** Heavy research / build / distribution commands print a one-line
+  stderr banner before doing work — **silent when healthy**, otherwise e.g.
+  `metalworks: 2 setup issue(s) · update 0.1.1->0.2.0 available — run 'metalworks doctor'`. It is
+  cached (the update-check cache + cheap local probes), session-once (a `~/.metalworks/` timestamp
+  guard), gated by the `preflight_banner` config setting (default on), and **non-blocking** — it
+  never changes an exit code or stops a command. The MCP stdio server prints the same one-line
+  status to **stderr** at startup (stdout stays the clean protocol channel).
+
+### Changed
+- **`doctor` now renders from `preflight()`** — a single source of truth. The pure check helpers
+  (extras / keys / resolved-models / renderer / corpus-reader / hints) moved into
+  `metalworks.preflight`; both `doctor` and `preflight()` call the same code, so they can never
+  drift. doctor keeps `--fix` and stays a pretty-printing superset, and now also reports the active
+  corpus reader and an "update available" line.
+
 ## [0.1.1] - 2026-06-25
 
 ### Changed

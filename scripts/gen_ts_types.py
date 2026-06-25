@@ -98,6 +98,8 @@ from metalworks.contract import (  # noqa: E402
     PivotTarget,
     PositioningBrief,
     PostLintVerdict,
+    PreflightIssue,
+    PreflightReport,
     PriceEvidence,
     PriceFinding,
     PriceHypothesis,
@@ -125,6 +127,7 @@ from metalworks.contract import (  # noqa: E402
     SynthesisThresholds,
     TargetSubreddit,
     TriageThresholds,
+    UpdateStatus,
     ValidationResult,
     WebFinding,
     WedgeClaim,
@@ -234,6 +237,10 @@ MODELS: list[type[BaseModel]] = [
     BuildPersona,
     PricingTier,
     BuildSpec,
+    # preflight — the proactive setup + update report (doctor's machine-readable twin)
+    UpdateStatus,
+    PreflightIssue,
+    PreflightReport,
     # reddit
     ComplianceVerdict,
     LintViolation,

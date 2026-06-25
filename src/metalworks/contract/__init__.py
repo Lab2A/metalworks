@@ -85,6 +85,11 @@ from metalworks.contract.positioning import (
     PriceHypothesis,
     WedgeClaim,
 )
+from metalworks.contract.preflight import (
+    PreflightIssue,
+    PreflightReport,
+    UpdateStatus,
+)
 from metalworks.contract.reddit import (
     ComplianceVerdict,
     DiscoveryContext,
@@ -200,6 +205,10 @@ __all__ = [  # noqa: RUF022 — grouped by domain (evidence / research / reddit)
     "PositioningBrief",
     "PriceHypothesis",
     "WedgeClaim",
+    # Preflight — the proactive setup + update report (doctor's machine-readable twin).
+    "PreflightIssue",
+    "PreflightReport",
+    "UpdateStatus",
     # Surface + screens — product-shape primitives the build spec owns.
     "DesignBrief",
     "Screen",

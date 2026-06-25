@@ -220,6 +220,21 @@ def arctic_pull_threads(
 
 
 @guard
+def preflight(check_update: bool = True) -> ToolResult:
+    """TIER 1. The proactive setup + update report (doctor's machine-readable twin).
+
+    Reports the active corpus reader, resolved chat/embedding models, installed
+    extras, present keys, and actionable setup issues — plus a cached, offline-safe
+    PyPI update check (skip it with ``check_update=false``). Zero-key, no LLM, and
+    offline-safe: a network failure simply omits the update line.
+    """
+    from metalworks.preflight import preflight as run_preflight
+
+    report = run_preflight(check_update=check_update)
+    return {"preflight": report.model_dump(mode="json")}
+
+
+@guard
 def corpus_stats(store_path: str | None = None) -> ToolResult:
     """TIER 1. Counts of persisted runs and reports in the local store (offline)."""
     from metalworks import config

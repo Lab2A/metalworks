@@ -1092,6 +1092,49 @@ export interface BuildSpec {
   caveat?: string | null;
 }
 
+export interface UpdateStatus {
+  /** The installed metalworks version. */
+  installed: string;
+  /** The latest version seen on PyPI. */
+  latest: string;
+  /** True when ``latest`` is newer than ``installed``. */
+  update_available?: boolean;
+}
+
+export interface PreflightIssue {
+  /** ``error`` blocks the pipeline; ``warn`` degrades it. Preflight never changes an exit code — severity is advisory. */
+  severity?: "warn" | "error";
+  /** What's wrong, in one human-readable line. */
+  message: string;
+  /** A copy-paste command or instruction that resolves it. */
+  fix?: string;
+}
+
+export interface PreflightReport {
+  /** True when there are no error-severity issues. */
+  ok?: boolean;
+  /** The installed metalworks version. */
+  version?: string;
+  /** The cached update check result; None when up-to-date / unknown / offline. */
+  update?: UpdateStatus | null;
+  /** Actionable setup issues (the same lines doctor's Hints prints). */
+  issues?: PreflightIssue[];
+  /** The corpus reader a run would use: arctic_shift_api | hf_parquet | supabase_mirror. */
+  active_reader?: string;
+  /** A short human note about the active reader (e.g. its endpoint). */
+  reader_detail?: string;
+  /** The resolved chat model id, or None when unresolved (no key / extra). */
+  resolved_chat?: string | null;
+  /** The resolved embedding model id, or None when unresolved. */
+  resolved_embeddings?: string | null;
+  /** Optional extras → installed? (the doctor 'Optional extras' table). */
+  extras?: Record<string, boolean>;
+  /** API key labels → present in the environment? (never the value). */
+  keys?: Record<string, boolean>;
+  /** The renderer tier a teardown would use: playwright | firecrawl | none. */
+  renderer?: string;
+}
+
 export interface ComplianceVerdict {
   /** True if the reply is OK to post. */
   pass: boolean;

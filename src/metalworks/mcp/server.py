@@ -28,6 +28,11 @@ from metalworks.mcp import tools
 
 
 # Tier 1 (zero-key)
+async def preflight(check_update: bool = True) -> dict[str, Any]:
+    """TIER 1. Proactive setup + update report (offline-safe; doctor's machine twin)."""
+    return tools.preflight(check_update)
+
+
 async def compliance_lint(text: str, subreddit_rules: list[str] | None = None) -> dict[str, Any]:
     """TIER 1. Deterministic offline compliance check; emits a confirm_token on pass."""
     return tools.compliance_lint(text, subreddit_rules)
@@ -271,6 +276,7 @@ async def reddit_post_comment(
 
 # Registration order = the tool list the server exposes.
 _TOOL_WRAPPERS = (
+    preflight,
     compliance_lint,
     reddit_search_posts,
     reddit_get_post_comments,
@@ -307,6 +313,30 @@ _TOOL_WRAPPERS = (
     discovery_run,
     reddit_post_comment,
 )
+
+
+def _emit_preflight_status() -> None:
+    """Print a ONE-LINE preflight status to STDERR at stdio startup.
+
+    stdout is the MCP protocol channel and MUST stay clean, so this writes only to
+    stderr. Non-blocking and offline-safe by contract: any failure is swallowed.
+    """
+    import sys
+
+    try:
+        from metalworks.preflight import preflight as run_preflight
+
+        report = run_preflight(check_update=True)
+        parts: list[str] = []
+        if report.issues:
+            parts.append(f"{len(report.issues)} setup issue(s)")
+        if report.update is not None and report.update.update_available:
+            u = report.update
+            parts.append(f"update {u.installed}→{u.latest} available")
+        status = "; ".join(parts) if parts else "all set"
+        print(f"metalworks {report.version} — preflight: {status}", file=sys.stderr)
+    except Exception:
+        return
 
 
 def _import_fastmcp() -> Any:
@@ -347,6 +377,7 @@ def serve(
     """
     transport = transport.lower()
     if transport == "stdio":
+        _emit_preflight_status()
         server = build_server()
         server.run(transport="stdio")
         return

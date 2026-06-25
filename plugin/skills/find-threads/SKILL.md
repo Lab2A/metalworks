@@ -3,6 +3,14 @@ name: find-threads
 description: Find live Reddit threads worth engaging for a product or topic. Use when the user wants to find conversations to join, monitor a subreddit for relevant discussion, or surface high-intent threads about their space. Needs no API key.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are finding Reddit threads worth a genuine, disclosed reply for the user's
 product or topic.
 

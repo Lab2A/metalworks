@@ -3,6 +3,14 @@ name: build-spec
 description: Turn a finished demand report into an evidence-grounded build harness for a coding agent — a BuildSpec (core features each mapped to a real demand cluster and carrying that cluster's verbatim quotes, the product surface to build on — sdk/web/mobile/cli/... — auto-picked with a one-line rationale or pinned by you, a feature-grounded screen skeleton, ICP personas from the audience segments, pricing tiers copied through from the report's price evidence) plus a scaffolded repo (CLAUDE.md cite-or-die rule, docs/SPEC.md, a frozen docs/EVIDENCE.md quote table, a build-pack of skills, and the metalworks MCP wiring). Use after a demand report exists and the user asks "what should I build", "spec the product", "scaffold the app", "what surface should this be", "what screens do I need", "turn this into a build", "give me a build plan", or wants to hand the validated demand to a coding agent. metalworks specs and scaffolds — it does NOT write product code. No un-grounded feature survives.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one finished demand report into a build the user's OWN coding
 agent will execute. metalworks researched and specced; it does not write the
 product. The output is two things: a grounded `BuildSpec` and an on-disk harness

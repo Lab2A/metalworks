@@ -21,7 +21,8 @@ are flagged **(chat key)** below; the rest are **zero-key**.
 | `metalworks start` | Jump straight to **validating an idea** end to end: sets up a project if needed, asks for your idea, runs demand → landscape → assess with the **GO/PIVOT/NO-GO call in your hands** each round, then offers positioning / build spec once it earns a GO. | chat key |
 | `metalworks setup` | Interactive onboarding: detect provider keys, pick a model, choose sources, scaffold a project, warm embeddings. `--yes` accepts every default non-interactively. | zero-key |
 | `metalworks version` | Print the installed metalworks version. | zero-key |
-| `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the store path, connected Reddit accounts, and actionable hints. | zero-key |
+| `metalworks preflight` | **Proactive setup + update check** — is everything ready to run? Reports the active corpus reader, resolved models, extras, keys, setup issues, and a cached PyPI update check. `--json` emits the `PreflightReport`. The skills run this first. | zero-key |
+| `metalworks doctor` | Report installed extras, configured keys, the **resolved chat + embedding models**, the active corpus reader, the store path, connected Reddit accounts, and actionable hints (renders from the same checks as `preflight`; keeps `--fix`). | zero-key |
 | `metalworks init` | Create a `.metalworks/` project in the cwd (like `git init`) — a `project.json` manifest, a `config.toml`, a gitignored `corpus.db`, and a `.env.example`. Idempotent. | zero-key |
 
 **`metalworks init`** option: `--idea TEXT` — one line on what you're building (seeds the project slug).

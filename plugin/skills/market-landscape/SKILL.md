@@ -3,6 +3,14 @@ name: market-landscape
 description: Map the full "what exists today" for a finished demand report — the competitor map (direct rivals, adjacent alternatives, and the status-quo "do nothing" cost, each gap backed by a real cited complaint) PLUS an empirical existing-solutions scan of real shipped products (Product Hunt launches and web), each matched to a demand cluster with its traction. Use after a demand report exists and the user asks "what already exists", "what's the market landscape", "what's been built for this", "who's shipping in this space", or wants the supply side (what people can get today) to weigh against the demand side. This is the surface a GO/PIVOT/NO-GO assessment reads.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are mapping the full supply side for one idea — not just the named rivals, but the
 real products people can already get today — so the demand can be weighed against what
 exists. Unlike a generic competitor grid, every gap points to a real complaint and every

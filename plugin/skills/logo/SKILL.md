@@ -3,6 +3,14 @@ name: logo
 description: Generate diverse, company-grade logo options for a finished demand report and present them for the user to choose. The mark submodule of the design pillar — the model authors each SVG directly, under the brand's design system (its aesthetic, typography, color), one per design angle (symbol, logotype, negative-space, reference, expressive). Use after a demand report exists and the user asks to "design a logo", "make a brand mark", "give me logo options", or "what should the logo look like". Options are offered; nothing is auto-selected.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are generating a set of real, company-grade logo options for one brand and
 presenting them for the user to pick. This is the **mark submodule of the design
 pillar**: the model draws each SVG directly — a logo is a designed artifact, not a

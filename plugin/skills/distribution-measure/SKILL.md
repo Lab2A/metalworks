@@ -3,6 +3,14 @@ name: distribution-measure
 description: Close the distribution loop for a finished demand report — emit, per selected channel, the success metric that defines what "worked" (e.g. attributed signups in 7d, installs + WAU, qualified replies + click-through, citation appearances) and the exact instrumentation to wire BEFORE the push (a UTM tag, an attributed-signup query, a citation check), all read DETERMINISTICALLY from a table keyed by the channel's surface type — never an invented KPI. This is the falsifiable disposition applied to distribution: name the metric and the instrument up front so the push is measurable, then the human records real results and feeds them back to re-rank the next push (the channels that performed rise, the dead ones fall). Use after a demand report (and ideally a distribution plan) exists and the user asks "how do I measure this", "what's the success metric for each channel", "how do I instrument the launch", "how do I know if a channel worked", "what do I track", or wants to close the loop rather than launch and hope. PLANNING ONLY — it defines what to measure; the human measures and records.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are closing the distribution loop for one demand report. Everything else in
 the Distribution pillar PLANS — channels, assets, the sequenced push/stream plan.
 This is where it learns: you name, per channel, what "worked" means and exactly

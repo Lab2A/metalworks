@@ -3,6 +3,14 @@ name: distribution-data-report
 description: Turn a finished demand report into a corpus-derived data report — the on-brand flagship asset metalworks can uniquely generate. A deterministic ranking of the report's real clusters (a complaint index, a feature ranking, or a "State of X"), every row carrying the cluster's REAL distinct-author / mention counts, real Reddit permalinks, and a verbatim quote, with a disclosed methodology. Use after a demand report exists and the user asks "make me a data report", "build a complaint index", "rank the top complaints/features", "give me a State of X report", "what original research can I publish", or wants a shareable, citable data asset grounded in real Reddit discussion rather than a fabricated survey. The numbers are copied from the corpus, never invented — rigor IS the credibility.
 ---
 
+## Preamble (run first)
+
+Before any other tool, run the `preflight` MCP tool (or `metalworks preflight` on
+the CLI). If it reports setup issues or that an update is available, surface that
+to the user in one line and help them resolve it (install the missing extra/key,
+or `pip install -U metalworks`) before continuing. Skip only if the user has
+already passed preflight this session.
+
 You are turning one demand report into a **data report** — the data-as-marketing
 flagship asset. It stacks every AI-citation driver at once: original research +
 a ranking (the top AI-cited format) + verbatim quotes + permalinks, over a
