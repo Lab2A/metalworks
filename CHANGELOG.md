@@ -8,6 +8,31 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-25
+
+### Fixed
+- **The MCP research pipeline now uses the live Arctic Shift reader by default** (0.1.1's
+  live-reader default never reached it). `mcp/tools.py` hardcoded `ArcticReader(probe_sleep_s=0.0)`
+  (the HF Parquet mirror) at four sites — `_build_deps`, `research_plan_brief`, `arctic_list_months`,
+  `arctic_pull_threads` — so MCP runs (the plugin surface) pulled posts from Hugging Face and **429'd**
+  while `preflight` (which calls the resolver) reported `active_reader: arctic_shift_api`. All four now
+  call `config.resolve_corpus_reader()`, so the live API is the default on the MCP surface too and
+  `preflight` no longer disagrees with what the pipeline does.
+- **A config `model` that is a routable ref now works on its own.** Setting
+  `model = "deepseek/deepseek-v4-flash"` in `metalworks.toml` **without** also pinning `provider` was
+  silently ignored for provider routing — resolution fell through to key-order/Vertex autodetection
+  (so a machine with stray `GOOGLE_GENAI_USE_VERTEXAI` resolved Google instead). A config `model`
+  carrying a vendor namespace (`deepseek/...`, `openai:...`) now routes on its own, before
+  autodetection. A pinned `provider`+`model` is unchanged; a bare model id (no namespace) still can't
+  self-route.
+
+### Added
+- **`preflight`/`doctor` now flag the Vertex-without-the-extra landmine** (error severity): when
+  `GOOGLE_GENAI_USE_VERTEXAI` is on but `google.genai` isn't installed, chat→Vertex and embeddings
+  (`resolve_embeddings` checks Vertex first) both fail on the missing SDK — even with an OpenRouter key
+  set. The hint says to set `METALWORKS_MODEL` + `GOOGLE_GENAI_USE_VERTEXAI=false`, or
+  `pip install "metalworks[google]"`. This is the exact first-run failure the preamble exists to catch.
+
 ## [0.2.0] - 2026-06-25
 
 ### Added
