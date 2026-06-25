@@ -121,7 +121,7 @@ contracts may change in any release.
   and the source catalog (`docs/sources.md`) are untouched. New `tests/test_source_magnitude_pypi.py`
   (offline stub-client unit tests for measure → downloads, 404 omission, non-package skipping +
   name normalization, `check_magnitude_provider` conformance, registry resolution, plus a
-  `network`-marked live smoke).
+  `network`-marked live smoke). The homegrown loop is **opt-in** (`[sources].discover = true`, mirroring the #123 selector): with it unset a configured single-shot SearchProvider keeps driving the legacy single-pass path — no extra LLM rounds, default cost unchanged; an agentic provider always delegates regardless.
 
 - **Consolidated built-in connector registration into one list (#139).** A new source was
   registered in four scattered places (`get_source` lazy map, the selector's spec-import, the

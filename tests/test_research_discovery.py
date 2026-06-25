@@ -9,6 +9,8 @@ the legacy single-pass path is byte-identical.
 
 from __future__ import annotations
 
+import pytest
+
 from metalworks import config
 from metalworks.contract import ResearchBrief, SignalStrength, TargetSubreddit
 from metalworks.llm import FakeChatModel
@@ -171,9 +173,11 @@ def test_gate_agentic_delegates_and_loop_does_not_run() -> None:
     assert findings[0].source_url == "https://x.com"
 
 
-def test_gate_homegrown_runs_with_only_search() -> None:
+def test_gate_homegrown_runs_with_search_when_opted_in(monkeypatch: pytest.MonkeyPatch) -> None:
     from metalworks.research.discovery import _FollowupQueries
 
+    # Opt in to the homegrown loop (``[sources].discover = true``).
+    monkeypatch.setattr(config, "discovery_loop_enabled", lambda: True)
     search = _StubSearch(
         default=[_result("https://a.com", "A", "real snippet about focus supplements")]
     )
@@ -183,6 +187,26 @@ def test_gate_homegrown_runs_with_only_search() -> None:
     assert search.queries  # homegrown loop ran (searched at least once)
     assert len(findings) == 1
     assert findings[0].specifics == "real snippet about focus supplements"
+
+
+def test_gate_search_without_optin_is_single_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    # DEFAULT: a SearchProvider is configured but the loop is NOT opted in
+    # (``discover`` unset) → rung 3 single-pass _external_search, NOT the loop.
+    # The loop's signature move — a ``_FollowupQueries`` LLM call — must NOT fire
+    # (single-pass still makes a structured findings call, just never a follow-up).
+    from metalworks.research.discovery import _FollowupQueries
+
+    monkeypatch.setattr(config, "discovery_loop_enabled", lambda: False)
+    search = _StubSearch(
+        default=[_result("https://a.com", "A", "real snippet about focus supplements")]
+    )
+    chat = FakeChatModel(grounded=False)
+    web_research(_deps(chat, search=search), brief=_brief())
+    assert search.queries  # single-pass still searches the SearchProvider
+    # The loop's signature LLM call (follow-up queries) must NOT fire — proves we
+    # took rung 3 (single-pass), not rung 2 (the opt-in loop). Single-pass may make
+    # its own structured findings call, but never a _FollowupQueries one.
+    assert not any(c.get("output_model") is _FollowupQueries for c in chat.calls)
 
 
 def test_gate_neither_provider_is_byte_identical_single_pass() -> None:

@@ -429,8 +429,13 @@ def _discover(
             return []
         return _findings_from_discovery(found, excluded=excluded, max_findings=max_findings)
 
-    # Rung 2 — a SearchProvider exists: run our own iterate-and-dig loop.
-    if deps.search is not None:
+    # Rung 2 — a SearchProvider exists AND the homegrown loop is opted in
+    # (``[sources].discover = true``): run our own iterate-and-dig loop. The opt-in
+    # gate (mirrors the #123 selector) keeps the more-expensive, LLM-driven loop from
+    # silently replacing single-pass for existing search users — default stays rung 3.
+    from metalworks import config
+
+    if deps.search is not None and config.discovery_loop_enabled():
         loop = HomegrownDiscovery(search=deps.search, chat=deps.chat)
         try:
             found = loop.discover(question=brief_question, directions=directions, budget=budget)
@@ -438,7 +443,8 @@ def _discover(
             return []
         return _findings_from_discovery(found, excluded=excluded, max_findings=max_findings)
 
-    # Rung 3 — neither: today's single-pass path, byte-identical.
+    # Rung 3 — agentic off and (loop off OR not opted in): today's single-pass path,
+    # byte-identical. This is the DEFAULT for a configured single-shot SearchProvider.
     return _external_search(
         deps,
         brief_question=brief_question,

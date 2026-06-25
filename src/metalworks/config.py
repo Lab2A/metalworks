@@ -297,6 +297,21 @@ def source_selector_enabled() -> bool:
     return value is True
 
 
+def discovery_loop_enabled() -> bool:
+    """Whether the homegrown agentic discovery LOOP is opt-in enabled (``[sources].discover``).
+
+    **Opt-in by default** (mirrors :func:`source_selector_enabled` — #123 precedent): with
+    ``discover`` unset or false, a configured single-shot ``SearchProvider`` drives the
+    legacy **single-pass** web-research path exactly as before — no extra LLM follow-up-query
+    rounds, default behavior and cost unchanged. Set ``discover = true`` to run the
+    iterate-and-dig loop (`research.discovery.HomegrownDiscovery`). NOTE: an **agentic**
+    ``DiscoveryProvider`` (Exa Research / Parallel Task), when configured, always delegates
+    regardless of this flag — the flag only gates metalworks' own loop over a single-shot
+    provider, which is the behavior change that should not ship silently.
+    """
+    return load_sources_config().get("discover") is True
+
+
 def resolve_sources(override: list[str] | None = None, **source_kwargs: Any) -> list[ItemSource]:
     """Construct the active :class:`ItemSource` connectors, in order.
 
