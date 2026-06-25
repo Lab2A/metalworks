@@ -8,6 +8,38 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-25
+
+### Changed
+- **Live Reddit submissions are now the DEFAULT corpus reader.** Submissions previously came
+  from the Hugging Face `open-index/arctic` Parquet mirror (`ArcticReader`, `[arctic]` extra,
+  DuckDB) — stale, slow, and prone to anonymous HTTP 429s on a first run. They now come from the
+  **live Arctic Shift posts API** (`ArcticShiftReader`, `/posts/search` + `/posts/ids`) using only
+  core `httpx` — no extra, current month included, no HF rate limits. Comments already came from
+  the same live API. New `config.resolve_corpus_reader()` resolves the reader from
+  `ARCTIC_SHIFT_SOURCE`: unset/`api` → live (default); `hf` (aliases `parquet`/`arctic`) → the HF
+  Parquet mirror; `mirror` → the Supabase mirror (`ArcticMirrorReader`, `[supabase]`). The library
+  facade and every CLI research/build/distribution command resolve through it, so a keyless,
+  extra-less install pulls real submissions immediately. (`ArcticShiftApiClient` gains
+  `search_submissions` / `submissions_by_ids`.)
+
+### Added
+- **`--model` / `-m` override on `research run` and `research ideate`, plus the `METALWORKS_MODEL`
+  env var.** Pick a chat model per-invocation without editing config: `--model
+  deepseek/deepseek-v4-flash` routes via OpenRouter (an unknown vendor namespace → OpenRouter),
+  `--model openai/gpt-5` goes native. `METALWORKS_MODEL` applies the same override to **every**
+  surface — CLI, MCP server, and the SDK — and beats config/key-order autodetection (so stray
+  `VERTEX_*`/`GOOGLE_APPLICATION_CREDENTIALS` env no longer hijacks provider selection on a machine
+  that also has an OpenRouter key).
+
+### Fixed
+- **`ArcticReader` now reads `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN` / `HUGGINGFACE_HUB_TOKEN`)
+  from the environment.** An opt-in HF run (`ARCTIC_SHIFT_SOURCE=hf`) previously 429'd against the
+  public mirror because the CLI never threaded a token to the reader.
+- **Provider-resolution failures now teach the escape hatch.** When no chat provider resolves, the
+  CLI prints a tip to pass `--model PROVIDER/MODEL` (e.g. `deepseek/deepseek-v4-flash` with
+  `OPENROUTER_API_KEY`) instead of only a bare key list.
+
 ## [0.1.0] - 2026-06-24
 
 ### Changed

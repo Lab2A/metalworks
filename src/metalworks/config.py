@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from metalworks.embeddings import EmbeddingProvider
     from metalworks.llm import ChatModel
     from metalworks.render import PageRenderer
+    from metalworks.research.deps import CorpusReader
     from metalworks.research.discovery import DiscoveryProvider
     from metalworks.research.sources import ItemSource
     from metalworks.search import SearchProvider
@@ -359,7 +360,13 @@ def _build_source(get_source: Any, source_id: str, source_kwargs: dict[str, Any]
 
 def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     """Return (provider, model_id) from an explicit ``provider:id`` arg, the
-    config file's ``provider``/``model``, or the first present API key."""
+    ``METALWORKS_MODEL`` env override, the config file's ``provider``/``model``,
+    or the first present API key.
+
+    ``METALWORKS_MODEL`` behaves exactly like an explicit ``--model`` ref, so it
+    wins over config and over key-order autodetection (the env var is the
+    every-surface escape hatch: CLI, MCP server, and the SDK all honor it)."""
+    model = model or os.environ.get("METALWORKS_MODEL") or None
     if model and ":" in model:
         provider, _, model_id = model.partition(":")
         return provider.strip().lower(), (model_id.strip() or None)
@@ -657,6 +664,33 @@ def default_store(path: str | None = None) -> MemoryStores | SqliteStores:
     store_path = Path(resolved).expanduser()
     store_path.parent.mkdir(parents=True, exist_ok=True)
     return SqliteStores(store_path)
+
+
+def resolve_corpus_reader() -> CorpusReader:
+    """Resolve the submissions corpus reader from ``ARCTIC_SHIFT_SOURCE``.
+
+    Default (unset or ``api``) → :class:`ArcticShiftReader`, the LIVE Arctic
+    Shift posts API: current data, core ``httpx``, no extra, no HF rate limits.
+    This is the right first-run default — a keyless, extra-less install can pull
+    real submissions immediately.
+
+    Opt-in tiers for offline / bulk work: ``hf`` (aliases ``parquet``,
+    ``arctic``) → :class:`ArcticReader`, the HF Parquet mirror (``[arctic]``
+    extra; reads ``HF_TOKEN`` from the env); ``mirror`` →
+    :class:`ArcticMirrorReader`, the Supabase mirror (``[supabase]`` extra).
+    """
+    source = (os.environ.get("ARCTIC_SHIFT_SOURCE") or "api").strip().lower()
+    if source in ("hf", "parquet", "arctic"):
+        from metalworks.research.arctic import ArcticReader
+
+        return ArcticReader(probe_sleep_s=0.0)
+    if source == "mirror":
+        from metalworks.research.arctic import ArcticMirrorReader
+
+        return ArcticMirrorReader()
+    from metalworks.research.arctic import ArcticShiftReader
+
+    return ArcticShiftReader()
 
 
 def auto_store() -> MemoryStores | SqliteStores:

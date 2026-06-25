@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import time
 from collections.abc import Iterator, Sequence
 from typing import Any
@@ -100,7 +101,14 @@ class ArcticReader:
         # beats the module-level default.
         self._data_root = data_root if data_root is not None else globals()["data_root"]
         self._memory_limit_gb = memory_limit_gb
-        self._hf_token = hf_token
+        # Fall back to the standard HF env tokens so an opt-in HF run clears the
+        # public-mirror 429 ceiling without the caller threading a token through.
+        self._hf_token = (
+            hf_token
+            or os.environ.get("HF_TOKEN")
+            or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+            or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        )
         # Courtesy delay between HF probe requests in ``latest_available_month``.
         # Injectable/zeroable so tests don't sleep.
         self._probe_sleep_s = probe_sleep_s

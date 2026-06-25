@@ -675,12 +675,11 @@ def _guided_session() -> None:
 
     # 3. The interactive validate loop (you make the GO/PIVOT/NO-GO call each round).
     from metalworks.research import validate as run_validate
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -1364,10 +1363,10 @@ def _arctic_source_kwargs() -> dict[str, Any]:
     comment client. Other (keyless) connectors ignore these — ``resolve_sources``
     only passes the kwargs a factory accepts.
     """
-    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+    from metalworks.research.arctic import ArcticShiftApiClient
 
     return {
-        "reader": ArcticReader(probe_sleep_s=0.0),
+        "reader": config.resolve_corpus_reader(),
         "comments": ArcticShiftApiClient(),
     }
 
@@ -1571,7 +1570,6 @@ def research_plan(
     """
     import uuid
 
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.planner import (
         QUESTIONS,
@@ -1583,7 +1581,7 @@ def research_plan(
     chat = _resolve_chat_or_exit()
     embeddings = _resolve_embeddings_or_exit()
     store = config.default_store()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(chat=chat, embeddings=embeddings, corpus=store, reader=reader)
 
     state = BriefState(brief_id=str(uuid.uuid4()), prompt=prompt)
@@ -1632,11 +1630,21 @@ def research_run(
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the report JSON here.")
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Chat model override, e.g. 'deepseek/deepseek-v4-flash' (routes via "
+            "OpenRouter) or 'openai/gpt-5'. Beats config/env autodetection. Or set "
+            "METALWORKS_MODEL to apply it to every command.",
+        ),
+    ] = None,
 ) -> None:
     """Run the research pipeline from a --question (no brief.json needed) or a --brief file."""
     from metalworks.contract import ResearchBrief, RunSummary
     from metalworks.research import run_research
-    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+    from metalworks.research.arctic import ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.planner import brief_from_question
 
@@ -1644,10 +1652,10 @@ def research_run(
         err_console.print("[red]Pass exactly one of --question or --brief.[/red]")
         raise typer.Exit(code=2)
 
-    chat = _resolve_chat_or_exit()
+    chat = _resolve_chat_or_exit(model)
     embeddings = _resolve_embeddings_or_exit()
     store = config.default_store()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     comments = ArcticShiftApiClient()
     # --source overrides the run's connectors (override wins over the selector);
     # without it deps.sources stays None so the brief-aware selector picks by idea
@@ -1775,7 +1783,7 @@ def research_refresh(
 ) -> None:
     """Re-synthesize a stored report against the current corpus → a new pinned version + diff."""
     from metalworks.contract import DemandReport, RunSummary
-    from metalworks.research.arctic import ArcticReader, ArcticShiftApiClient
+    from metalworks.research.arctic import ArcticShiftApiClient
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.refresh import refresh_report
 
@@ -1799,7 +1807,7 @@ def research_refresh(
 
     chat = _resolve_chat_or_exit()
     embeddings = _resolve_embeddings_or_exit()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     comments = ArcticShiftApiClient()
     deps = ResearchDeps(
         chat=chat,
@@ -1908,7 +1916,6 @@ def research_position(
     ] = None,
 ) -> None:
     """Derive a grounded positioning wedge from a stored report (one LLM call)."""
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.synthesis import build_positioning_brief
 
@@ -1922,7 +1929,7 @@ def research_position(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -1976,7 +1983,6 @@ def research_landscape(
 ) -> None:
     """Map the full landscape: competitors + existing solutions + cost of doing nothing."""
     from metalworks.research import run_landscape
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -1989,7 +1995,7 @@ def research_landscape(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -2035,18 +2041,27 @@ def research_ideate(
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Write the result JSON here.")
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Chat model override, e.g. 'deepseek/deepseek-v4-flash' (routes via "
+            "OpenRouter) or 'openai/gpt-5'. Beats config/env autodetection. Or set "
+            "METALWORKS_MODEL to apply it to every command.",
+        ),
+    ] = None,
 ) -> None:
     """Frame an idea to test — idea-first (sharpen a pitch) or evidence-first (--from-report)."""
     if not idea and not from_report:
         err_console.print("[red]Provide an idea, or --from-report <report_id>.[/red]")
         raise typer.Exit(code=1)
     from metalworks.research import ideate_from_idea, ideate_from_report
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
-    chat = _resolve_chat_or_exit()
+    chat = _resolve_chat_or_exit(model)
     store = config.default_store()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -2120,7 +2135,6 @@ def research_assess(
 ) -> None:
     """Verdict: GO / PIVOT / NO-GO — the deterministic gap over demand + landscape."""
     from metalworks.research import run_assessment, run_landscape
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -2130,7 +2144,7 @@ def research_assess(
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -2240,12 +2254,11 @@ def research_validate(
     headlessly. Either way the final report is saved to the store.
     """
     from metalworks.research import validate as run_validate
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
     store = config.default_store()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -2311,7 +2324,6 @@ def research_design(
         render_design_preview_html,
         run_landscape,
     )
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     if taste not in TASTE_PRESETS:
@@ -2326,7 +2338,7 @@ def research_design(
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2399,7 +2411,6 @@ def research_logo(
         build_logo_set,
         render_logo_picker_html,
     )
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     if taste not in TASTE_PRESETS:
@@ -2414,7 +2425,7 @@ def research_logo(
     if report is None:
         err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2473,7 +2484,6 @@ def research_design_review(
 
     system = None
     if report_id is not None:
-        from metalworks.research.arctic import ArcticReader
         from metalworks.research.deps import ResearchDeps
 
         chat = _resolve_chat_or_exit()
@@ -2483,7 +2493,7 @@ def research_design_review(
         if report is None:
             err_console.print(f"[red]No report {report_id!r} in the local store.[/red]")
             raise typer.Exit(code=1)
-        reader = ArcticReader(probe_sleep_s=0.0)
+        reader = config.resolve_corpus_reader()
         deps = ResearchDeps(
             chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
         )
@@ -2566,7 +2576,6 @@ def build_init(
 
     from metalworks.build import build_spec_from_report, scaffold
     from metalworks.contract.surface import SurfaceKind
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
     from metalworks.research.synthesis import build_positioning_brief
 
@@ -2580,7 +2589,7 @@ def build_init(
 
     report_obj = _load_report_for_build(report)
     chat = _resolve_chat_or_exit()
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat,
         embeddings=_resolve_embeddings_or_exit(),
@@ -2654,7 +2663,6 @@ def distribution_strategy(
 ) -> None:
     """Route a stored report's named entities + signals into test→focus channel experiments."""
     from metalworks.research import build_channel_strategy
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -2667,7 +2675,7 @@ def distribution_strategy(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2712,7 +2720,6 @@ def distribution_assets(
 ) -> None:
     """Draft channel-SHAPED, drafting-only distribution assets per channel (DRAFTING ONLY)."""
     from metalworks.research import build_channel_assets, build_channel_strategy
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -2725,7 +2732,7 @@ def distribution_assets(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2781,7 +2788,6 @@ def distribution_data_report(
     """Project a stored report into a corpus-derived data report — a deterministic ranking
     of its clusters with REAL counts, real permalinks, and a verbatim quote per row."""
     from metalworks.research import build_data_asset
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     allowed = ("complaint_index", "feature_ranking", "state_of")
@@ -2800,7 +2806,7 @@ def distribution_data_report(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2849,7 +2855,6 @@ def distribution_geo(
 ) -> None:
     """GEO / LLM-citability: participation targets, citability probes, answer-first briefs."""
     from metalworks.research import build_geo_plan
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -2862,7 +2867,7 @@ def distribution_geo(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2921,7 +2926,6 @@ def distribution_engage(
     GEO participation target (a real thread). DRAFTING ONLY — a human posts it (gated)."""
     from metalworks.contract import ParticipationTarget
     from metalworks.research import participation_reply
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     if not permalink or not why:
@@ -2940,7 +2944,7 @@ def distribution_engage(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -2989,7 +2993,6 @@ def distribution_requirements(
     """Emit the distribution → build requirements (D3): embedded loops + the conversion surface."""
     from metalworks.research import build_channel_strategy
     from metalworks.research import distribution_requirements as _distribution_requirements
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -3002,7 +3005,7 @@ def distribution_requirements(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -3059,7 +3062,6 @@ def distribution_plan(
 ) -> None:
     """Sequence the report's channels into pushes (moments) + streams (continuous) (D7)."""
     from metalworks.research import build_channel_strategy, plan_distribution
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -3072,7 +3074,7 @@ def distribution_plan(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -3111,7 +3113,6 @@ def distribution_measure(
 ) -> None:
     """Emit the per-channel success metric + instrumentation to wire BEFORE the push (D8)."""
     from metalworks.research import build_channel_strategy, channel_metrics
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.deps import ResearchDeps
 
     chat = _resolve_chat_or_exit()
@@ -3124,7 +3125,7 @@ def distribution_measure(
             "Run `metalworks research run` first, or check the id."
         )
         raise typer.Exit(code=1)
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     deps = ResearchDeps(
         chat=chat, embeddings=_resolve_embeddings_or_exit(), corpus=store, reader=reader
     )
@@ -3304,10 +3305,9 @@ def reddit_post(
 @arctic_app.command("months")
 def arctic_months(subreddit: str) -> None:
     """Print the latest available submissions month in the Arctic corpus."""
-    from metalworks.research.arctic import ArcticReader
 
     _ = subreddit  # availability is corpus-wide; arg kept for symmetry/UX
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     try:
         latest = reader.latest_available_month("submissions")
         console.print(f"latest available month: [bold]{latest}[/bold]")
@@ -3324,11 +3324,10 @@ def arctic_pull(
     ] = None,
 ) -> None:
     """Pull submissions for a subreddit from the Arctic corpus → table or JSONL."""
-    from metalworks.research.arctic import ArcticReader
     from metalworks.research.types import months_back
 
     sub = subreddit.strip().lstrip("r/").lstrip("/")
-    reader = ArcticReader(probe_sleep_s=0.0)
+    reader = config.resolve_corpus_reader()
     try:
         window = months_back(months, anchor=reader.latest_available_month("submissions"))
         rows = list(
@@ -3468,15 +3467,25 @@ def _resolve_report_id(store: RunRepo, report_id: str | None) -> str:
     return runs[0].report_id
 
 
-def _resolve_chat_or_exit() -> ChatModel:
+def _resolve_chat_or_exit(model: str | None = None) -> ChatModel:
+    """Resolve the chat model, or exit cleanly with guidance.
+
+    ``model`` (the command's ``--model`` override, a ``provider/id`` or
+    ``provider:id`` ref) wins over the config/env provider when given.
+    """
     from metalworks.errors import MetalworksError
 
     try:
-        return config.resolve_chat()
+        return config.resolve_chat(model)
     except MetalworksError as exc:
         err_console.print(f"[red]{exc.message}[/red]")
         if exc.fix:
             err_console.print(f"[dim]{exc.fix}[/dim]")
+        err_console.print(
+            "[dim]Tip: pass --model PROVIDER/MODEL to pick a provider directly, e.g. "
+            "--model deepseek/deepseek-v4-flash (with OPENROUTER_API_KEY set), or "
+            "--model openai/gpt-5.[/dim]"
+        )
         raise typer.Exit(code=1) from exc
 
 

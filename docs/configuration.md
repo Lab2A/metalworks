@@ -45,7 +45,27 @@ provider = "anthropic"
 model = "claude-opus-4-8"
 ```
 
-Precedence: explicit `model=` ref > config file > first present key.
+Set `METALWORKS_MODEL` to apply a ref to **every** surface — CLI, MCP server, and the
+SDK — without editing config; the `research run` / `research ideate` commands also take a
+`--model` / `-m` flag. Both behave like an explicit ref, so they win over the config file and
+over key-order autodetection (handy when stray `VERTEX_*` / `GOOGLE_APPLICATION_CREDENTIALS`
+env would otherwise hijack selection):
+
+```bash
+metalworks research run -q "..." --model deepseek/deepseek-v4-flash   # → OpenRouter
+METALWORKS_MODEL=openai/gpt-5 metalworks research ideate "..."        # everywhere
+```
+
+Precedence: explicit `model=` / `--model` ref > `METALWORKS_MODEL` env > config file > first
+present key.
+
+## Where Reddit data comes from
+
+Submissions and comments come from the **live Arctic Shift API** by default — current data,
+core `httpx`, no extra. Opt into a bulk/offline tier with `ARCTIC_SHIFT_SOURCE`: `hf` (aliases
+`parquet`/`arctic`) reads the Hugging Face `open-index/arctic` Parquet mirror (`[arctic]` extra,
+DuckDB; reads `HF_TOKEN` from the env to clear the public-mirror rate limit); `mirror` reads a
+Supabase mirror (`[supabase]` extra). Both lag the live API.
 
 ## Google via Vertex AI
 
