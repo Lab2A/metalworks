@@ -23,6 +23,7 @@ more evidence behind every report.
 | `hn_archive` | Alias of `hackernews_archive` (the offline Hacker News archive) | grounding | No | — |
 | `producthunt` | Product Hunt launches + their comments | grounding | A free key | `PRODUCT_HUNT_TOKEN` |
 | `reddit` | Public Reddit posts and comments | grounding | No | — |
+| `samgov` | U.S. government procurement notices (SAM.gov) — explicit unmet needs with a budget | grounding | A free key | `SAM_GOV_API_KEY` |
 | `stackexchange` | Stack Exchange Q&A across 170+ sites (Stack Overflow, Server Fault, DBA, …) | grounding | No | — |
 | `web` | Web pages from a search engine (Exa, Tavily, parallel.ai, or Firecrawl) | web | A free key | `EXA_API_KEY`, `TAVILY_API_KEY`, `PARALLEL_API_KEY`, `FIRECRAWL_API_KEY` |
 

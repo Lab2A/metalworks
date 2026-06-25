@@ -38,6 +38,7 @@ import metalworks.research.sources.hackernews
 import metalworks.research.sources.hn_archive
 import metalworks.research.sources.magnitude
 import metalworks.research.sources.producthunt
+import metalworks.research.sources.samgov
 import metalworks.research.sources.stackexchange
 import metalworks.research.sources.web  # noqa: F401
 
@@ -321,6 +322,38 @@ class _StubAtsClient:
             return _StubResponse(_ATS_GREENHOUSE)
 
 
+_SAMGOV_SEARCH = {
+    "totalRecords": 1,
+    "limit": 100,
+    "offset": 0,
+    "opportunitiesData": [
+        {
+            "noticeId": "abc123",
+            "title": "Stim-free focus aid for federal employees",
+            "solicitationNumber": "SOL-2026-001",
+            "fullParentPathName": "GENERAL SERVICES ADMINISTRATION.FAS",
+            "uiLink": "https://sam.gov/opp/abc123/view",
+            "description": "https://api.sam.gov/opportunities/v1/noticedesc?noticeid=abc123",
+            "postedDate": "2026-05-15",
+            "type": "Solicitation",
+            "award": {"amount": "500000", "date": "2026-05-20"},
+        }
+    ],
+}
+
+
+class _StubSamGovClient:
+    """A minimal httpx.Client stand-in for the SAM.gov Opportunities API. No network."""
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> _StubResponse:
+        if "/opportunities/v2/search" in url:
+            return _StubResponse(_SAMGOV_SEARCH)
+        raise AssertionError(f"unexpected URL {url}")
+
+    def close(self) -> None:
+        return None
+
+
 _DISCOURSE_SEARCH = {
     "topics": [
         {
@@ -419,6 +452,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
         "hackernews_archive": {"reader": _FakeHnArchiveReader()},
         "hn_archive": {"reader": _FakeHnArchiveReader()},
         "producthunt": {"token": "dev-token", "client": _StubPhClient()},
+        "samgov": {"key": "dev-key", "client": _StubSamGovClient()},
         "stackexchange": {"client": _StubSeClient(), "author_salt": "t"},
         "discourse": {"client": _StubDiscourseClient(), "author_salt": "t"},
         # 'web' is a web lane, not grounding — rule 1 skips it (no fixture needed).
@@ -441,6 +475,7 @@ SHIPPED_SOURCE_IDS = frozenset(
         "hackernews_archive",
         "hn_archive",
         "producthunt",
+        "samgov",
         "stackexchange",
         "discourse",
         "web",

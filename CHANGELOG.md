@@ -9,6 +9,27 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources P3 — SAM.gov procurement connector (#148).** New
+  `metalworks.research.sources.samgov.SamGovItemSource` — the marquee Phase-3 grounding singleton, a
+  `yields_units` `ItemSource` over the SAM.gov Opportunities API
+  (`https://api.sam.gov/opportunities/v2/search`). Public procurement is the one B2B layer nothing
+  else reaches: government buyers post explicit unmet needs **with a dollar value and a deadline
+  attached, named** (the contracting agency). `pull` runs the brief's terms as the `title` keyword
+  search over the posted-date window (`postedFrom`/`postedTo`, `MM/dd/yyyy`, one-year cap) and maps
+  each notice to a self-representing `CorpusRecord` (title + solicitation summary; `uiLink`
+  permalink; contracting agency `fullParentPathName` as the "author"); `yields_units=True` so the
+  ranker measures breadth by distinct agency/domain, and `comments_for` returns `None`. A notice
+  carrying an award attaches `{"rfp_budget": <amount>}` — the literal willingness-to-pay magnitude,
+  already registered `is_magnitude=True` (no new `register_signal`) — and **OMITS** it (never `0.0`)
+  when absent. Auth is a free, registered key (`SAM_GOV_API_KEY`): `auth="key"`, `access="free_key"`,
+  passed when present; the selector's access gate skips it cleanly when unset. As a `yields_units`
+  grounding source it is rule-5 exempt (its only signal is the magnitude `rfp_budget`). Registered
+  via the single `BUILTIN_SOURCE_MODULES` map (#139); `docs/sources.md` regenerated. New
+  `tests/test_source_samgov.py` (offline stub-client unit tests for search→notice→unit, agency as
+  author, `rfp_budget` attached / omitted-not-zero, keyword+window+key request shape, unkeyed-skip,
+  `check_item_source` conformance, registry resolution, plus a `network`-marked live smoke).
+  USAspending award-$ overlay left as a docstring TODO (a lane-② `MagnitudeProvider`, not part of the
+  grounding deliverable); EU TED is a fast-follow on this shape.
 - **Sources P2 — Wikipedia pageviews magnitude provider (#144).** New
   `metalworks.research.sources.magnitude_wikipedia.WikipediaPageviewsProvider` — a keyless lane-②
   magnitude provider over the Wikimedia REST pageviews API

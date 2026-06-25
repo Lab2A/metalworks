@@ -143,6 +143,7 @@ BUILTIN_SOURCE_MODULES: dict[str, str] = {
     "hackernews_archive": "metalworks.research.sources.hn_archive",
     "hn_archive": "metalworks.research.sources.hn_archive",
     "producthunt": "metalworks.research.sources.producthunt",
+    "samgov": "metalworks.research.sources.samgov",
     "stackexchange": "metalworks.research.sources.stackexchange",
     "discourse": "metalworks.research.sources.discourse",
     "web": "metalworks.research.sources.web",
