@@ -678,6 +678,16 @@ def setup(
             console.print(f"  [yellow]could not warm: {exc.message}[/yellow]")
             if exc.fix:
                 console.print(f"  [dim]{exc.fix}[/dim]")
+        except Exception as exc:
+            # Warming is best-effort — a provider/auth failure (e.g. a stale Vertex
+            # creds path) must never crash setup. Surface it and move on.
+            console.print(
+                f"  [yellow]could not warm: {type(exc).__name__}: {str(exc)[:200]}[/yellow]"
+            )
+            console.print(
+                "  [dim]Set METALWORKS_EMBEDDINGS=local to force the keyless model, "
+                "or fix the provider credentials.[/dim]"
+            )
 
     # 6. Finish with the doctor summary.
     console.print("\n[bold]── doctor ──[/bold]")

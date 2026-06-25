@@ -562,19 +562,51 @@ def resolve_models(
     return main, fast
 
 
+def _vertex_creds_usable() -> bool:
+    """True when Vertex mode could actually authenticate.
+
+    ``vertex_enabled()`` only reads ``GOOGLE_GENAI_USE_VERTEXAI`` — it does NOT
+    mean Vertex is usable. When ``GOOGLE_APPLICATION_CREDENTIALS`` is set, the
+    file must exist (a stale path pointing at a deleted key is the #1 way a
+    machine that once used Vertex now crashes on first embed). When it is unset
+    we assume ambient ADC (gcloud / GCE metadata) may exist and don't preempt it.
+    """
+    creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if creds:
+        return Path(creds).expanduser().is_file()
+    return True
+
+
 def resolve_embeddings() -> EmbeddingProvider:
     """Resolve an :class:`~metalworks.embeddings.EmbeddingProvider`.
 
-    A present Google (``GOOGLE_API_KEY`` / ``GEMINI_API_KEY`` / Vertex) key wins,
-    then OpenAI (``OPENAI_API_KEY``). With no embeddings-capable key, falls back
-    to a local, keyless fastembed model — so a chat-only setup (including an
-    Anthropic-only one, since Anthropic ships no embeddings API) still works end
-    to end. The local model is the floor, never a forced downgrade: this never
-    raises for a missing key. (The fastembed weights install via the ``research``
-    extra; :class:`~metalworks.errors.MissingExtraError` surfaces only on first
-    embed if the extra is absent.) The adapter is imported lazily.
+    Precedence: an explicit ``METALWORKS_EMBEDDINGS`` override
+    (``local`` / ``openai`` / ``google``) > a present Google key (``GOOGLE_API_KEY``
+    / ``GEMINI_API_KEY``, or Vertex with usable creds) > OpenAI (``OPENAI_API_KEY``)
+    > a local, keyless fastembed model. The local model is the floor — a chat-only
+    setup (Anthropic- or OpenRouter-only) just works, and a misconfigured Vertex
+    env (``GOOGLE_GENAI_USE_VERTEXAI=true`` but a missing creds file) **degrades to
+    local instead of crashing** rather than returning a doomed Google adapter. This
+    never raises for a missing key. (fastembed installs via the ``research`` extra;
+    :class:`~metalworks.errors.MissingExtraError` surfaces only on first embed if
+    absent.) Adapters are imported lazily.
     """
-    if vertex_enabled() or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+    override = (os.environ.get("METALWORKS_EMBEDDINGS") or "").strip().lower()
+    if override == "local":
+        from metalworks.embeddings.adapters.fastembed import FastEmbedEmbedding
+
+        return FastEmbedEmbedding()
+    if override == "openai":
+        from metalworks.embeddings.adapters.openai import OpenAIEmbedding
+
+        return OpenAIEmbedding()
+    if override in ("google", "gemini", "vertex"):
+        from metalworks.embeddings.adapters.google import GoogleEmbedding
+
+        return GoogleEmbedding()
+
+    google_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if google_key or (vertex_enabled() and _vertex_creds_usable()):
         from metalworks.embeddings.adapters.google import GoogleEmbedding
 
         return GoogleEmbedding()

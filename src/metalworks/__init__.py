@@ -20,6 +20,6 @@ through a deprecation cycle. Everything else may change in any 0.x release.
 
 from metalworks.client import Metalworks
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 __all__ = ["Metalworks", "__version__"]

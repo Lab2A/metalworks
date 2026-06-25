@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from metalworks import config
@@ -134,6 +135,17 @@ def doctor_hints() -> list[str]:
             "Vertex chat/embeddings will fail; set METALWORKS_MODEL=<provider/model> and "
             'GOOGLE_GENAI_USE_VERTEXAI=false, or pip install "metalworks[google]".'
         )
+    else:
+        # Vertex on, the extra present, but the creds file is a stale/missing path:
+        # embeddings degrade to local (0.3.2) — surface it so it isn't a silent
+        # downgrade, and chat still needs a working provider (METALWORKS_MODEL).
+        _vertex_creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if vertex_enabled() and _vertex_creds and not Path(_vertex_creds).expanduser().is_file():
+            hints.append(
+                "GOOGLE_GENAI_USE_VERTEXAI is on but GOOGLE_APPLICATION_CREDENTIALS points at a "
+                "missing file → embeddings fall back to the local model; set "
+                "GOOGLE_GENAI_USE_VERTEXAI=false (or fix the creds path) to silence this."
+            )
     for provider, env_vars, module in PROVIDER_MATRIX:
         found = next((v for v in env_vars if os.environ.get(v)), None)
         if found and not module_available(module):

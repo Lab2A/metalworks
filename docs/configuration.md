@@ -149,8 +149,14 @@ So a chat-only provider (Anthropic, OpenRouter, a local LLM) just works: embeddi
 to the local model, downloaded once to the Hugging Face cache, then fully offline. A Google
 or OpenAI key is used automatically when present (higher quality, no download).
 
+Force a backend without editing code with **`METALWORKS_EMBEDDINGS`** (`local` / `openai` /
+`google`) — handy on a machine with stray `GOOGLE_GENAI_USE_VERTEXAI` you don't want embeddings to
+use. And if Vertex is enabled but its `GOOGLE_APPLICATION_CREDENTIALS` points at a missing file,
+embeddings **degrade to the local model** instead of crashing.
+
 ```bash
 metalworks models warm          # pre-download the local model before your first run
+METALWORKS_EMBEDDINGS=local metalworks setup   # force the keyless local model
 ```
 
 Override explicitly by injecting a provider:
