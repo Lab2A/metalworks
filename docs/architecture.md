@@ -45,6 +45,47 @@ already computed. This is what makes the output defensible and CI-testable: the 
 produce the same verdict, and a unit test can pin the whole decision matrix without a model in the
 loop.
 
+## Three source lanes
+
+Research reads from many sources, and going wide stays safe only because every source
+*declares* what kind of thing it is — its **lane**. There are exactly three, each a different
+shape:
+
+- **grounding** — an `ItemSource` that yields quotable `CorpusRecord` / `CorpusComment` (text +
+  permalink + pseudonymizable author). The cite-or-die spine; Reddit, Stack Exchange, GitHub,
+  the ATS boards all live here.
+- **magnitude** — a `MagnitudeProvider` overlay: an absolute number (downloads, installs,
+  search volume) attached to a theme *after* clustering. It weights ranking; it never creates a
+  cluster.
+- **web** — the agentic discovery lane: a `DiscoveryProvider` that runs its own iterate-and-dig
+  loop to reach the long tail without a per-venue connector.
+
+The source pipeline runs them in order — **selector → pull per lane → cluster → magnitude
+overlay → deterministic score**:
+
+```
+[sources].select?  →  pull grounding + web (quotes)  →  cluster by distinct voice
+                                                              │
+                            magnitude overlay (numbers) ──────┤  (advisory: ranking only)
+                                                              ▼
+                                                   deterministic demand score
+                                                   verdict band (breadth only)
+```
+
+A built-in grounding connector registers in **one** place — the `BUILTIN_SOURCE_MODULES` map in
+`research/sources/__init__.py` — and a 0.5 conformance sweep (`tests/test_conformance_sweep.py`)
+holds the whole registry to lane discipline. See [Build a source](/docs/build-sources) for the
+how-to.
+
+### Advisory magnitude, breadth-only verdict
+
+This is the load-bearing split. A source emits `signals: dict[str, float]`, and a `SignalSpec`
+registry classifies each kind (magnitude vs not, polarity). The deterministic scorer reads the
+known kinds — but **magnitude is advisory**: it lifts a high-volume theme in the *ranking*
+(`compute_demand_score` reorders clusters), while the GO / NO-GO **verdict band stays
+breadth-only** — `demand.strength` reads distinct-author / distinct-voice counts and never sees
+the magnitude signal. A number can sharpen the sort order; it can never move the call.
+
 ## No-cite-no-claim
 
 Every claim resolves to a real quote. A cluster carries verbatim `ResolvedCitation`s; a competitor

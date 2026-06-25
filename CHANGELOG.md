@@ -502,6 +502,29 @@ contracts may change in any release.
   `mw.design_review()`, `metalworks research design-review`, the `design_review` MCP tool, and the
   `/design-review` skill. Needs a script-capable browser renderer (Playwright).
 
+### Docs
+- **Refreshed corpus/sources docs for the 3-lane source model + connector build guides.** The
+  conceptual docs described the old Reddit/HN single-source world; they now reflect the
+  ultra-wide-sources surface. New page `docs/build-sources.md` ("Build a source") is the
+  canonical how-to for all three lanes, each with a copy-paste worked example mirroring a shipped
+  source — a **grounding** connector (`ItemSource` + `SourceSpec` + the single
+  `BUILTIN_SOURCE_MODULES` registration (#139) + `register_signal` + the `yields_units` / rule-5
+  rule + `metalworks sources scaffold`; ref `stackexchange.py`), a **magnitude** provider
+  (`MagnitudeProvider` + `register_magnitude`, omission=unknown-never-0, never-creates-a-cluster;
+  ref `magnitude.py` / npm), and an agentic **discovery** provider (`DiscoveryProvider`,
+  cite-or-die when delegating, the capability-ladder gate; ref `discovery/exa.py`). `docs/corpus.md`
+  is now the corpus-purpose overview (the 3 lanes, buyer-layer breadth, cite-or-die, the advisory
+  demand-volume signal) instead of just "where the .db lives". `docs/architecture.md` and
+  `docs/how-it-works.md` show the source pipeline (selector → pull per lane → cluster → magnitude
+  overlay → deterministic score) and the deterministic-scorer / **advisory-magnitude,
+  breadth-only-verdict** split. `docs/custom-corpus.md`, `docs/extending.md`,
+  `docs/metalworks-internals.md`, `docs/load-reddit-corpus.md`, `docs/load-hn-corpus.md` updated;
+  the stale `sources#add-your-own-source` cross-references now point at the build guide.
+  `CONTRIBUTING.md` "Adding a source connector" gains the #139 single-registration step and a
+  pointer to the magnitude/discovery guides. The generated `docs/sources.md` (via
+  `scripts/gen_sources_md.py` static prose) leads with the lane model and links the build guide;
+  `docs.json` nav adds the new page. Docs-only — no `src/` behavior change.
+
 ### Changed
 
 - **`DemandReport.pinned_axis` / `optimized_axis` are now optional (`str | None`, default `None`).**

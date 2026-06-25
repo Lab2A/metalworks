@@ -7,9 +7,11 @@ description: "Choose where metalworks reads from — Reddit, Hacker News, the we
      Source of truth: each connector's SourceSpec (metalworks.research.sources).
      Regenerate: python scripts/gen_sources_md.py -->
 
-**A source is where metalworks reads conversations.** Out of the box it can read from Reddit,
-Hacker News, and the web; you can also plug in your own. Read from more than one and you get
-more evidence behind every report.
+**A source is where metalworks reads demand.** Out of the box it reads across consumer, dev,
+IT-admin, procurement, and hiring layers — Reddit, Hacker News, Stack Exchange, GitHub, the web,
+and more; you can also plug in your own. Read from more than one and you get more evidence behind
+every report. Every source declares a **lane**: *grounding* (quotable records), *magnitude* (an
+absolute number attached to a theme), or *web* (the agentic discovery loop).
 
 ## What's available
 
@@ -73,7 +75,12 @@ others.
 ## Add your own source
 
 A source is a small piece of code that fetches items and hands them to metalworks in a common
-shape. The fastest way in is to scaffold one:
+shape. There are three lanes to add — a **grounding** connector (quotable records), a
+**magnitude** provider (a number attached to a theme), or an agentic **discovery** provider
+(reaches the long tail). The full how-to for all three, with copy-paste worked examples, is
+[Build a source](/docs/build-sources).
+
+The fastest start for a grounding connector is to scaffold one:
 
 ```bash
 metalworks sources scaffold mysource --lane grounding --auth none
@@ -81,10 +88,10 @@ metalworks sources scaffold mysource --lane grounding --auth none
 
 That writes a connector module (with a filled `SourceSpec` and a `register_signal` block), a
 conformance test, prints the `pyproject.toml` extra to add, and the `docs/sources.md` row.
-Fill in the `pull` / `comments_for` bodies and you're done — see
-[Adding a source connector](https://github.com/Lab2A/metalworks/blob/main/CONTRIBUTING.md) in
-`CONTRIBUTING.md` for the worked example. To wire one up by hand instead, copy
-`research/sources/template.py`:
+Fill in the `pull` / `comments_for` bodies, add one line to `BUILTIN_SOURCE_MODULES` in
+`research/sources/__init__.py` to register it, and you're done — see
+[Build a source](/docs/build-sources) for the worked example. To wire one up by hand instead,
+copy `research/sources/template.py`:
 
 ```python
 from collections.abc import Iterator, Sequence
@@ -125,7 +132,8 @@ register_source(
 )
 ```
 
-Once registered, it works like any built-in: `--source mysource`, `get_source("mysource")`, or
+Then list it in one map — `BUILTIN_SOURCE_MODULES` in `research/sources/__init__.py`. Once
+registered, it works like any built-in: `--source mysource`, `get_source("mysource")`, or
 `Metalworks(sources=[MySource()])`.
 
 **If your source has no comments** (a web page, a product listing), return `None` from
@@ -137,7 +145,8 @@ tests (the scaffold writes one for you).
 
 ## Next
 
-- [Your research data](/docs/corpus) — where what you read is saved, and how to update a
+- [Your corpus](/docs/corpus) — what the corpus is, where it's saved, and how to update a
   report later.
+- [Build a source](/docs/build-sources) — add a grounding, magnitude, or discovery source.
 - [Demand research](/docs/demand-research) — run a report.
 - [Use your own data](/docs/custom-corpus) — load conversations you already have.

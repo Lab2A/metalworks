@@ -50,7 +50,7 @@
           },
           {
             "group": "Your project",
-            "pages": ["docs/projects", "docs/corpus", "docs/sources"]
+            "pages": ["docs/projects", "docs/corpus", "docs/sources", "docs/build-sources"]
           },
           {
             "group": "Research",
@@ -106,6 +106,7 @@
               "docs/architecture",
               "docs/protocols",
               "docs/extending",
+              "docs/build-sources",
               "docs/custom-chatmodel",
               "docs/custom-corpus",
               "docs/load-reddit-corpus",

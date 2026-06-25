@@ -1,11 +1,44 @@
 ---
-title: "Your research data"
-description: "Where metalworks saves the conversations it reads, how that collection grows as you run more research, and how to update an old report to see what changed."
+title: "Your corpus"
+description: "What metalworks reads demand from — quotable conversations across three lanes and every buyer layer, plus where that data is saved and how to update an old report."
 ---
 
-When metalworks runs research, it saves the conversations it read. That saved collection is
-**your research data** (metalworks calls it your *corpus*). This page answers three questions:
-where is it, does it stick around, and can you update an old report later.
+When metalworks runs research, it reads real demand and saves what it read. That saved
+collection is **your corpus** (your research data). This page is the bigger picture first —
+what the corpus *is* now — then the practical part: where it lives and how to update an old
+report.
+
+## What the corpus is
+
+The corpus is the evidence the whole product rests on: every claim in a report, a positioning
+wedge, or a launch line resolves back to a real quote in it. Three things make it more than a
+pile of threads.
+
+**It spans three lanes.** A source declares which lane it serves, and the lanes do different
+jobs:
+
+- **Grounding** — quotable records: a post, a comment, a Q&A answer, a job description, an
+  issue. Each carries its real permalink and a pseudonymized author, so a downstream quote
+  always traces back. This is the cite-or-die spine.
+- **Magnitude** — an absolute number (downloads, installs, search volume) attached to a theme
+  *after* clustering. It weights how a need ranks; it never creates a theme on its own.
+- **Web** — the agentic discovery lane, which reaches the long tail (niche forums, blogs,
+  community threads) without a per-venue connector, ingesting only verbatim citations.
+
+**It spans every buyer layer.** The shipped catalog reaches from consumers (Reddit) through
+developers (Hacker News, Stack Exchange, GitHub) to IT admins (WordPress, Discourse),
+procurement (SAM.gov), and the exec/hiring layer (ATS job boards) — so a need isn't measured
+from one crowd's voice alone. See the [live catalog](/docs/sources) for what's available and
+reachable.
+
+**It carries a demand-volume signal.** Beyond *how many distinct people* raised a need (the
+breadth that drives the verdict), a magnitude overlay can attach *how big* a theme is — a
+package's downloads, a search term's volume. That lifts a high-volume theme in the **ranking**,
+but the GO / NO-GO **verdict band stays breadth-only**: a number can sharpen the sort order, it
+can never manufacture a verdict. (See [How it works](/docs/how-it-works).)
+
+To read from more sources, mix them per run or save your choices to config — see
+[Sources](/docs/sources). To add a source of your own, see [Build a source](/docs/build-sources).
 
 ## Where it's saved
 
@@ -73,6 +106,7 @@ The comparison has two parts:
 
 ## Next
 
-- [Sources](/docs/sources) — where the data comes from.
+- [Sources](/docs/sources) — the live catalog of where the data comes from.
+- [Build a source](/docs/build-sources) — add a grounding, magnitude, or discovery source.
 - [Projects](/docs/projects) — the `.metalworks/` folder this lives in.
 - [Use your own data](/docs/custom-corpus) — load conversations you already have.

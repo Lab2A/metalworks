@@ -146,5 +146,5 @@ resolves to the mirror automatically. This mirrors how Reddit's Supabase tier wo
 ## Other sources
 
 This is one of several [sources](/docs/sources) you can read from. For Reddit's archive, see
-[Use Reddit's archive offline](/docs/load-reddit-corpus); to plug in something else, [add your
-own source](/docs/sources#add-your-own-source).
+[Use Reddit's archive offline](/docs/load-reddit-corpus); to plug in something else, [build your
+own source](/docs/build-sources).

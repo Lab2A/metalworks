@@ -8,7 +8,7 @@ on what that data is:
 
 - **Not Reddit** (a forum, a reviews API, an internal dataset) → write a
   **source**. You map your items to the standard shape and they work like any
-  built-in source. See [Add your own source](/docs/sources#add-your-own-source).
+  built-in source. See [Build a source](/docs/build-sources).
 - **Reddit data from somewhere other than the public archive** (local files, your
   own database, a cache) → implement **`CorpusReader`** and **`CommentSource`**,
   two small interfaces that hand metalworks raw post and comment rows. That's this
@@ -69,5 +69,8 @@ tests and air-gapped runs.
 ## Data that isn't Reddit
 
 For anything that isn't Reddit (a forum, reviews, your own dataset), don't use
-`CorpusReader` — [add a source](/docs/sources#add-your-own-source) instead. You
-map your items to the standard shape and they work like any built-in source.
+`CorpusReader` — [build a source](/docs/build-sources) instead. You map your items
+to the standard shape and they work like any built-in source. There are three lanes
+to pick from: a **grounding** connector that yields quotable records, a **magnitude**
+provider that attaches a number (downloads, search volume) to a theme, or an agentic
+**discovery** provider that reaches the long tail.

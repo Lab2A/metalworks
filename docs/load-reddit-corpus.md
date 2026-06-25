@@ -81,5 +81,5 @@ they'll be thinner) — see
 ## Other data
 
 This script is just for Reddit. To run research over something else — your own
-database, an internal API, a forum — [add a source](/docs/sources#add-your-own-source)
+database, an internal API, a forum — [build a source](/docs/build-sources)
 or implement [`CorpusReader`](/docs/custom-corpus) for non-archive Reddit data.
