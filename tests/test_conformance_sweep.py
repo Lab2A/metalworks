@@ -34,6 +34,7 @@ import pytest
 import metalworks.research.sources.arctic
 import metalworks.research.sources.ats
 import metalworks.research.sources.discourse
+import metalworks.research.sources.github
 import metalworks.research.sources.hackernews
 import metalworks.research.sources.hn_archive
 import metalworks.research.sources.magnitude
@@ -354,6 +355,52 @@ class _StubSamGovClient:
         return None
 
 
+_GITHUB_SEARCH = {
+    "items": [
+        {
+            "id": 900,
+            "number": 42,
+            "title": "stim-free focus aid: plugin doesn't support it",
+            "body": "I want focus without jitters.",
+            "html_url": "https://github.com/acme/focus/issues/42",
+            "repository_url": "https://api.github.com/repos/acme/focus",
+            "user": {"login": "alice"},
+            "comments": 1,
+            "reactions": {"+1": 340, "total_count": 350},
+            "state": "open",
+            "created_at": "2026-05-15T10:00:00Z",
+        }
+    ],
+    "total_count": 1,
+}
+_GITHUB_COMMENTS_42 = [
+    {
+        "id": 9100,
+        "body": "L-theanine works for me.",
+        "html_url": "https://github.com/acme/focus/issues/42#issuecomment-9100",
+        "user": {"login": "carol"},
+        "reactions": {"+1": 5},
+        "created_at": "2026-05-15T11:00:00Z",
+    }
+]
+
+
+class _StubGitHubClient:
+    """A minimal httpx.Client stand-in for the GitHub REST API. No network/token."""
+
+    def get(
+        self, url: str, params: dict[str, Any] | None = None, headers: Any = None
+    ) -> _StubResponse:
+        if "/search/issues" in url:
+            return _StubResponse(_GITHUB_SEARCH)
+        if "/issues/42/comments" in url:
+            return _StubResponse(_GITHUB_COMMENTS_42)  # type: ignore[arg-type]
+        raise AssertionError(f"unexpected URL {url}")
+
+    def close(self) -> None:
+        return None
+
+
 _DISCOURSE_SEARCH = {
     "topics": [
         {
@@ -455,6 +502,7 @@ def _source_fixtures() -> dict[str, dict[str, object]]:
         "samgov": {"key": "dev-key", "client": _StubSamGovClient()},
         "stackexchange": {"client": _StubSeClient(), "author_salt": "t"},
         "discourse": {"client": _StubDiscourseClient(), "author_salt": "t"},
+        "github": {"client": _StubGitHubClient(), "author_salt": "t"},
         # 'web' is a web lane, not grounding — rule 1 skips it (no fixture needed).
     }
 
@@ -478,6 +526,7 @@ SHIPPED_SOURCE_IDS = frozenset(
         "samgov",
         "stackexchange",
         "discourse",
+        "github",
         "web",
     }
 )

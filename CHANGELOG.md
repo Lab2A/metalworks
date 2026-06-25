@@ -9,6 +9,30 @@ contracts may change in any release.
 ## [Unreleased]
 
 ### Added
+- **Sources P3 — GitHub Issues connector (#149).** New
+  `metalworks.research.sources.github.GitHubItemSource` — a Phase-3 grounding singleton, a
+  keyless-with-optional-token `ItemSource` over the GitHub REST API. GitHub Issues capture a demand
+  modality nothing else reaches: **feature requests and bug reports filed against shipping products**
+  ("plugin X doesn't support SSO", 340 👍) from the developers and buyers of dev tooling. `pull` runs
+  the brief's terms through `GET /search/issues` (`advanced_search=true`, scoped `type:issue` over a
+  `created:<start>..<end>` window) and maps each issue to a `CorpusRecord` (title, body, `html_url`,
+  author login pseudonymized); `comments_for` fetches each issue's
+  `/repos/{owner}/{repo}/issues/{n}/comments` thread → `CorpusComment` (body + per-comment permalink +
+  author), addressing recovered from the search hit's `repository_url` + `number`. A **new
+  `reactions` signal kind** is registered `is_magnitude=True` in
+  `metalworks.research.synthesis.signals` (the 👍/`+1` count = absolute endorsement volume; it lifts
+  ranking, never the verdict band). Because GitHub has a real comment layer it is **not**
+  `yields_units`, so per the rule-5 sweep the grounding lane also declares the non-magnitude
+  `engagement` (the issue's comment count) — each record emits
+  `{"reactions": <+1 count>, "engagement": <comment count>}` and `signals=("reactions", "engagement")`.
+  Auth mirrors Stack Exchange's optional-key pattern: `auth="key"`, `access="open"` (keyless works at
+  60/hr), `env=("GITHUB_TOKEN",)`; the token is sent as an `Authorization: Bearer` header **only when
+  present** (keyless leaks no token — asserted). `targeting="keyword"`. Registered via the single
+  `BUILTIN_SOURCE_MODULES` map (#139); `docs/sources.md` regenerated. New `tests/test_source_github.py`
+  (offline stub-client unit tests for search→issue→record, comments→quotes, ghost-author tombstone,
+  empty-comment drop, `reactions` registered + ranking lift, keyless-leaks-no-token, query/window
+  shape, `check_item_source` conformance, registry resolution, plus a `network`-marked live smoke).
+  GraphQL Discussions and per-repo deep crawl left out of scope per the issue.
 - **Sources P3 — SAM.gov procurement connector (#148).** New
   `metalworks.research.sources.samgov.SamGovItemSource` — the marquee Phase-3 grounding singleton, a
   `yields_units` `ItemSource` over the SAM.gov Opportunities API
