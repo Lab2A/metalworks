@@ -64,7 +64,7 @@ _ALL_CHAT_KEYS = (
 # OpenAI-compatible adapter. Any *other* head (a vendor namespace such as
 # ``meta-llama/llama-3``) is treated as an OpenRouter model id verbatim, so a
 # bare ``anthropic/claude-x`` never silently mis-routes to OpenRouter.
-_NATIVE_PROVIDERS = frozenset({"anthropic", "openai", "google", "gemini"})
+_NATIVE_PROVIDERS = frozenset({"anthropic", "openai", "google", "gemini", "claude-code"})
 _COMPAT_PROVIDERS = frozenset({"openrouter", "openai-compatible", "compat"})
 
 _CONFIG_FILENAME = "metalworks.toml"
@@ -446,7 +446,33 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     for provider, env_var in _COMPAT_KEY_ORDER:
         if os.environ.get(env_var):
             return provider, model
-    raise MissingKeyError(_ALL_CHAT_KEYS, provider="chat model")
+    # Keyless floor: if nothing above resolved but the Claude Agent SDK + the
+    # `claude` CLI are present, run on the user's Claude Code login (no API key) —
+    # the chat analogue of resolve_embeddings' local-model floor. Every keyed/ref
+    # path above wins, so this only engages when nothing else is configured.
+    if _claude_code_available():
+        return "claude-code", model
+    raise MissingKeyError(
+        _ALL_CHAT_KEYS,
+        provider="chat model",
+        detail="Or install metalworks[claude-code] to run keyless on your Claude Code login.",
+    )
+
+
+def _claude_code_available() -> bool:
+    """True iff a keyless Claude Code chat backend is usable.
+
+    Requires both the ``claude-agent-sdk`` package (the ``claude-code`` extra) and
+    a locatable ``claude`` CLI. Cheap and side-effect-free: it imports the package
+    spec and probes PATH/the bundled binary — it never spawns a subprocess and
+    reads no env. The actual login is only checked at first call.
+    """
+    import importlib.util
+    import shutil
+
+    if importlib.util.find_spec("claude_agent_sdk") is None:
+        return False
+    return shutil.which("claude") is not None
 
 
 def resolve_chat(model: str | None = None) -> ChatModel:
@@ -472,6 +498,10 @@ def resolve_chat(model: str | None = None) -> ChatModel:
         from metalworks.llm.adapters.google import GoogleChatModel
 
         return GoogleChatModel(model_id=model_id) if model_id else GoogleChatModel()
+    if provider == "claude-code":
+        from metalworks.llm.adapters.claude_code import ClaudeCodeChatModel
+
+        return ClaudeCodeChatModel(model_id=model_id) if model_id else ClaudeCodeChatModel()
     if provider == "openrouter":
         from metalworks.llm.adapters.openai import OpenAIChatModel
 

@@ -42,6 +42,9 @@ metalworks = "metalworks.cli:app"
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.50"]
 google = ["google-genai>=1.0"]
+# Run keyless on the user's Claude Code login (the bundled `claude` CLI). The
+# keyless chat floor when no provider key/ref is configured.
+claude-code = ["claude-agent-sdk>=0.2.110"]
 litellm = ["litellm>=1.55,<2"]
 reddit = ["redditwarp>=1.3", "cryptography>=42"]
 arctic = ["duckdb>=1.1"]
@@ -65,7 +68,7 @@ firecrawl = ["firecrawl-py>=4.0"]
 browser = ["playwright>=1.40,<2"]
 mcp = ["mcp[cli]>=1.2"]
 all = [
-  "metalworks[anthropic,openai,google,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,browser,mcp]",
+  "metalworks[anthropic,openai,google,claude-code,reddit,arctic,supabase,research,exa,tavily,parallel,firecrawl,browser,mcp]",
 ]
 dev = [
   "pytest>=8",

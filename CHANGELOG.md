@@ -8,6 +8,17 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+### Added
+- **Run on your Claude Code login — no API key (`metalworks[claude-code]`).** A new `claude-code`
+  provider (a `ClaudeCodeChatModel` over the Claude Agent SDK) runs completions through the bundled
+  `claude` CLI using the machine's Claude Code session, so a chat-only setup needs no provider key.
+  It is the **keyless chat floor**: when no key/ref/`METALWORKS_MODEL` is configured and the SDK + CLI
+  are present, `resolve_chat()` falls back to it instead of raising `MissingKeyError` (the chat
+  analogue of the embeddings local-model floor). Any explicit key/ref still wins. Select a tier with
+  `--model claude-code/{sonnet,opus,haiku}`. Native structured output via the SDK's `output_format`,
+  with the schema-in-prompt ladder as fallback. Note: it spawns the CLI per call (~5-7s/call, the
+  keyless convenience path, not the fast one) and uses your individual Claude Code subscription.
+
 ## [0.3.3] - 2026-06-25
 
 ### Fixed
