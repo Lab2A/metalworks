@@ -155,7 +155,18 @@ def doctor_hints() -> list[str]:
                 f'pip install "metalworks[{extra}]"'
             )
     if not any(os.environ.get(v) for _, evs, _ in PROVIDER_MATRIX for v in evs):
-        hints.append("No provider key found → set one (e.g. OPENAI_API_KEY) to run the pipeline.")
+        from metalworks.config import claude_code_available
+
+        if claude_code_available():
+            hints.append(
+                "No provider key → running keyless on your Claude Code login (claude-code). "
+                "Set a provider key (e.g. OPENAI_API_KEY) for a faster path."
+            )
+        else:
+            hints.append(
+                "No provider key found → set one (e.g. OPENAI_API_KEY), or "
+                'pip install "metalworks[claude-code]" to run keyless on your Claude Code login.'
+            )
     if not any(os.environ.get(v) for v in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")):
         if module_available("fastembed"):
             hints.append(

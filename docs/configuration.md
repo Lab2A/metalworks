@@ -87,6 +87,21 @@ Honest trade-offs:
   in distributed products; this is intended for your own local/individual use, not for shipping a
   multi-user service on one subscription.
 
+### Web research, keyless too
+
+The same extra also makes **web research** keyless. Normally the web stream needs an external search
+key (`EXA_API_KEY` / `TAVILY_API_KEY` / …); with `metalworks[claude-code]` and no such key, a
+`claude-code` `SearchProvider` drives Claude Code's `WebSearch` tool and feeds the same grounding
+path — so a *full* report (Reddit demand **and** web) runs with zero keys. Any external search key
+still wins.
+
+Grounding note: native web-search citations aren't reachable through the SDK (it drops the
+Messages-API `citations`), so attribution is reconstructed — the model's `{url, title, snippet}`
+results are **validated against the URLs `WebSearch` actually returned**, and any invented URL is
+dropped (no-cite-no-claim holds at the claim→URL level). It's slower and more token-heavy than a
+search API, and the binding is claim→URL rather than native span-citation — for the strongest web
+grounding, set an `EXA_API_KEY`.
+
 ## LLM call timeout (reasoning models)
 
 Each LLM call has a per-call timeout budget, default **300s**. The OpenAI/compatible path

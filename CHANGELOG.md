@@ -18,6 +18,14 @@ contracts may change in any release.
   `--model claude-code/{sonnet,opus,haiku}`. Native structured output via the SDK's `output_format`,
   with the schema-in-prompt ladder as fallback. Note: it spawns the CLI per call (~5-7s/call, the
   keyless convenience path, not the fast one) and uses your individual Claude Code subscription.
+- **Keyless web research, too — a `claude-code` `SearchProvider`.** Web research no longer needs an
+  Exa/Tavily key when running on Claude Code: a `ClaudeCodeSearch` provider drives the SDK's
+  `WebSearch` tool and returns `{url, title, snippet}` hits that the existing web-research rung grounds
+  like any other search. It is the **keyless search floor** — `resolve_search()` falls back to it when
+  no search key is set (any search key still wins). Native web-search citations aren't reachable
+  through the SDK (it drops them), so grounding is reconstructed and **URL-validated**: only URLs the
+  `WebSearch` tool actually returned survive, so an invented source can never enter the corpus. Slower
+  and token-heavier than a search API; the honest keyless option for a *full* (demand + web) report.
 
 ## [0.3.3] - 2026-06-25
 
