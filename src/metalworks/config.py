@@ -450,7 +450,7 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     # `claude` CLI are present, run on the user's Claude Code login (no API key) —
     # the chat analogue of resolve_embeddings' local-model floor. Every keyed/ref
     # path above wins, so this only engages when nothing else is configured.
-    if _claude_code_available():
+    if claude_code_available():
         return "claude-code", model
     raise MissingKeyError(
         _ALL_CHAT_KEYS,
@@ -459,7 +459,7 @@ def _resolve_chat_provider(model: str | None) -> tuple[str, str | None]:
     )
 
 
-def _claude_code_available() -> bool:
+def claude_code_available() -> bool:
     """True iff a keyless Claude Code chat backend is usable.
 
     Requires both the ``claude-agent-sdk`` package (the ``claude-code`` extra) and
@@ -678,7 +678,7 @@ def resolve_search() -> SearchProvider | None:
     # Keyless search floor: no external search key, but the Claude Agent SDK + CLI
     # are present → search the web on the user's Claude Code login (the search
     # analogue of the keyless chat floor). Any search key above still wins.
-    if _claude_code_available():
+    if claude_code_available():
         from metalworks.search.adapters.claude_code import ClaudeCodeSearch
 
         return ClaudeCodeSearch()

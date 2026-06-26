@@ -122,7 +122,7 @@ def test_search_floor_engages_when_no_key(monkeypatch: pytest.MonkeyPatch) -> No
     for k in _SEARCH_KEYS:
         monkeypatch.delenv(k, raising=False)
     _install_fake_sdk(monkeypatch, structured=None)
-    monkeypatch.setattr(config, "_claude_code_available", lambda: True)
+    monkeypatch.setattr(config, "claude_code_available", lambda: True)
     from metalworks.search.adapters.claude_code import ClaudeCodeSearch
 
     assert isinstance(resolve_search(), ClaudeCodeSearch)
@@ -131,5 +131,5 @@ def test_search_floor_engages_when_no_key(monkeypatch: pytest.MonkeyPatch) -> No
 def test_search_floor_absent_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     for k in _SEARCH_KEYS:
         monkeypatch.delenv(k, raising=False)
-    monkeypatch.setattr(config, "_claude_code_available", lambda: False)
+    monkeypatch.setattr(config, "claude_code_available", lambda: False)
     assert resolve_search() is None

@@ -175,20 +175,20 @@ def _isolate(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_floor_engages_when_no_key(monkeypatch: pytest.MonkeyPatch) -> None:
     _isolate(monkeypatch)
-    monkeypatch.setattr(config, "_claude_code_available", lambda: True)
+    monkeypatch.setattr(config, "claude_code_available", lambda: True)
     assert resolve_provider(None) == ("claude-code", None)
 
 
 def test_explicit_key_wins_over_floor(monkeypatch: pytest.MonkeyPatch) -> None:
     _isolate(monkeypatch)
-    monkeypatch.setattr(config, "_claude_code_available", lambda: True)
+    monkeypatch.setattr(config, "claude_code_available", lambda: True)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-x")
     assert resolve_provider(None) == ("anthropic", None)
 
 
 def test_no_floor_raises_when_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     _isolate(monkeypatch)
-    monkeypatch.setattr(config, "_claude_code_available", lambda: False)
+    monkeypatch.setattr(config, "claude_code_available", lambda: False)
     with pytest.raises(MissingKeyError):
         resolve_provider(None)
 
