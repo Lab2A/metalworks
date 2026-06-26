@@ -32,13 +32,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import importlib
-import threading
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, ClassVar, TypeVar, cast
 
 from pydantic import BaseModel
 
 from metalworks.errors import MetalworksError, MissingExtraError, StructuredOutputError
+from metalworks.llm.adapters._claude_code_runtime import background_loop, sdk_model
 from metalworks.llm.adapters._timeout import resolve_timeout_s
 from metalworks.llm.protocol import (
     PROTOCOL_VERSION,
@@ -50,46 +50,6 @@ from metalworks.llm.protocol import (
 from metalworks.llm.structured import prompt_embedded_structured, validate_payload
 
 T = TypeVar("T", bound=BaseModel)
-
-_MODEL_PREFIX = "claude-code/"
-_DEFAULT_MODEL = "sonnet"
-
-# A single shared background event loop drives every adapter call. The SDK is
-# async-only; the protocol is sync and called from metalworks' ThreadPoolExecutor.
-# One daemon loop thread + run_coroutine_threadsafe lets concurrent sync callers
-# each schedule an independent one-shot query() and block for its result.
-_loop: asyncio.AbstractEventLoop | None = None
-_loop_lock = threading.Lock()
-
-
-def _background_loop() -> asyncio.AbstractEventLoop:
-    global _loop
-    loop = _loop
-    if loop is not None and loop.is_running():
-        return loop
-    with _loop_lock:
-        loop = _loop
-        if loop is not None and loop.is_running():
-            return loop
-        loop = asyncio.new_event_loop()
-        thread = threading.Thread(
-            target=loop.run_forever, name="metalworks-claude-code", daemon=True
-        )
-        thread.start()
-        _loop = loop
-        return loop
-
-
-def _sdk_model(model_id: str) -> str:
-    """Map a metalworks ``model_id`` to the SDK ``model`` arg.
-
-    Accepts ``claude-code/sonnet``, a bare alias (``sonnet``/``opus``/``haiku``),
-    or a full model id; the ``claude-code/`` prefix is stripped.
-    """
-    name = model_id.strip()
-    if name.startswith(_MODEL_PREFIX):
-        name = name[len(_MODEL_PREFIX) :]
-    return name or _DEFAULT_MODEL
 
 
 def _usage_of(result: Any) -> Usage:
@@ -125,7 +85,7 @@ class ClaudeCodeChatModel:
         except ImportError as exc:
             raise MissingExtraError("claude-code", package="claude-agent-sdk") from exc
         self.model_id = model_id
-        self._model = _sdk_model(model_id)
+        self._model = sdk_model(model_id)
         self.capabilities = ChatCapabilities(
             native_structured=True,
             tool_calls=False,
@@ -237,7 +197,7 @@ class ClaudeCodeChatModel:
                     final = message
             return final
 
-        loop = _background_loop()
+        loop = background_loop()
         future = asyncio.run_coroutine_threadsafe(_drive(), loop)
         try:
             result = future.result(timeout=timeout_s)

@@ -675,6 +675,13 @@ def resolve_search() -> SearchProvider | None:
         from metalworks.search.adapters.firecrawl import FirecrawlSearch
 
         return FirecrawlSearch()
+    # Keyless search floor: no external search key, but the Claude Agent SDK + CLI
+    # are present → search the web on the user's Claude Code login (the search
+    # analogue of the keyless chat floor). Any search key above still wins.
+    if _claude_code_available():
+        from metalworks.search.adapters.claude_code import ClaudeCodeSearch
+
+        return ClaudeCodeSearch()
     return None
 
 
