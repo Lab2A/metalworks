@@ -213,6 +213,39 @@ def candidate_specs_map() -> dict[str, Any]:
     return {s.source_id: s for s in candidate_specs()}
 
 
+def test_web_skip_caveat_omits_web_when_search_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`web` is the agentic corpus connector; when a SearchProvider runs web research
+    anyway (incl. the keyless claude-code floor), the caveat must not name `web` as
+    'skipped' — but the structured `skipped` field still records it."""
+    import dataclasses
+
+    for key in ("EXA_API_KEY", "TAVILY_API_KEY", "PARALLEL_API_KEY", "FIRECRAWL_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    chat = FakeChatModel()
+    chat.script(_RankingOutput, _ranking("reddit"))
+    base = _deps(chat)
+
+    # No search provider: web is a missing-key source, so the caveat names it.
+    no_search = select_sources(base, brief=_brief())
+    assert no_search.caveat is not None and "web" in no_search.caveat
+    assert any(s.source_id == "web" for s in no_search.skipped)
+
+    # A search provider is resolved (e.g. the keyless claude-code floor) → web
+    # research runs via the web stream, so the caveat must NOT name `web`.
+    class _FakeSearch:
+        provider_id = "claude-code"
+        protocol_version = "1.0"
+
+        def search(self, *, query: str, max_results: int = 10, recency_days: int | None = None):
+            return []
+
+    chat.script(_RankingOutput, _ranking("reddit"))
+    with_search = dataclasses.replace(base, search=_FakeSearch())  # type: ignore[arg-type]
+    sel = select_sources(with_search, brief=_brief())
+    assert sel.caveat is None or "web" not in sel.caveat
+    assert any(s.source_id == "web" for s in sel.skipped)  # still in the structured field
+
+
 # ── pre-flight "skipped (no key)" line from specs ────────────────────────────
 
 
