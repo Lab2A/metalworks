@@ -23,7 +23,7 @@ report's.) This is the report every other step runs on, so do it first.
 ```python Python
 from metalworks import Metalworks
 
-mw = Metalworks()                       # picks up your provider key from the env
+mw = Metalworks()                       # provider key from the env, or keyless via Claude Code login
 research = mw.research(
     "an affordable, jitter-free focus supplement for developers",
     subreddits=["Nootropics", "Supplements"],   # omit to let it pick

@@ -136,6 +136,15 @@ except ImportError as exc:
 
 See [docs/custom-chatmodel.md](docs/custom-chatmodel.md) for a worked example.
 
+**Keyless "floor" providers.** `claude-code` chat (`llm/adapters/claude_code.py`) and search
+(`search/adapters/claude_code.py`) are *floors*: `config.resolve_chat` / `config.resolve_search`
+fall back to them — instead of raising `MissingKeyError` / returning `None` — only when no
+key/ref is configured and `claude_code_available()` is true (the `claude-agent-sdk` extra + the
+`claude` CLI). They use the ambient Claude Code login, read no env key, and share one async→sync
+event loop via `llm/adapters/_claude_code_runtime.py` (the Agent SDK is async-only; the protocols
+are sync). A floor goes at the *end* of its resolver, after every keyed path. Mirror this if you
+add another keyless backend.
+
 ## Adding a source connector
 
 A *source* is where research reads demand from. It comes in one of **three lanes**:

@@ -10,8 +10,11 @@ command that needs it.
 
 Secrets come from the **environment only** — never the config file. The chat
 provider is auto-resolved by which key is present (`ANTHROPIC_API_KEY` >
-`OPENAI_API_KEY` > `GOOGLE_API_KEY`/`GEMINI_API_KEY`). Commands that call a model
-are flagged **(chat key)** below; the rest are **zero-key**.
+`OPENAI_API_KEY` > `GOOGLE_API_KEY`/`GEMINI_API_KEY`), then the keyless
+**`claude-code`** floor when `metalworks[claude-code]` is installed and no key is set.
+Commands flagged **(chat key)** below need a model — which now includes the keyless
+Claude Code login; the rest are **zero-key**. See [Run on your Claude Code
+login](/docs/configuration#run-on-your-claude-code-login-no-api-key).
 
 ## Top-level commands
 

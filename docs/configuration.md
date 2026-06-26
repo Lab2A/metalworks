@@ -37,8 +37,10 @@ With no `model`, the provider is taken from the first key present, in order:
 Anthropic, OpenAI, Google. So `Metalworks()` with only `OPENAI_API_KEY` set uses
 OpenAI. If none of those is set, a lone `OPENROUTER_API_KEY` is the recognized
 single-key fallback — `Metalworks()` then talks to OpenRouter's OpenAI-compatible
-endpoint (so one key reaches many models). A native key always wins over it. You
-can also pin a default in `~/.config/metalworks/metalworks.toml`:
+endpoint (so one key reaches many models). A native key always wins over it. And
+with **no key at all**, if `metalworks[claude-code]` is installed, the `claude-code`
+login is the ultimate fallback (the keyless floor — see below). You can also pin a
+default in `~/.config/metalworks/metalworks.toml`:
 
 ```toml
 provider = "anthropic"

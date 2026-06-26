@@ -16,8 +16,9 @@ description: "A complete internals reference for metalworks — the contract lay
 
 ## 0. What metalworks is, in one breath
 
-Give it one sentence about a product idea. It reads **real Reddit conversations** (plus
-optional web research), tells you whether people actually want it, and turns that into the
+Give it one sentence about a product idea. It reads **real conversations across the web**
+(Reddit, Hacker News, forums, plus optional web research), tells you whether people actually
+want it, and turns that into the
 things you need to launch: positioning, the competitors to beat, a design system, a logo, a
 build spec, and launch copy. **Every demand claim links back to a real
 comment you can click. Anything it cannot back with a real quote, it drops.**

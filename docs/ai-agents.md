@@ -19,7 +19,7 @@ the reference page for your path above.
 
 ```python
 from metalworks import Metalworks
-mw = Metalworks()                       # provider inferred from env keys
+mw = Metalworks()                       # provider inferred from env keys (or your Claude Code login)
 ```
 
 - `mw.research(question, subreddits=[...]) -> Research` — demand research (the `DemandReport` is on `.demand`).
@@ -27,8 +27,10 @@ mw = Metalworks()                       # provider inferred from env keys
 - `mw.discovery.run / filter / generate` — discovery loop + building blocks.
 
 Construction never raises; a `MissingKeyError` (with a `fix` string) surfaces only when a
-call needs a key. Every error carries `error_code`, `message`, `fix`, and `docs_url` — relay
-the `fix` verbatim.
+call needs a key. With `metalworks[claude-code]` installed and no provider key set, the chat
+model falls back to your Claude Code login — so a call that would raise `MissingKeyError`
+runs keyless instead. Every error carries `error_code`, `message`, `fix`, and `docs_url` —
+relay the `fix` verbatim.
 
 ## MCP tools (the language-agnostic surface)
 
