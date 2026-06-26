@@ -668,8 +668,18 @@ def select_sources(
             floor,
         )
     elif skipped:
-        names = ", ".join(s.source_id for s in skipped)
-        caveat = f"Some sources were skipped for missing keys: {names}."
+        # `web` here is the agentic *corpus* connector (needs a key). When a
+        # SearchProvider is resolved — including the keyless claude-code floor —
+        # web RESEARCH still runs via the web stream and the report carries
+        # web_findings, so naming `web` in a "skipped" caveat misleads the reader.
+        # Drop it from the user-facing names when search is active; the structured
+        # `skipped` field below still records it.
+        caveat_skips = skipped
+        if deps.search is not None:
+            caveat_skips = [s for s in skipped if s.source_id != "web"]
+        if caveat_skips:
+            names = ", ".join(s.source_id for s in caveat_skips)
+            caveat = f"Some sources were skipped for missing keys: {names}."
 
     rationale = (
         f"Selected {len(selected)} reachable source(s) for the brief"

@@ -8,6 +8,13 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+### Fixed
+- **The "sources skipped for missing keys" caveat no longer names `web` when web research actually
+  ran.** With a `SearchProvider` resolved (including the keyless `claude-code` floor), the web stream
+  produces `web_findings`, so listing the agentic `web` *corpus* connector as "skipped" in the
+  report caveat contradicted the findings sitting right there. `web` is now dropped from the
+  user-facing caveat when search is active (still recorded in `source_selection.skipped`).
+
 ### Added
 - **Run on your Claude Code login — no API key (`metalworks[claude-code]`).** A new `claude-code`
   provider (a `ClaudeCodeChatModel` over the Claude Agent SDK) runs completions through the bundled
