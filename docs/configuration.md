@@ -59,6 +59,34 @@ METALWORKS_MODEL=openai/gpt-5 metalworks research ideate "..."        # everywhe
 Precedence: explicit `model=` / `--model` ref > `METALWORKS_MODEL` env > config file > first
 present key.
 
+## Run on your Claude Code login (no API key)
+
+If you already use **Claude Code**, metalworks can run on that login with **no API key** — this
+is the **keyless chat floor**. Install the extra (it bundles the `claude` CLI; no Node):
+
+```bash
+pip install "metalworks[claude-code]"
+```
+
+With the extra installed and nothing else configured (no provider key, no `model` ref, no
+`METALWORKS_MODEL`), `resolve_chat()` falls back to the `claude-code` provider — the chat analogue
+of how embeddings fall back to the local model. It runs through the **Claude Agent SDK**, using the
+machine's Claude Code session (`claude` login / `CLAUDE_CODE_OAUTH_TOKEN`). Select a tier with a ref:
+
+```bash
+metalworks research run -q "..." --model claude-code/sonnet   # or claude-code/opus, claude-code/haiku
+```
+
+Honest trade-offs:
+
+- **Any explicit key/ref wins.** The floor only engages when nothing else is configured, so adding a
+  provider key later silently takes over — set `ANTHROPIC_API_KEY` (etc.) to switch back.
+- **It spawns the bundled `claude` CLI per call (~5–7s/call)** — the keyless *convenience* path, not
+  the fast one. A configured API key is faster for a many-call research run.
+- **It uses your individual Claude Code subscription.** Anthropic restricts offering claude.ai login
+  in distributed products; this is intended for your own local/individual use, not for shipping a
+  multi-user service on one subscription.
+
 ## LLM call timeout (reasoning models)
 
 Each LLM call has a per-call timeout budget, default **300s**. The OpenAI/compatible path
