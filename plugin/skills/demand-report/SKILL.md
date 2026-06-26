@@ -1,6 +1,6 @@
 ---
 name: demand-report
-description: Produce a demand report for a product idea from real Reddit conversations. Use when the user wants to validate an idea, gauge demand, find unmet needs, or understand what consumers say about a category. Works with no API keys (sampled corpus + synthesis here) or with an LLM key (the full clustered pipeline).
+description: Produce a demand report for a product idea from real conversations across the web (Reddit, Hacker News, forums, and more). Use when the user wants to validate an idea, gauge demand, find unmet needs, or understand what consumers say about a category. Works with an LLM key (the full clustered pipeline), keyless on your Claude Code login (install metalworks[claude-code] — full pipeline, no key), or fully zero-setup (sampled corpus + synthesis here).
 ---
 
 ## Preamble (run first)
@@ -11,6 +11,12 @@ to the user in one line and help them resolve it (install the missing extra/key,
 or `pip install -U metalworks`) before continuing. Skip only if the user has
 already passed preflight this session.
 
+**No provider key? You're in Claude Code — run keyless.** If preflight shows no chat
+key but `claude-code` as the resolved provider, the **full** clustered pipeline runs
+keyless on the user's Claude Code login (web research included). If `metalworks[claude-code]`
+isn't installed, offer `pip install "metalworks[claude-code]"` as the no-key path before
+falling back to the sampled here-synthesis route. It's slower (~5–7s/LLM call) but needs no key.
+
 **Read the reference; never reverse-engineer the source.** The moment you need to know how
 metalworks behaves — provider/model resolution, which source/reader runs, config precedence,
 an error you hit, or the async run loop — **STOP and read `docs/operating-metalworks.md`
@@ -19,7 +25,7 @@ do not derive behavior from source. (Full docs: https://metalworks.lab2a.ai/docs
 long-running run, poll status with the Monitor tool or a bounded loop — never a blind `sleep`.
 
 You are running the metalworks demand-report flow. The goal is a report grounded
-in real Reddit conversations, never in your own assumptions.
+in real conversations across the web, never in your own assumptions.
 
 ## Step 1: Frame the question
 

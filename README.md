@@ -2,17 +2,18 @@
 
 **Go from a startup idea to launch, grounded in real demand.**
 
-Give metalworks one sentence about what you want to build. It reads real Reddit
-conversations to tell you whether people actually want it, then turns that into
-the things you need to launch: your positioning, the competitors to beat, a
-design system, a build plan for your coding agent, and launch copy. **Every claim
-links back to a real comment you can click — nothing is invented.**
+Give metalworks one sentence about what you want to build. It reads real
+conversations across the web — Reddit, Hacker News, forums, Q&A, or your own
+data — to tell you whether people actually want it, then turns that into the
+things you need to launch: your positioning, the competitors to beat, a design
+system, a build plan for your coding agent, and launch copy. **Every claim links
+back to a real quote you can click — nothing is invented.**
 
 A Python library (also a CLI, an MCP server, and a Claude Code plugin). MIT
 licensed and built to be embedded — every layer (LLM, search, embeddings,
 storage, data source) is a swappable protocol.
 
-> **Status: pre-release (0.0.4).** APIs are unstable below 1.0. The stable
+> **Status: pre-release (0.4.0).** APIs are unstable below 1.0. The stable
 > surface is the `Metalworks` facade, the `metalworks.contract` Pydantic models,
 > and the MCP tool contracts — everything else may change in any 0.x release.
 > Everything described in this README runs today.
@@ -30,9 +31,20 @@ pip install "metalworks[openai,research]"   # or [google,research], [anthropic,r
 export OPENAI_API_KEY=...                    # or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
 ```
 
-Embeddings need no separate key: with a Google or OpenAI key metalworks uses theirs, otherwise
+Or **run keyless on your Claude Code login** — no provider key at all:
+
+```bash
+pip install "metalworks[claude-code,research]"   # bundles the `claude` CLI; no env var to set
+```
+
+With `[claude-code]` installed and no key configured, the chat model **and** web search fall back to
+your Claude Code session (the keyless "floor"). It's the no-setup path for local/individual use — it
+spawns the `claude` CLI per call (~5–7s each), so a configured key is faster for big runs, and any
+explicit key/ref still wins.
+
+Embeddings need no separate key either: with a Google or OpenAI key metalworks uses theirs, otherwise
 it falls back to a small local model (`fastembed`, bundled with `[research]`, downloaded once).
-So a single chat key — Anthropic, OpenRouter, anything — gets you a full run.
+So one chat key — Anthropic, OpenRouter, anything — *or zero keys via Claude Code* — gets you a full run.
 `metalworks models warm` pre-downloads the local model.
 
 Prefer Vertex AI over an API key? Set `GOOGLE_GENAI_USE_VERTEXAI=true` plus
@@ -56,11 +68,12 @@ Anything metalworks can't back with a real quote, it drops. See
 
 The `Metalworks` facade is the easy path over `run_research` / `run_discovery`
 and the protocols — drop down to those whenever you want more control. Submissions
-come from the Hugging Face `open-index/arctic` Parquet mirror; comments from the
-live Arctic Shift API. Set `HF_TOKEN` for windows beyond a few months. To read
-the submission corpus from a Supabase Storage bucket instead (no HF runtime
-dependency), install `metalworks[supabase]` and set `ARCTIC_SHIFT_SOURCE=mirror`,
-or [bring your own corpus](https://metalworks.lab2a.ai/docs/custom-corpus) to skip Arctic Shift.
+and comments both come from the **live Arctic Shift API** by default — current data,
+keyless, on core `httpx`. Opt into a bulk/offline tier with `ARCTIC_SHIFT_SOURCE`: `hf`
+reads the Hugging Face `open-index/arctic` Parquet mirror (`metalworks[arctic]`, reads
+`HF_TOKEN` to lift the public rate limit), `mirror` reads a Supabase Storage bucket
+(`metalworks[supabase]`). Or [bring your own corpus](https://metalworks.lab2a.ai/docs/custom-corpus)
+to skip Arctic Shift entirely.
 
 ## Extras
 
@@ -80,6 +93,7 @@ pip install "metalworks[all]"
 | `anthropic` | `anthropic` | Claude `ChatModel` adapter |
 | `openai` | `openai` | OpenAI `ChatModel` + embedding adapters |
 | `google` | `google-genai` | Gemini `ChatModel` (native grounding) + embeddings |
+| `claude-code` | `claude-agent-sdk` | **Run keyless on your Claude Code login** (bundled `claude` CLI) — the chat *and* web-search floors when no provider key is set |
 | `litellm` | `litellm` | Optional long-tail provider routing |
 | `reddit` | `redditwarp`, `cryptography` | Reddit search, OAuth, posting, token encryption |
 | `arctic` | `duckdb` | Read Arctic Shift Parquet shards (submissions corpus) |
@@ -87,6 +101,8 @@ pip install "metalworks[all]"
 | `supabase` | `arctic` + `supabase` | `ArcticMirrorReader` — Arctic corpus from a Supabase Storage bucket (`ARCTIC_SHIFT_SOURCE=mirror`) |
 | `exa` | `exa-py` | Exa `SearchProvider` adapter |
 | `tavily` | `tavily-python` | Tavily `SearchProvider` adapter |
+| `parallel` | `parallel-web` | Parallel `SearchProvider` / agentic discovery |
+| `firecrawl` | `firecrawl-py` | Firecrawl search + hosted page rendering |
 | `browser` | `playwright` | Owned headless Chromium `PageRenderer` (competitor teardowns, design review). **Post-install step:** `metalworks browser install`. On a server, `FIRECRAWL_API_KEY` renders without a local browser. |
 | `mcp` | `mcp[cli]` | MCP server surface |
 | `all` | everything above | Kitchen sink |
@@ -103,7 +119,7 @@ default. The protocols are the seam your code and the pipeline speak through:
 - `ChatModel` — `complete_text` / `complete_structured`, model bound at adapter
   construction. `GroundedChatModel` adds model-native web grounding with full
   provenance (chunks plus character-offset supports).
-- `SearchProvider` — external web search (Exa, Tavily).
+- `SearchProvider` — external web search (Exa, Tavily, Parallel, Firecrawl), or keyless via Claude Code.
 - `EmbeddingProvider` — embeddings with a hard index-identity guard.
 - The typed repos (`CorpusRepo`, `BriefRepo`, `RunRepo`, `AccountRepo`,
   `OpportunityRepo`, `InboxRepo`) are the storage protocol. `MemoryStores` and

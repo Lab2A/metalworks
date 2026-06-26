@@ -33,7 +33,8 @@ validated demand.
    harness: `metalworks build init <report_id> --dest ./build --surface auto
    --base <stack-hint>`. Via MCP, call the `build_spec` tool with the `report_id`
    (optionally `surface` and `stack`) to get the `BuildSpec` JSON without writing
-   files. It needs a chat + embedding key (Tier 2). Leave `--surface auto` (the
+   files. It needs a chat + embedding provider (Tier 2) — a configured key, or the
+   keyless Claude Code login when `metalworks[claude-code]` is installed. Leave `--surface auto` (the
    default) to let the spec pick the surface and explain why; pin it (e.g.
    `--surface cli`) when the user already knows the build shape.
 

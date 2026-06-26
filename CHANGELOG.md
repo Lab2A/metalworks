@@ -8,6 +8,14 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-25
+
+**Run metalworks fully keyless on your Claude Code login.** This release adds a `claude-code` chat
+provider and a `claude-code` web-search provider, both as keyless "floors" — so with
+`metalworks[claude-code]` installed and no API/search key set, a full demand + web report runs on
+your Claude Code session, no keys at all. Also folds in the 0.3.1–0.3.3 reliability run (streaming
++ honest LLM timeout, embeddings/setup robustness, Arctic `422 Timeout` retry + best-effort pull).
+
 ### Fixed
 - **The "sources skipped for missing keys" caveat no longer names `web` when web research actually
   ran.** With a `SearchProvider` resolved (including the keyless `claude-code` floor), the web stream

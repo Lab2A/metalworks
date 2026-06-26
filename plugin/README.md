@@ -32,7 +32,7 @@ validation-loop skills (`/ideate`, `/go-no-go`, `/validate`).
 
 ## Skills
 
-- **/demand-report `<idea>`** — a demand report from real Reddit conversations.
+- **/demand-report `<idea>`** — a demand report from real conversations across the web (Reddit, Hacker News, forums, …).
   Runs with no API key (sampled corpus + synthesis) or the full clustered
   pipeline when an LLM key is set.
 - **/find-threads `<product>`** — find live threads worth a genuine reply.

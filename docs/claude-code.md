@@ -33,7 +33,9 @@ your session opens), so the first real command doesn't pay the one-time install 
 
 The data tools run with **no API key**. The research and synthesis tools use whatever provider
 key is in your environment (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` — first
-present wins). A few tools also need an embeddings key.
+present wins) — or, with `metalworks[claude-code]` installed and no key set, they run **keyless on
+your Claude Code login** (the session you're already in). The embeddings a few tools need likewise
+default to a keyless local model. So inside Claude Code, the whole pipeline can run with zero keys.
 
 The tools fall into four tiers by what they need: **zero-key** data tools (Reddit + corpus
 reads, compliance lint, the corpus-derived data report), **chat-key** synthesis tools (demand
@@ -49,7 +51,7 @@ Each command runs one step of the [end-to-end workflow](/docs/walkthrough). Star
 
 ### Research
 
-- **`/demand-report <idea>`** — is there real demand? Runs the pipeline (`research_plan_brief` → `research_start` → poll `research_status` → `research_result`), or a zero-key Arctic-corpus path if no key is set. Returns a go/no-go plus ranked demand clusters with distinct-author counts and verbatim, permalinked quotes. Research only — never posts.
+- **`/demand-report <idea>`** — is there real demand? Runs the full pipeline (`research_plan_brief` → `research_start` → poll `research_status` → `research_result`) on your provider key — or **keyless on your Claude Code login** when `metalworks[claude-code]` is installed and no key is set. Returns a go/no-go plus ranked demand clusters with distinct-author counts and verbatim, permalinked quotes. Research only — never posts.
 - **`/position-wedge`** — turns the report into a Dunford wedge (competitive alternative, unique attribute, value, beachhead, category) + a price band. Calls `positioning_from_report`. Every slot resolves to a real quote; if nothing defensible survives, it says so rather than inventing one.
 
 ### Validation loop

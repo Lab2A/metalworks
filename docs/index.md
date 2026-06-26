@@ -23,6 +23,13 @@ pip install "metalworks[research,openai]"     # or [research,google], [research,
 export OPENAI_API_KEY=...                      # or ANTHROPIC_API_KEY / GOOGLE_API_KEY
 ```
 
+Or **run keyless on your Claude Code login** — no key at all (the chat model and web search use
+your Claude Code session):
+
+```bash
+pip install "metalworks[research,claude-code]"   # then just run; nothing to export
+```
+
 <CodeGroup>
 
 ```text Claude Code
@@ -68,7 +75,7 @@ New here? Walk one idea from start to finish in the [end-to-end walkthrough](/do
 
 ## Why it's not just another AI tool
 
-Most "AI market research" makes up plausible-sounding answers. metalworks doesn't. It reads
+Most AI research tools make up plausible-sounding answers. metalworks doesn't. It reads
 real conversations across real sources, and **anything it can't back with an actual quote, it
 drops.** When the demand isn't there, it tells you — instead of inventing an opportunity.
 That's what makes the output safe to act on. See [why you can trust the output](/docs/how-it-works).

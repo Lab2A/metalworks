@@ -25,6 +25,12 @@ an OpenAI or Google key, metalworks uses *its* embeddings automatically (higher 
 download). Either way, you never need a second key.
 </Note>
 
+<Note>
+**No API key? Run keyless on your Claude Code login.** Install `metalworks[research,claude-code]`
+and run with no key set — the chat model *and* web search fall back to your Claude Code session
+(the bundled `claude` CLI). See [Run on your Claude Code login](/docs/configuration#run-on-your-claude-code-login-no-api-key).
+</Note>
+
 ## Pick your extras
 
 Install only what your workflow needs — combine them like `"metalworks[research,reddit]"`.
@@ -36,6 +42,7 @@ Install only what your workflow needs — combine them like `"metalworks[researc
 | `arctic` | Read the historical Reddit corpus directly (a subset of `research`). |
 | `mcp` | Run the MCP server (`metalworks mcp serve`). |
 | `anthropic` / `openai` / `google` | Use that provider's models. Any one is enough (see the note above). |
+| `claude-code` | **Run keyless on your Claude Code login** — no provider key needed. The chat model and web search fall back to your Claude Code session when no other key is set. Needs the `claude` CLI on your PATH (bundled with the extra). |
 | `exa` / `tavily` | Add live web search to ground findings against the web. |
 | `browser` | An owned headless Chromium for competitor teardowns and design review. **One post-install step:** `metalworks browser install` (downloads Chromium). On a server where Chromium is painful, set `FIRECRAWL_API_KEY` to render without a local browser. |
 | `all` | Everything above. |

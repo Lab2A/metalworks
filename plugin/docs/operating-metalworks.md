@@ -12,7 +12,15 @@ Resolution precedence (highest first):
 explicit `--model` / `model=` ref **>** `METALWORKS_MODEL` env **>** a config `model`
 that is a routable ref **>** config `provider` (+ `model`) **>** first present API key
 (Anthropic → OpenAI → Google) **>** Vertex (if `GOOGLE_GENAI_USE_VERTEXAI` is on) **>**
-a lone `OPENROUTER_API_KEY`.
+a lone `OPENROUTER_API_KEY` **>** the keyless **`claude-code`** floor (if
+`metalworks[claude-code]` is installed and the `claude` CLI is present).
+
+**Keyless on Claude Code (plugin users).** If you're in Claude Code with no API key,
+install `metalworks[claude-code]` and run — with nothing else configured, the pipeline
+falls back to the `claude-code` provider (your Claude Code login is the chat backend),
+and web research runs keyless via Claude Code's `WebSearch`. Any explicit key/ref still
+wins. Trade-off: it spawns the `claude` CLI per call (~5–7s each) — slower than a
+configured key, but zero setup.
 
 - A **ref** is `provider/id` or `provider:id`. An unknown vendor namespace routes to
   OpenRouter. So `deepseek/deepseek-v4-flash` → OpenRouter, `openai/gpt-5` → OpenAI
@@ -59,4 +67,4 @@ flags this as an error.
 | "defaulting to a Google model" / `MissingExtraError: google` | the Vertex gotcha | `METALWORKS_MODEL=<provider/model>` + `GOOGLE_GENAI_USE_VERTEXAI=false`, or install `[google]` |
 | HTTP **429** on the post pull | you're on the `hf` reader (HF Parquet) | use the live default (unset `ARCTIC_SHIFT_SOURCE` or set `api`), or set `HF_TOKEN`, or tighten the month window |
 | config `model` "still resolves Gemini" | pre-0.2.1, a config `model` needed a `provider` too | upgrade, set `provider` too, or use `METALWORKS_MODEL` |
-| `missing_key` envelope from a tool | no LLM provider key resolved | set a provider key (or `METALWORKS_MODEL` + its key); embeddings can stay keyless via `[research]` |
+| `missing_key` envelope from a tool | no LLM provider key resolved | set a provider key (or `METALWORKS_MODEL` + its key); **or, inside Claude Code, install `metalworks[claude-code]` to run keyless on your login**; embeddings can stay keyless via `[research]` |

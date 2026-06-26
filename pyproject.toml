@@ -4,15 +4,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "metalworks"
-version = "0.3.3"
-description = "Open-source marketing research and Reddit engagement library — demand reports from real conversations, usable as a Python library, CLI, MCP server, or Claude Code plugin."
+version = "0.4.0"
+description = "Open-source research engine for builders: turn a startup idea into a launch plan, grounded in real demand. metalworks reads real conversations across the web — every claim backed by a real quote, nothing invented. Python library, CLI, MCP server, or Claude Code plugin; runs keyless on your Claude Code login, or with any provider key."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "Lab2A", email = "hello@lab2a.dev" }]
-keywords = ["reddit", "marketing", "research", "demand", "mcp", "agents", "claude"]
+keywords = [
+  "research", "demand", "validation", "startups", "founders", "reddit",
+  "mcp", "agents", "claude", "claude-code", "keyless", "anthropic", "openai", "openrouter",
+]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",

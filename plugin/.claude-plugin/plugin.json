@@ -1,8 +1,8 @@
 {
   "name": "metalworks",
   "displayName": "metalworks",
-  "description": "Reddit demand reports, thread discovery, and gated reply drafting. The data tools run with no API keys; the pipeline tools use whatever provider key you have.",
-  "version": "0.3.3",
+  "description": "Turn a startup idea into a launch plan, grounded in real demand: demand reports from real conversations across the web (every claim backed by a real quote), plus positioning, competitors, a build spec, and gated Reddit reply drafting. Runs keyless on your Claude Code login when no key is set (install metalworks[claude-code]), or with any provider key.",
+  "version": "0.4.0",
   "author": {
     "name": "Lab2A",
     "email": "hello@lab2a.dev"
@@ -10,5 +10,5 @@
   "homepage": "https://github.com/Lab2A/metalworks",
   "repository": "https://github.com/Lab2A/metalworks",
   "license": "MIT",
-  "keywords": ["reddit", "marketing", "research", "demand", "mcp"]
+  "keywords": ["reddit", "marketing", "research", "demand", "mcp", "claude-code", "keyless"]
 }

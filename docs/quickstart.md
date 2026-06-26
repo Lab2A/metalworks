@@ -3,7 +3,7 @@ title: "Quickstart"
 description: "Install metalworks with one provider key and get a real demand report — a go/no-go plus the needs people actually voiced, each backed by a real quote — in about five minutes."
 ---
 
-## 1. Install + set a key
+## 1. Install + set a key (or go keyless)
 
 Install metalworks with a provider SDK, then set **one** key — any provider works:
 
@@ -11,6 +11,10 @@ Install metalworks with a provider SDK, then set **one** key — any provider wo
 pip install "metalworks[research,openai]"     # or [research,google], [research,anthropic]
 export OPENAI_API_KEY=...                      # or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
 ```
+
+No API key? **Run keyless on your Claude Code login** instead — install
+`metalworks[research,claude-code]` and run with nothing set; the chat model and web search use
+your Claude Code session (slower, but zero setup).
 
 Embeddings need no separate key: a Google or OpenAI key is used when present, otherwise a
 small local model (bundled with `[research]`) is downloaded once — so a single chat key,

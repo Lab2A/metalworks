@@ -72,3 +72,10 @@ Bind your model anywhere a `ChatModel` is expected, including `ResearchDeps`:
 ```python
 deps = ResearchDeps(chat=MyChatModel(), embeddings=..., corpus=..., reader=...)
 ```
+
+For complete, shipped adapters to model yours on, see the source: the native
+[`anthropic`](https://github.com/Lab2A/metalworks/blob/main/src/metalworks/llm/adapters/anthropic.py)
+and [`openai`](https://github.com/Lab2A/metalworks/blob/main/src/metalworks/llm/adapters/openai.py)
+adapters, or the keyless
+[`claude_code`](https://github.com/Lab2A/metalworks/blob/main/src/metalworks/llm/adapters/claude_code.py)
+adapter (which drives the Claude Agent SDK and bridges its async API to the sync protocol).
