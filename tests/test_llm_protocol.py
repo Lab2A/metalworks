@@ -81,21 +81,30 @@ def test_validate_payload_wraps_validation_errors() -> None:
 def test_prompt_embedded_ladder_retries_once_with_feedback() -> None:
     responses = iter(["not json at all", '{"keep": false, "reason": "fixed on retry"}'])
     prompts: list[str] = []
+    budgets: list[int] = []
 
-    def complete(prompt: str) -> str:
+    def complete(prompt: str, max_tokens: int) -> str:
         prompts.append(prompt)
+        budgets.append(max_tokens)
         return next(responses)
 
     out = prompt_embedded_structured(
-        model_id="m", output_model=Verdict, complete_text=complete, user="judge this"
+        model_id="m",
+        output_model=Verdict,
+        complete_text=complete,
+        user="judge this",
+        max_tokens=1024,
     )
     assert out.reason == "fixed on retry"
     assert len(prompts) == 2
     assert "previous response was invalid" in prompts[1]
+    # The retry asks for a BIGGER token budget — a truncated reasoning-model
+    # response needs more room, not the same room re-tried.
+    assert budgets == [1024, 8192]
 
 
 def test_prompt_embedded_ladder_fails_typed_after_retry() -> None:
-    def complete(prompt: str) -> str:
+    def complete(prompt: str, max_tokens: int) -> str:
         return "still not json"
 
     with pytest.raises(StructuredOutputError):

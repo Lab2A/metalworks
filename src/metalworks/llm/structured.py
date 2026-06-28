@@ -85,17 +85,33 @@ def extract_first_json_object(text: str) -> str:
     raise ValueError("unbalanced JSON in model output")
 
 
+# Retry budget: the dominant tier-3 failure is a reasoning model burying the
+# JSON under hidden thinking tokens and truncating mid-string — a same-size
+# retry just reproduces it. So the retry asks for MORE room, not the same room.
+_RETRY_FLOOR_TOKENS = 8192
+_RETRY_CAP_TOKENS = 32768
+
+
+def _escalated(max_tokens: int) -> int:
+    """A bigger token budget for the retry (≥ the floor, ≤ the cap)."""
+    return min(_RETRY_CAP_TOKENS, max(max_tokens * 2, _RETRY_FLOOR_TOKENS))
+
+
 def prompt_embedded_structured(
     *,
     model_id: str,
     output_model: type[T],
-    complete_text: Callable[[str], str],
+    complete_text: Callable[[str, int], str],
     user: str,
+    max_tokens: int = 1024,
 ) -> T:
-    """Ladder tier 3: schema-in-prompt with one validation-feedback retry.
+    """Ladder tier 3: schema-in-prompt with one feedback + bigger-budget retry.
 
-    `complete_text` is a single-arg closure over the adapter's text
-    completion (the adapter binds system/max_tokens/etc.).
+    `complete_text(ask, max_tokens)` is a closure over the adapter's text
+    completion (the adapter binds system/temperature/timeout). The retry both
+    appends the validation error AND raises the token budget, because a
+    truncated JSON (the common reasoning-model failure) needs a larger window,
+    not the same one re-tried.
     """
     schema = json.dumps(output_model.model_json_schema(), indent=None)
     ask = (
@@ -103,7 +119,7 @@ def prompt_embedded_structured(
         "Respond with ONLY a JSON object matching this JSON Schema — no prose, "
         f"no markdown fences:\n{schema}"
     )
-    text = complete_text(ask)
+    text = complete_text(ask, max_tokens)
     try:
         return validate_payload(model_id, output_model, extract_first_json_object(text))
     except (StructuredOutputError, ValueError) as first_error:
@@ -112,7 +128,7 @@ def prompt_embedded_structured(
             f"Your previous response was invalid: {first_error}\n"
             "Return ONLY the corrected JSON object."
         )
-        text = complete_text(retry_ask)
+        text = complete_text(retry_ask, _escalated(max_tokens))
         try:
             return validate_payload(model_id, output_model, extract_first_json_object(text))
         except ValueError as exc:

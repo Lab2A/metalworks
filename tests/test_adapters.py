@@ -849,6 +849,19 @@ def test_openai_read_timeout_uses_resolved_budget(monkeypatch: pytest.MonkeyPatc
     assert timeout.connect == 15.0
 
 
+def test_openai_stream_total_deadline_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The per-chunk read timeout can't catch a stream that keeps trickling but
+    # never finishes — an overall wall-clock deadline must. Drive time past the
+    # budget so the first chunk trips it (the triaging-stage hang).
+    import metalworks.llm.adapters.openai as oa
+
+    model, _ = _openai_with_chunks(monkeypatch, _delta_chunks("a", "b", "c"))
+    ticks = iter([0.0, 10_000.0, 10_001.0, 10_002.0, 10_003.0])
+    monkeypatch.setattr(oa.time, "monotonic", lambda: next(ticks))
+    with pytest.raises(TimeoutError, match="total budget"):
+        model.complete_text(system="s", user="u")
+
+
 def test_openai_read_timeout_defaults_to_llm_timeout_s(monkeypatch: pytest.MonkeyPatch) -> None:
     # No explicit timeout_s and no env knob → the 300s reasoning-safe default.
     model, client = _openai_with_chunks(monkeypatch, _delta_chunks("ok"))

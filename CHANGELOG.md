@@ -8,6 +8,28 @@ contracts may change in any release.
 
 ## [Unreleased]
 
+### Fixed
+- **The planner now fails loud instead of substituting a canned, off-topic brief.** When a
+  planner turn's structured-output call failed (e.g. a reasoning model truncating the JSON), the
+  brief planner silently fell back to a built-in canned decision and auto-selected its
+  "recommended" option — which sent the whole run off-topic (the classic failure: a
+  *supplement/nootropics* brief generated for an *auto-repair* idea). The canned option banks are
+  removed; a failed planner turn now raises a typed `PlannerError` (`error_code: planner_failed`)
+  that surfaces through the MCP/CLI/facade instead of quietly steering the research wrong.
+- **Reasoning models no longer silently truncate structured output.** The schema-in-prompt
+  structured ladder (used by OpenRouter and any compatible endpoint) retried a failed parse with the
+  *same* token budget — so a reasoning model that buried the JSON under hidden thinking tokens
+  truncated identically on the retry. The retry now also **raises the token budget** (≥8192, capped
+  at 32768), and the planner's own structured call asks for a generous budget up front, so a
+  reasoning model (DeepSeek-v4-flash, Gemini 3.x) gets room for thinking *and* the JSON.
+- **Streamed OpenAI/OpenRouter responses can no longer hang a run forever.** The httpx read timeout
+  on a streamed completion is only a *per-chunk* (gap-between-tokens) budget, so a stream that
+  trickles bytes without finishing — or a half-dead keep-alive socket — had no overall ceiling and
+  could stall a stage indefinitely (the triaging-stage hang). Streaming now enforces an **overall
+  wall-clock deadline** (4× the per-call timeout, floor 600s, scaled by `METALWORKS_LLM_TIMEOUT`);
+  exceeding it raises `TimeoutError` so the run fails cleanly and `research_resume` can pick up from
+  the last checkpoint instead of sitting at 0% CPU.
+
 ## [0.4.0] - 2026-06-25
 
 **Run metalworks fully keyless on your Claude Code login.** This release adds a `claude-code` chat

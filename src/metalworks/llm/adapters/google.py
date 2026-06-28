@@ -215,11 +215,11 @@ class GoogleChatModel:
                 raise
 
             # Schema rejected by the API — fall through to ladder tier 3.
-            def _text(ask: str) -> str:
+            def _text(ask: str, cap: int) -> str:
                 return self.complete_text(
                     system=system,
                     user=ask,
-                    max_tokens=max_tokens,
+                    max_tokens=cap,
                     temperature=temperature,
                     thinking_budget=thinking_budget,
                     timeout_s=timeout_s,
@@ -230,6 +230,7 @@ class GoogleChatModel:
                 output_model=output_model,
                 complete_text=_text,
                 user=user,
+                max_tokens=max_tokens,
             )
         self._emit("structured", _usage_of(response))
         payload: Any = getattr(response, "parsed", None)

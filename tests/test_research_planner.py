@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from metalworks.contract import ResearchBrief, TargetSubreddit
+from metalworks.errors import PlannerError
 from metalworks.llm import FakeChatModel
 from metalworks.research.deps import ResearchDeps
 from metalworks.research.planner import (
@@ -108,27 +109,26 @@ def test_provide_content_returns_scripted_brief() -> None:
     assert out.decision_id == "D1"
 
 
-def test_provide_content_falls_back_on_llm_failure() -> None:
-    # FakeChatModel with no script raises AssertionError -> fallback kicks in.
+def test_provide_content_raises_on_llm_failure() -> None:
+    # FakeChatModel with no script raises -> the planner must FAIL LOUD, never
+    # substitute a canned brief (an auto-selected default sends the run
+    # off-topic — the supplement-brief-for-auto-repair bug).
     chat = FakeChatModel()
     deps = _deps(chat)
     spec = find_question("D6")
     assert spec is not None
-    out = provide_content(deps, question_spec=spec, prompt="p", prior_answers={})
-    assert isinstance(out, DecisionBrief)
-    assert out.decision_id == "D6"
-    assert out.header == spec.header_chip
-    # Exactly one recommended option in the canned fallback.
-    assert sum(1 for o in out.options if o.is_recommended) == 1
+    with pytest.raises(PlannerError) as exc_info:
+        provide_content(deps, question_spec=spec, prompt="p", prior_answers={})
+    assert exc_info.value.decision_id == "D6"
+    assert exc_info.value.error_code == "planner_failed"
 
 
-def test_provide_content_fallback_covers_every_question() -> None:
-    chat = FakeChatModel()  # never scripted -> always falls back
+def test_provide_content_raises_for_every_question() -> None:
+    chat = FakeChatModel()  # never scripted -> every decision must raise, no silent path
     deps = _deps(chat)
     for q in QUESTIONS:
-        out = provide_content(deps, question_spec=q, prompt="p", prior_answers={})
-        assert out.decision_id == q.decision_id
-        assert out.multi_select == q.multi_select
+        with pytest.raises(PlannerError):
+            provide_content(deps, question_spec=q, prompt="p", prior_answers={})
 
 
 # ── subreddit picker ─────────────────────────────────────────────────────
