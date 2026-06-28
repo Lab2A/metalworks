@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import os
+import time
 from typing import Any, ClassVar, TypeVar
 
 from pydantic import BaseModel
@@ -57,7 +58,22 @@ def _supports_reasoning(model_id: str) -> bool:
     return model_id.startswith("o") or model_id.startswith("gpt-5")
 
 
-def _consume_stream(stream: Any) -> tuple[str, Usage, Any]:
+# Streaming makes the httpx read timeout a per-CHUNK budget (gap between
+# tokens), with NO ceiling on total wall-clock — a stream that trickles a byte
+# every few seconds, or a half-dead keep-alive socket, can hang a run forever
+# (the triaging-stage stall). This factor turns the per-call timeout into an
+# overall deadline too: the per-call budget covers time-to-first-token + each
+# gap, and N times it bounds the whole stream. METALWORKS_LLM_TIMEOUT scales both.
+_STREAM_TOTAL_FACTOR = 4.0
+_STREAM_TOTAL_FLOOR_S = 600.0
+
+
+def _stream_total_budget(timeout_s: float) -> float:
+    """Overall wall-clock ceiling for one streamed response."""
+    return max(_STREAM_TOTAL_FLOOR_S, timeout_s * _STREAM_TOTAL_FACTOR)
+
+
+def _consume_stream(stream: Any, *, total_budget_s: float) -> tuple[str, Usage, Any]:
     """Accumulate a streamed chat.completions response into (text, usage, last_chunk).
 
     Iterates delta chunks, concatenating ``chunk.choices[0].delta.content``
@@ -65,11 +81,24 @@ def _consume_stream(stream: Any) -> tuple[str, Usage, Any]:
     ``include_usage`` chunk (it carries ``.usage`` and an empty ``choices``
     list). The accumulated text equals the non-streamed message content for the
     same response — the streaming change is transparent to callers.
+
+    Raises :class:`TimeoutError` if the stream runs past ``total_budget_s`` of
+    wall-clock — the per-chunk httpx read timeout can't catch a stream that
+    keeps trickling but never finishes.
     """
     parts: list[str] = []
     usage = Usage()
     last_chunk: Any = None
+    deadline = time.monotonic() + total_budget_s
     for chunk in stream:
+        if time.monotonic() > deadline:
+            with contextlib.suppress(Exception):
+                stream.close()
+            raise TimeoutError(
+                f"OpenAI stream exceeded its {total_budget_s:.0f}s total budget "
+                "(model trickled tokens without completing); raise METALWORKS_LLM_TIMEOUT "
+                "if this model legitimately needs longer."
+            )
         last_chunk = chunk
         choices: list[Any] = list(getattr(chunk, "choices", None) or [])
         if choices:
@@ -168,7 +197,7 @@ class OpenAIChatModel:
                 stream_options={"include_usage": True},
                 **self._tuning_kwargs(temperature, thinking_budget),
             )
-            return _consume_stream(stream)
+            return _consume_stream(stream, total_budget_s=_stream_total_budget(budget))
 
         text, usage, last_chunk = with_backoff(_call, provider="OpenAI")
         self._emit("text", usage)
@@ -187,11 +216,11 @@ class OpenAIChatModel:
     ) -> T:
         budget = resolve_timeout_s(timeout_s)
 
-        def _text(ask: str) -> str:
+        def _text(ask: str, cap: int) -> str:
             return self.complete_text(
                 system=system,
                 user=ask,
-                max_tokens=max_tokens,
+                max_tokens=cap,
                 temperature=temperature,
                 thinking_budget=thinking_budget,
                 timeout_s=budget,
@@ -205,6 +234,7 @@ class OpenAIChatModel:
                 output_model=output_model,
                 complete_text=_text,
                 user=user,
+                max_tokens=max_tokens,
             )
         response_format = {
             "type": "json_schema",
@@ -229,7 +259,7 @@ class OpenAIChatModel:
                 stream_options={"include_usage": True},
                 **self._tuning_kwargs(temperature, thinking_budget),
             )
-            return _consume_stream(stream)
+            return _consume_stream(stream, total_budget_s=_stream_total_budget(budget))
 
         try:
             text, usage, _ = with_backoff(_call, provider="OpenAI")
@@ -240,6 +270,7 @@ class OpenAIChatModel:
                 output_model=output_model,
                 complete_text=_text,
                 user=user,
+                max_tokens=max_tokens,
             )
         self._emit("structured", usage)
         return validate_payload(self.model_id, output_model, text)

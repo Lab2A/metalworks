@@ -86,6 +86,27 @@ class StructuredOutputError(MetalworksError):
         )
 
 
+class PlannerError(MetalworksError):
+    """The brief planner could not get a valid decision from the model.
+
+    A planner turn that fails is a HARD stop — metalworks does NOT substitute a
+    canned default brief, because an auto-selected default silently steers the
+    whole run off-topic (the classic failure: a supplement/nootropics brief
+    generated for an auto-repair idea). The caller surfaces this instead of
+    proceeding on a fabricated answer.
+    """
+
+    error_code = "planner_failed"
+
+    def __init__(self, decision_id: str, detail: str):
+        self.decision_id = decision_id
+        super().__init__(
+            f"The planner could not generate decision {decision_id}: {detail}",
+            fix="Retry, or use a stronger chat model — a reasoning model can truncate the "
+            "planner's structured output; raise METALWORKS_LLM_TIMEOUT if it timed out.",
+        )
+
+
 class GroundingUnavailable(MetalworksError):
     """Model-native web grounding was requested but isn't available."""
 
